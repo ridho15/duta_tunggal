@@ -43,6 +43,9 @@ class DeliveryOrderFeatureTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Tes lama membuat DO tanpa stok; sejak Tahap 3 stok dipotong saat DO dibuat. Tunda pemotongan (perilaku sebelum Tahap 3).
+        \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+        $this->beforeApplicationDestroyed(fn () => \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false);
 
         // Create test data
         $this->user = User::create([

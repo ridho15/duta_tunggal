@@ -317,21 +317,15 @@ fi
 # Step 7: Clear & Rebuild Caches (Optimization)
 log_step "[7/8] Membersihkan & Membangun Ulang Cache Aplikasi"
 
-# 1. Jalankan upgrade Filament terlebih dahulu (agar reset cache bawaannya tidak menghapus cache yang baru dibangun)
-run_artisan filament:upgrade || true
-
-# 2. Bersihkan cache lama
+# 1. Bersihkan cache lama
 run_artisan optimize:clear
 
-# 3. Bangun cache Laravel
+# 2. Bangun cache Laravel
 run_artisan config:cache
 run_artisan route:cache
 run_artisan view:cache
 
-# 4. Bangun cache Filament 3
-run_artisan filament:optimize || true
-
-# 5. Restart worker queue
+# 3. Restart worker queue
 run_artisan queue:restart || true
 
 # 6. Pastikan permission folder storage & cache aman

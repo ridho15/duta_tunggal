@@ -260,20 +260,3 @@ it('[flag mati] approve SO stok kurang tetap lolos (perilaku lama) dan tidak dit
     expect($so->fresh()->status)->toBe('approved')->and($so->fresh()->is_backorder)->toBeFalse();
 });
 
-it('UI: aksi Setujui sebagai Backorder tampil di halaman SO hanya untuk penyetuju dan hanya saat stok kurang', function () {
-    $ctx = stkContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-    $short = bkoShortSo($ctx, 35);
-    $enough = bkoShortSo($ctx, 10);
-    $manager = bkoUser($ctx);
-    $regular = bkoUser($ctx, 'Sales');
-
-    $view = fn ($user, $so) => \Livewire\Livewire::actingAs($user)->test(\App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder::class, ['record' => $so->getKey()]);
-
-    $view($manager, $short)->assertActionVisible('approve_backorder');
-    $view($manager, $enough)->assertActionHidden('approve_backorder');
-    $view($regular, $short)->assertActionHidden('approve_backorder');
-
-    config(['sales.stock.block_short_approval' => false]);
-    $view($manager, $short)->assertActionHidden('approve_backorder');
-});

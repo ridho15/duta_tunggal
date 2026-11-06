@@ -1,6 +1,5 @@
 <?php
 
-use App\Filament\Resources\AccountReceivableResource;
 use App\Models\Cabang;
 use App\Models\Warehouse;
 use App\Services\StockAvailability;
@@ -44,9 +43,3 @@ it('SC-01: isolasi cabang membatasi gudang yang dapat diakses jika lihat_stok_ca
         ->and($accessibleAll)->toContain($gudangB->id);
 });
 
-it('SC-02: proteksi sub-ledger piutang menolak pembuatan atau modifikasi manual langsung', function () {
-    // Verifikasi bahwa canCreate, canEdit, dan canDelete bernilai false
-    expect(AccountReceivableResource::canCreate())->toBeFalse()
-        ->and(AccountReceivableResource::canEdit(new \App\Models\AccountReceivable()))->toBeFalse()
-        ->and(AccountReceivableResource::canDelete(new \App\Models\AccountReceivable()))->toBeFalse();
-});

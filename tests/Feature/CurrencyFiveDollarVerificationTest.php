@@ -183,23 +183,39 @@ class CurrencyFiveDollarVerificationTest extends TestCase
             'tipe_pengiriman' => 'Kirim Langsung',
         ]);
 
-        SaleOrderItem::create([
+        $warehouse = \App\Models\Warehouse::factory()->create();
+        $soItem = SaleOrderItem::create([
             'sale_order_id' => $so->id,
             'product_id' => $product->id,
             'quantity' => 1,
-            'unit_price' => $usdAmount,
+            'unit_price' => $expectedIdr,   // harga satuan SO disimpan dalam IDR; nilai USD diturunkan lewat kurs
             'discount' => 0,
             'tax' => 0,
             'tipe_pajak' => 'none',
-            'warehouse_id' => \App\Models\Warehouse::factory()->create()->id,
-            'rak_id' => \App\Models\Rak::factory()->create(['warehouse_id' => \App\Models\Warehouse::first()->id])->id,
+            'currency_id' => $this->usd->id,
+            'warehouse_id' => $warehouse->id,
+            'rak_id' => \App\Models\Rak::factory()->create(['warehouse_id' => $warehouse->id])->id,
         ]);
 
-        $so->update(['status' => 'completed']);
+        // Jalur "SO selesai -> invoice" sudah dihapus (alur wajib SO -> DO -> SJ -> Invoice); invoice otomatis kini lewat DO selesai.
+        config(['sales.invoice.auto_on_do_complete' => true]);
+        \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+        $this->beforeApplicationDestroyed(fn () => \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false);
+        $inventoryCoa = ChartOfAccount::firstOrCreate(['code' => '1140.10'], ['name' => 'Persediaan', 'type' => 'Asset', 'is_active' => true, 'opening_balance' => 0]);
+        $goodsCoa = ChartOfAccount::firstOrCreate(['code' => '1140.20'], ['name' => 'Barang Terkirim', 'type' => 'Asset', 'is_active' => true, 'opening_balance' => 0]);
+        $product->forceFill(['inventory_coa_id' => $inventoryCoa->id, 'goods_delivery_coa_id' => $goodsCoa->id])->save();
+        $do = \App\Models\DeliveryOrder::create([
+            'do_number' => 'DO-USD-' . strtoupper(substr(uniqid(), -6)), 'delivery_date' => now(), 'status' => 'draft',
+            'cabang_id' => $so->cabang_id, 'warehouse_id' => $warehouse->id,
+        ]);
+        $do->salesOrders()->attach($so->id);
+        $doItem = \App\Models\DeliveryOrderItem::create(['delivery_order_id' => $do->id, 'sale_order_item_id' => $soItem->id, 'product_id' => $product->id, 'quantity' => 1]);
+        \App\Models\DeliveryOrderItemWarehouseSource::create(['delivery_order_item_id' => $doItem->id, 'warehouse_id' => $warehouse->id, 'quantity' => 1]);
+        foreach (['sent', 'completed'] as $status) {
+            $do->update(['status' => $status]);
+        }
 
-        $invoice = Invoice::where('from_model_type', SaleOrder::class)
-            ->where('from_model_id', $so->id)
-            ->firstOrFail();
+        $invoice = Invoice::whereJsonContains('delivery_orders', $do->id)->firstOrFail();
 
         $this->assertEquals($expectedIdr, (float) $invoice->total);
         $this->assertEquals($this->usd->id, $invoice->currency_id);

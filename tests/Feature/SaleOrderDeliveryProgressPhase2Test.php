@@ -6,8 +6,6 @@
  *  - Isu 5: pemilihan SO di Delivery Order dibatasi (status, sisa, customer & alamat sama), status berbahasa Indonesia
  */
 
-use App\Filament\Resources\CustomerReceiptResource;
-use App\Filament\Resources\SaleOrderResource\Pages\ViewSaleOrder;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
@@ -32,6 +30,12 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+// Tes lama membuat DO tanpa stok; sejak Tahap 3 stok dipotong saat DO dibuat. Tunda pemotongan (perilaku sebelum Tahap 3).
+beforeEach(function () {
+    \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+        $this->beforeApplicationDestroyed(fn () => \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false);
+});
 
 function phase2Context(): array
 {
@@ -242,22 +246,6 @@ it('Isu 3: DO tanpa pivot ke SO tidak mengubah status SO (perilaku lama), namun 
         ->and((float) $item->fresh()->delivered_quantity)->toBe(12.0);
 });
 
-it('Isu 3: ringkasan di halaman SO memperlihatkan Terkirim, Dalam Proses DO, dan status Dikirim Sebagian', function () {
-    $ctx = phase2Context();
-    [$so, $item] = phase2SaleOrder($ctx);
-    phase2DeliveryOrder($ctx, $so, $item, 12, 'completed');
-    phase2DeliveryOrder($ctx, $so, $item, 5, 'approved');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSaleOrder::class, ['record' => $so->getKey()])
-        ->assertSee('Dikirim Sebagian')
-        ->assertSee('Total Qty Terkirim')
-        ->assertSee('Dalam Proses DO')
-        ->assertSee('Sisa Qty Belum Dikirim')
-        ->assertSee('Belum Dijadwalkan')
-        ->assertDontSee('partially_delivered');
-});
-
 // ───────────────────── Isu 5: validator sumber DO ─────────────────────
 
 it('Isu 5: SO yang sudah Selesai TIDAK bisa dijadikan sumber DO; Dikirim Sebagian bisa', function () {
@@ -381,7 +369,7 @@ it('Regresi: invoice dari SO Dikirim Sebagian tetap muncul di daftar penerimaan 
     \App\Models\AccountReceivable::whereHas('invoice', fn ($q) => $q->where('invoice_number', 'INV-P2-LUNAS'))
         ->update(['paid' => 100, 'remaining' => 0]);
 
-    $numbers = CustomerReceiptResource::invoiceableInvoicesQuery($ctx['customer']->id)->pluck('invoices.invoice_number')->all();
+    $numbers = \App\Models\Invoice::invoiceableForCustomer($ctx['customer']->id)->pluck('invoices.invoice_number')->all();
 
     // Daftar mengikuti sisa piutang (AR), bukan status SO
     expect($numbers)->toContain('INV-P2-PARSIAL')->not->toContain('INV-P2-LUNAS');
@@ -470,44 +458,3 @@ function phase2CreatePage(array $data): array
     return $method->invoke($page, $data);
 }
 
-it('Isu 5: halaman Create DO menolak SO Selesai di sisi server', function () {
-    $ctx = phase2Context();
-    [$done, $doneItem] = phase2SaleOrder($ctx, ['status' => 'completed']);
-
-    expect(fn () => phase2CreatePage([
-        'do_number' => 'DO-P2-CR1',
-        'salesOrders' => [$done->id],
-        'delivery_date' => now()->toDateTimeString(),
-        'deliveryOrderItem' => [['sale_order_item_id' => $doneItem->id, 'product_id' => $ctx['product']->id, 'quantity' => 5]],
-    ]))->toThrow(ValidationException::class, 'Selesai');
-});
-
-it('Isu 5: halaman Create DO menolak penggabungan SO dengan alamat kirim berbeda', function () {
-    $ctx = phase2Context();
-    [$a, $itemA] = phase2SaleOrder($ctx, ['shipped_to' => 'Jl. A No. 1']);
-    [$b] = phase2SaleOrder($ctx, ['shipped_to' => 'Jl. B No. 2']);
-
-    expect(fn () => phase2CreatePage([
-        'do_number' => 'DO-P2-CR2',
-        'salesOrders' => [$a->id, $b->id],
-        'delivery_date' => now()->toDateTimeString(),
-        'deliveryOrderItem' => [['sale_order_item_id' => $itemA->id, 'product_id' => $ctx['product']->id, 'quantity' => 5]],
-    ]))->toThrow(ValidationException::class, 'alamat kirim yang sama');
-});
-
-it('Isu 5: halaman Create DO menerima SO Dikirim Sebagian untuk sisanya, dan menolak melebihi sisa', function () {
-    $ctx = phase2Context();
-    [$so, $item] = phase2SaleOrder($ctx);
-    phase2DeliveryOrder($ctx, $so, $item, 12, 'completed');   // -> partially_delivered, sisa 8
-    expect($so->fresh()->status)->toBe('partially_delivered');
-
-    $payload = fn (float $qty) => [
-        'do_number' => 'DO-P2-CR3',
-        'salesOrders' => [$so->id],
-        'delivery_date' => now()->toDateTimeString(),
-        'deliveryOrderItem' => [['sale_order_item_id' => $item->id, 'product_id' => $ctx['product']->id, 'quantity' => $qty]],
-    ];
-
-    expect(phase2CreatePage($payload(8)))->toBeArray();   // sisa 8: lolos validasi
-    expect(fn () => phase2CreatePage($payload(9)))->toThrow(ValidationException::class);   // 9 > sisa 8
-});

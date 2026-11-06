@@ -11,9 +11,9 @@ use App\Models\PaymentRequest;
 use App\Models\VendorPayment;
 use App\Services\LedgerPostingService;
 use App\Support\ProcurementFailureNotifier;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+use App\Support\Flash;
 
 class VendorPaymentObserver
 {
@@ -562,12 +562,7 @@ class VendorPaymentObserver
 
     protected function notifyDepositValidationFailure(string $title, string $message): void
     {
-        Notification::make()
-            ->title($title)
-            ->body($message)
-            ->danger()
-            ->persistent()
-            ->send();
+        Flash::error($title, $message);
 
         Log::warning($title . ': ' . $message);
     }

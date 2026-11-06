@@ -5,7 +5,6 @@
  * Nilai DO harus sama dengan invoice yang terbit dari DO itu (LineAmounts), bukan lagi `harga − diskon + pajak`.
  */
 
-use App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
@@ -221,31 +220,6 @@ it('label pilihan SO, DO, dan Quotation memuat customer, tanggal, dan nilai', fu
     expect($soLabel)->toContain($so->so_number)->toContain('PT Nilai DO')->toContain('12 Sep 2026')->toContain('Rp 183.208,83')
         ->and($doLabel)->toContain($do->do_number)->toContain('14 Sep 2026')->toContain('Rp '.number_format($total, 2, ',', '.'))
         ->and(DocumentLabels::deliveryOrder($do))->toBe($do->do_number.' · 14 Sep 2026');
-});
-
-it('form Invoice: pilihan SO memuat nama customer & nilai, pilihan DO memuat nilai yang benar (bukan Rp0)', function () {
-    $ctx = dovContext();
-    [$so, $soItem] = dovSaleOrder($ctx);
-    // 20 dari 20: SO menjadi Selesai (form Invoice manual hanya memuat SO Selesai — lihat teks bantu T1.8)
-    $do = dovDeliveryOrder($ctx, $so, $soItem, 20, ['status' => 'completed']);
-    $expectedTotal = app(DeliveryOrderValuation::class)->forDeliveryOrder($do)['total'];
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateSalesInvoice::class)
-        ->fillForm(['selected_customer' => $ctx['customer']->id])
-        ->assertFormFieldExists('selected_sale_order', function ($field) use ($so) {
-            $label = $field->getOptions()[$so->id] ?? '';
-
-            return str_contains($label, $so->so_number) && str_contains($label, 'PT Nilai DO') && str_contains($label, 'Rp 183.208,83');
-        })
-        ->fillForm(['selected_customer' => $ctx['customer']->id, 'selected_sale_order' => $so->id])
-        ->assertFormFieldExists('selected_delivery_orders', function ($field) use ($do, $expectedTotal) {
-            $label = $field->getOptions()[$do->id] ?? '';
-
-            return str_contains($label, $do->do_number)
-                && str_contains($label, 'Rp '.number_format($expectedTotal, 2, ',', '.'))
-                && ! str_contains($label, 'Rp 0,00');
-        });
 });
 
 it('PDF DO menampilkan total yang sama dengan valuation (2 desimal)', function () {

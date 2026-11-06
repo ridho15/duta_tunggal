@@ -95,18 +95,18 @@ class DeliveryOrderSourceValidator
             return [];
         }
 
-        $orders = SaleOrder::withoutGlobalScope(CabangScope::class)->whereIn('id', $ids)->get();
+        $orders = SaleOrder::withoutGlobalScope(CabangScope::class)->with('customer')->whereIn('id', $ids)->get();
         $errors = [];
 
         if ($orders->pluck('customer_id')->unique()->count() > 1) {
             $errors[] = 'Semua Sales Order dalam satu Delivery Order harus berasal dari customer yang sama.';
         }
 
-        $empty = $orders->filter(fn ($o) => self::normalizeAddress($o->shipped_to) === '');
+        $empty = $orders->filter(fn ($o) => self::normalizeAddress($o->shippingAddress()) === '');
         if ($empty->isNotEmpty()) {
             $errors[] = 'Alamat kirim belum diisi pada Sales Order ' . $empty->pluck('so_number')->implode(', ')
                 . '. Lengkapi alamat kirim sebelum digabung dalam satu Delivery Order.';
-        } elseif ($orders->map(fn ($o) => self::normalizeAddress($o->shipped_to))->unique()->count() > 1) {
+        } elseif ($orders->map(fn ($o) => self::normalizeAddress($o->shippingAddress()))->unique()->count() > 1) {
             $errors[] = 'Sales Order yang digabung dalam satu Delivery Order harus memiliki alamat kirim yang sama ('
                 . $orders->pluck('so_number')->implode(', ') . ').';
         }

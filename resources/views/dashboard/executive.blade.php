@@ -137,7 +137,7 @@
 
         {{-- KPI 3: Piutang Lewat Jatuh Tempo (Kuning Peringatan) --}}
         <a
-            href="{{ route('keuangan.cashbank.index') }}"
+            href="{{ route('penjualan.invoices.index', ['tab' => 'overdue']) }}"
             class="bg-[#fffbeb] border border-[#fcd34d] rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 no-underline text-gray-900 hover:border-amber-400 hover:shadow-xs transition"
         >
             <span class="text-xs sm:text-[13px] text-[#92400e] font-semibold">Piutang lewat jatuh tempo</span>
@@ -145,13 +145,13 @@
                 {{ formatShortCurrency($kpi['piutang_overdue']['nominal']) }}
             </span>
             <span class="text-xs font-semibold text-[#92400e] truncate">
-                {{ $kpi['piutang_overdue']['count_customer'] }} customer · tagih sekarang ›
+                {{ $kpi['piutang_overdue']['count_customer'] > 0 ? $kpi['piutang_overdue']['count_customer'].' customer · tagih sekarang ›' : 'Tidak ada piutang terlambat' }}
             </span>
         </a>
 
         {{-- KPI 4: Hutang Jatuh Tempo <= 7 Hari --}}
         <a
-            href="{{ route('pembelian.po.index') }}"
+            href="{{ route('pembelian.invoices.index') }}"
             class="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 no-underline text-gray-900 hover:border-gray-300 hover:shadow-xs transition"
         >
             <span class="text-xs sm:text-[13px] text-gray-500 font-semibold">Hutang jatuh tempo ≤ 7 hari</span>
@@ -159,7 +159,7 @@
                 {{ formatShortCurrency($kpi['hutang_due_soon']['nominal']) }}
             </span>
             <span class="text-xs text-gray-500 truncate">
-                {{ $kpi['hutang_due_soon']['count_supplier'] }} supplier · terdekat {{ $kpi['hutang_due_soon']['nearest_date'] }}
+                {{ $kpi['hutang_due_soon']['count_supplier'] > 0 ? $kpi['hutang_due_soon']['count_supplier'].' supplier · terdekat '.$kpi['hutang_due_soon']['nearest_date'] : 'Tidak ada hutang jatuh tempo' }}
             </span>
         </a>
     </div>

@@ -11,7 +11,6 @@ use App\Models\StockReservation;
 use App\Support\CurrencyConversionResolver;
 use App\Helpers\MoneyHelper;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -102,6 +101,8 @@ class SalesOrderService
             'exchange_rate' => $exchangeRate,
             'tempo_pembayaran' => $this->resolveTempoPembayaran(null, $customer, $quotation),
             'shipped_to' => $shippedTo,
+            'shipping_recipient_name' => $quotation->shipping_recipient_name ?? null,
+            'shipping_recipient_phone' => $quotation->shipping_recipient_phone ?? null,
             'notes' => filled($quotation->notes) ? $quotation->notes : null,
         ];
     }
@@ -198,12 +199,6 @@ class SalesOrderService
                 if ($creditService->policyEnabled()) {
                     $messages .= ' — Owner, Super Admin atau Finance Manager dapat mengecualikan dengan alasan tercatat.';
                 }
-                Notification::make()
-                    ->title('Persetujuan Ditolak')
-                    ->body($messages)
-                    ->danger()
-                    ->send();
-
                 throw ValidationException::withMessages([
                     'customer_id' => $messages,
                 ]);
@@ -292,12 +287,6 @@ class SalesOrderService
 
         if (! empty($insufficientItems)) {
             $msg = 'Stok gudang tidak mencukupi untuk item: '.implode('; ', $insufficientItems);
-            Notification::make()
-                ->title('Persetujuan Ditolak: Stok Kurang')
-                ->body($msg)
-                ->danger()
-                ->send();
-
             throw ValidationException::withMessages([
                 'stock' => $msg,
             ]);
@@ -322,8 +311,6 @@ class SalesOrderService
 
         if (! ($options['backorder'] ?? false)) {
             $msg = 'Stok tidak mencukupi — '.implode('; ', $lines).'. Kurangi qty, tunggu stok masuk, atau gunakan "Setujui sebagai Backorder" (alasan wajib) bila memang pre-order.';
-            Notification::make()->title('Persetujuan Ditolak: Stok Kurang')->body($msg)->danger()->send();
-
             throw ValidationException::withMessages(['stock' => $msg]);
         }
 
@@ -367,8 +354,6 @@ class SalesOrderService
             ]);
         } catch (\App\Exceptions\DeliveryOrderTransitionException $e) {
             // T2.3 (D15): stok fisik "Ambil Sendiri" tidak cukup
-            Notification::make()->title('Penyelesaian Ditolak: Stok Kurang')->body($e->getMessage())->danger()->send();
-
             throw ValidationException::withMessages(['stock' => $e->getMessage()]);
         }
     }
@@ -384,12 +369,6 @@ class SalesOrderService
 
         $saleOrderItems = $itemsQuery->with('product')->get();
         if ($saleOrderItems->isEmpty()) {
-            Notification::make()
-                ->title('Gagal Membuat Purchase Order')
-                ->body('Tidak ada item Sales Order yang valid untuk dibuatkan Purchase Order.')
-                ->danger()
-                ->send();
-
             throw ValidationException::withMessages([
                 'selected_sale_order_item_ids' => 'Tidak ada item Sales Order yang valid untuk dibuatkan Purchase Order.',
             ]);
@@ -504,12 +483,6 @@ class SalesOrderService
     {
         // Validate that SO is approved
         if ($saleOrder->status !== 'approved') {
-            Notification::make()
-                ->title('Gagal Konfirmasi Gudang')
-                ->body('Sales Order harus disetujui terlebih dahulu sebelum konfirmasi gudang.')
-                ->danger()
-                ->send();
-
             throw ValidationException::withMessages([
                 'status' => 'Sales Order harus disetujui terlebih dahulu sebelum konfirmasi gudang.',
             ]);
@@ -589,12 +562,6 @@ class SalesOrderService
     {
         // Validate that SO is confirmed
         if (!in_array($saleOrder->status, ['confirmed', 'partial_confirmed'])) {
-            Notification::make()
-                ->title('Gagal Membuat Delivery Order')
-                ->body('Sales Order harus sudah konfirmasi gudang sebelum Delivery Order dibuat.')
-                ->danger()
-                ->send();
-
             throw ValidationException::withMessages([
                 'status' => 'Sales Order harus sudah konfirmasi gudang sebelum Delivery Order dibuat.',
             ]);
@@ -603,12 +570,6 @@ class SalesOrderService
         // Create delivery order
         $warehouseId = $deliveryData['warehouse_id'] ?? $saleOrder->warehouseConfirmation->warehouseConfirmationItems->first()->warehouse_id ?? null;
         if (!$warehouseId) {
-            Notification::make()
-                ->title('Gagal Membuat Delivery Order')
-                ->body('Gudang harus dipilih untuk membuat Delivery Order.')
-                ->danger()
-                ->send();
-
             throw ValidationException::withMessages([
                 'warehouse_id' => 'Gudang harus dipilih untuk membuat Delivery Order.',
             ]);
@@ -619,11 +580,6 @@ class SalesOrderService
         $vehicleId = $deliveryData['vehicle_id'] ?? \App\Models\Vehicle::first()?->id;
 
         if (!$driverId || !$vehicleId) {
-            \Filament\Notifications\Notification::make()
-                ->title('Gagal Membuat Delivery Order')
-                ->danger()
-                ->body('Tidak ditemukan driver atau kendaraan di database. Silakan pastikan data master sudah terisi untuk auto-creation Delivery Order.')
-                ->send();
             throw ValidationException::withMessages([
                 'driver_id' => 'Driver dan kendaraan harus tersedia sebelum Delivery Order dapat dibuat.',
             ]);

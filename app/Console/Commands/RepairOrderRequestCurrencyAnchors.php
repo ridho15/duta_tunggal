@@ -2,7 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Filament\Resources\OrderRequestResource;
+use App\Support\OrderRequestPricing;
+use App\Support\TaxTypeHelper;
 use App\Helpers\MoneyHelper;
 use App\Models\OrderRequestItem;
 use Illuminate\Console\Command;
@@ -123,8 +124,8 @@ class RepairOrderRequestCurrencyAnchors extends Command
 
                 $originalIdr ??= $unitIdr;
 
-                $nextUnitPrice = OrderRequestResource::convertIdrAnchorToCurrency($unitIdr, $currencyId);
-                $nextOriginalPrice = OrderRequestResource::convertIdrAnchorToCurrency($originalIdr, $currencyId);
+                $nextUnitPrice = OrderRequestPricing::convertIdrAnchorToCurrency($unitIdr, $currencyId);
+                $nextOriginalPrice = OrderRequestPricing::convertIdrAnchorToCurrency($originalIdr, $currencyId);
                 $nextSubtotal = $this->calculateSubtotal($item, (float) $nextUnitPrice);
 
                 $changed = $this->isDifferent($item->unit_price_idr, $unitIdr, 2)
@@ -159,12 +160,12 @@ class RepairOrderRequestCurrencyAnchors extends Command
 
     protected function calculateSubtotal(OrderRequestItem $item, float $unitPrice): string
     {
-        $preview = OrderRequestResource::calculateApprovalItemPreview(
+        $preview = OrderRequestPricing::calculateApprovalItemPreview(
             (float) ($item->quantity ?? 0),
             $unitPrice,
             (float) ($item->discount ?? 0),
             (float) ($item->tax ?? 0),
-            OrderRequestResource::taxServiceTypeFromItemTaxType($item->tipe_pajak ?? null)
+            TaxTypeHelper::serviceType($item->tipe_pajak ?? null)
         );
 
         return number_format((float) $preview['subtotal'], 2, '.', '');

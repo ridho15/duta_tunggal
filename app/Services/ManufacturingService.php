@@ -10,7 +10,7 @@ use App\Models\MaterialIssueItem;
 use App\Models\ProductionPlan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Filament\Notifications\Notification;
+use App\Support\Flash;
 
 class ManufacturingService
 {
@@ -273,7 +273,7 @@ class ManufacturingService
                 $quantity = $bomItem->quantity * $productionPlan->quantity;
                 $costPerUnit = $bomItem->product->cost_price ?? 0;
                 $itemTotalCost = $quantity * $costPerUnit;
-                $warehouseId = \App\Filament\Resources\MaterialIssueResource::resolveWarehouseIdForProduct(
+                $warehouseId = \App\Support\WarehouseStockOptions::issueWarehouseIdForProduct(
                     $bomItem->product_id,
                     $productionPlan->warehouse_id
                 );
@@ -299,11 +299,7 @@ class ManufacturingService
             return $materialIssue;
 
         } catch (\Exception $e) {
-            Notification::make()
-                ->title('Error Creating Material Issue')
-                ->body('Failed to create Material Issue for Production Plan: ' . $e->getMessage())
-                ->danger()
-                ->send();
+            Flash::error('Error Creating Material Issue', 'Failed to create Material Issue for Production Plan: ' . $e->getMessage());
             Log::error('ManufacturingService createMaterialIssueForProductionPlan failed', [
                 'production_plan_id' => $productionPlan->id,
                 'warehouse_id' => $productionPlan->warehouse_id,

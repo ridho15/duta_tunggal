@@ -238,6 +238,8 @@ class SaleOrderApiController extends Controller
                 'exchange_rate' => (float) $mapped['exchange_rate'],
                 'tempo_pembayaran' => (int) $mapped['tempo_pembayaran'],
                 'shipped_to' => $mapped['shipped_to'] ?? '',
+                'shipping_recipient_name' => $mapped['shipping_recipient_name'] ?? '',
+                'shipping_recipient_phone' => $mapped['shipping_recipient_phone'] ?? '',
                 'total_amount' => (float) ($quotation->total_amount ?? 0),
                 'notes' => $mapped['notes'] ?? '',
                 'items' => $quotation->quotationItem->map(function ($item) {
@@ -479,7 +481,7 @@ class SaleOrderApiController extends Controller
                 'data' => [
                     'id' => $saleOrder->id,
                     'so_number' => $saleOrder->so_number,
-                    'redirect_url' => route('filament.admin.resources.sale-orders.index'),
+                    'redirect_url' => route('penjualan.so.index'),
                 ],
                 'warnings' => $this->stockWarnings($saleOrder),
             ]);
@@ -749,7 +751,7 @@ class SaleOrderApiController extends Controller
                 'data' => [
                     'id' => $saleOrder->id,
                     'so_number' => $saleOrder->so_number,
-                    'redirect_url' => route('filament.admin.resources.sale-orders.index'),
+                    'redirect_url' => route('penjualan.so.index'),
                 ],
                 'warnings' => $this->stockWarnings($saleOrder->fresh()),
             ]);

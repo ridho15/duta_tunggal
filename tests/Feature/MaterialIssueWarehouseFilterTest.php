@@ -1,6 +1,5 @@
 <?php
 
-use App\Filament\Resources\MaterialIssueResource;
 use App\Models\Cabang;
 use App\Models\InventoryStock;
 use App\Models\Product;
@@ -45,12 +44,12 @@ test('material issue warehouse resolver only returns stock-backed warehouses', f
         'qty_min' => 0,
     ]);
 
-    $options = MaterialIssueResource::resolveWarehouseOptionsForProduct($product->id);
+    $options = \App\Support\WarehouseStockOptions::issueOptionsForProduct($product->id);
 
     expect($options)
         ->toHaveKey($warehouseWithStock->id)
         ->not->toHaveKey($warehouseWithoutStock->id);
 
-    expect(MaterialIssueResource::resolveWarehouseIdForProduct($product->id, $warehouseWithoutStock->id))
+    expect(\App\Support\WarehouseStockOptions::issueWarehouseIdForProduct($product->id, $warehouseWithoutStock->id))
         ->toBe($warehouseWithStock->id);
 });

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Hp;
 
-use App\Filament\Pages\Hp\KirimanPage;
 use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
 use App\Services\Hp\PickingList;
@@ -18,7 +17,7 @@ class PickingListController extends Controller
         $user = $request->user();
         $warehouseId = (int) $request->query('warehouse');
 
-        abort_unless(KirimanPage::canAccess(), 403);
+        abort_unless(MenuAccess::allows('hp_kiriman'), 403);
         abort_unless(HpWarehouse::allows($user, $warehouseId) || MenuAccess::isSuper($user), 403);
 
         $warehouse = Warehouse::findOrFail($warehouseId);

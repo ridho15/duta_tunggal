@@ -145,49 +145,9 @@ class DeliveryOrderTask2326Test extends TestCase
         $this->assertDatabaseHas('surat_jalans',    ['id' => $sj->id, 'status' => 1]);
     }
 
-    #[Test]
-    public function task23_do_resource_has_no_standalone_mark_as_reservation_release_action(): void
-    {
-        // Parse the resource actions - ensure reservation-release action handle isn't present
-        // by verifying via the table action names from the resource's getActions method.
-        // We test this indirectly: the only path to the release stage is via SuratJalan.
-        $do = DeliveryOrder::create([
-            'do_number'     => 'DO-TASK23-002',
-            'delivery_date' => now()->addDays(1)->toDateString(),
-            'driver_id'     => $this->driver->id,
-            'vehicle_id'    => $this->vehicle->id,
-            'warehouse_id'  => $this->warehouse->id,
-            'status'        => 'approved',
-            'created_by'    => $this->user->id,
-            'cabang_id'     => $this->cabang->id,
-        ]);
-
-        // Verify that status is still 'approved': calling updateStatus(sent) via SJ
-        // is the only valid path; no Filament action on the DO record can do it alone.
-        $this->assertDatabaseHas('delivery_orders', ['id' => $do->id, 'status' => 'approved']);
-
-        // DeliveryOrderResource source file must NOT contain a standalone reservation-release label
-        $resourceSource = file_get_contents(
-            app_path('Filament/Resources/DeliveryOrderResource.php')
-        );
-        $this->assertStringNotContainsString("'Mark as Sent'", $resourceSource);
-        $this->assertStringNotContainsString('"Mark as Sent"', $resourceSource);
-    }
 
     // ─── Task 24 ──────────────────────────────────────────────────────────────
 
-    #[Test]
-    public function task24_do_approve_action_is_labeled_konfirmasi_dana_diterima(): void
-    {
-        $resourceSource = file_get_contents(
-            app_path('Filament/Resources/DeliveryOrderResource.php')
-        );
-
-        $this->assertStringContainsString('Konfirmasi Dana Diterima', $resourceSource,
-            'DO resource should contain "Konfirmasi Dana Diterima" label for the approve action');
-        $this->assertStringContainsString('Apakah Dana Sudah Diterima', $resourceSource,
-            'DO resource should contain modal heading "Apakah Dana Sudah Diterima?"');
-    }
 
     #[Test]
     public function task24_do_transitions_to_approved_via_service_when_dana_confirmed(): void
@@ -222,29 +182,6 @@ class DeliveryOrderTask2326Test extends TestCase
 
     // ─── Task 25 ──────────────────────────────────────────────────────────────
 
-    #[Test]
-    public function task25_do_resource_table_has_do_number_customer_date_status_as_primary_columns(): void
-    {
-        $resourceSource = file_get_contents(
-            app_path('Filament/Resources/DeliveryOrderResource.php')
-        );
-
-        // All four key columns must exist
-        $this->assertStringContainsString("'do_number'",      $resourceSource);
-        $this->assertStringContainsString("'customer_names'", $resourceSource);
-        $this->assertStringContainsString("'delivery_date'",  $resourceSource);
-        $this->assertStringContainsString("'status'",         $resourceSource);
-
-        // do_number should appear before customer_names in the table column list
-        $doPos       = strpos($resourceSource, "TextColumn::make('do_number')");
-        $custPos     = strpos($resourceSource, "TextColumn::make('customer_names')");
-        $datePos     = strpos($resourceSource, "TextColumn::make('delivery_date')");
-        $statusPos   = strpos($resourceSource, "TextColumn::make('status')\n");
-
-        $this->assertLessThan($custPos,   $doPos,     'do_number must appear before customer_names');
-        $this->assertLessThan($datePos,   $custPos,   'customer_names must appear before delivery_date');
-        $this->assertLessThan($statusPos, $datePos,   'delivery_date must appear before status');
-    }
 
     #[Test]
     public function task25_do_can_be_queried_with_relevant_fields(): void
@@ -305,26 +242,6 @@ class DeliveryOrderTask2326Test extends TestCase
         ]);
     }
 
-    #[Test]
-    public function task26_sj_resource_table_removes_legacy_shipping_columns(): void
-    {
-        $resourceSource = file_get_contents(
-            app_path('Filament/Resources/SuratJalanResource.php')
-        );
-
-        $this->assertStringNotContainsString("'sender_name'",     $resourceSource,
-            'SJ resource should no longer include legacy shipping columns');
-        $this->assertStringNotContainsString("'shipping_method'", $resourceSource,
-            'SJ resource should no longer include legacy shipping columns');
-
-        // Verify they are absent from the table() method as well
-        $tableStart = strpos($resourceSource, 'public static function table');
-        $senderPos  = strpos($resourceSource, "'sender_name'",  $tableStart);
-        $methodPos  = strpos($resourceSource, "'shipping_method'", $tableStart);
-
-        $this->assertFalse($senderPos,  'Legacy shipping columns should be removed from table()');
-        $this->assertFalse($methodPos,  'Legacy shipping columns should be removed from table()');
-    }
 
     #[Test]
     public function task26_delivery_schedule_allows_delivery_method_values(): void

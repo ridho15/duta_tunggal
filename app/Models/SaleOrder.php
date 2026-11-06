@@ -143,6 +143,8 @@ class SaleOrder extends Model
         'close_at',
         'completed_at',
         'shipped_to',
+        'shipping_recipient_name',
+        'shipping_recipient_phone',
         'reject_by',
         'reject_at',
         'reason_close',
@@ -221,6 +223,27 @@ class SaleOrder extends Model
             return false;
         }
         return in_array($this->status, self::DELIVERABLE_STATUSES);
+    }
+
+    public function recipientName(): string
+    {
+        return filled($this->shipping_recipient_name)
+            ? (string) $this->shipping_recipient_name
+            : (string) ($this->customer?->name ?: $this->customer?->perusahaan ?: '-');
+    }
+
+    public function recipientPhone(): ?string
+    {
+        return filled($this->shipping_recipient_phone)
+            ? (string) $this->shipping_recipient_phone
+            : ($this->customer?->telephone ?: $this->customer?->phone);
+    }
+
+    public function shippingAddress(): ?string
+    {
+        return filled($this->shipped_to)
+            ? (string) $this->shipped_to
+            : ($this->customer?->address);
     }
 
 

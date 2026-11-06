@@ -268,7 +268,7 @@ class ExecutiveDashboardService
     }
 
     /**
-     * 3. Hitung KPI Piutang Lewat Jatuh Tempo (AR Overdue)
+     * 3. Hitung KPI Piutang Lewat Jatuh Tempo (AR Overdue). Hanya data nyata; tanpa angka cadangan.
      */
     protected function getKpiPiutangOverdue(?int $cabangId, Carbon $today): array
     {
@@ -277,72 +277,30 @@ class ExecutiveDashboardService
             ->whereHas('invoice', fn ($q) => $q->where('due_date', '<', $today))
             ->where('status', '!=', 'Lunas');
 
-        $nominal = (float) $arQuery->sum('remaining');
-        $customerCount = (clone $arQuery)->distinct('customer_id')->count('customer_id');
-
-        if ($nominal <= 0) {
-            // Cek langsung ke tabel invoices
-            $invQuery = Invoice::query()
-                ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
-                ->where('due_date', '<', $today)
-                ->whereIn('status', ['unpaid', 'partially_paid', 'issued']);
-
-            $nominal = (float) $invQuery->sum('total');
-            $customerCount = (clone $invQuery)->distinct('customer_name')->count('customer_name');
-        }
-
-        // Nilai representatif visual bila data uji belum diset tanggal lampau
-        if ($nominal <= 0 && Invoice::count() > 0) {
-            $nominal = (float) Invoice::sum('total');
-            $customerCount = Invoice::distinct('customer_name')->count('customer_name');
-        }
-
         return [
-            'nominal'        => $nominal,
-            'count_customer' => max(1, $customerCount),
+            'nominal'        => (float) $arQuery->sum('remaining'),
+            'count_customer' => (clone $arQuery)->distinct('customer_id')->count('customer_id'),
         ];
     }
 
     /**
-     * 4. Hitung KPI Hutang Jatuh Tempo <= 7 Hari (AP Due Soon)
+     * 4. Hitung KPI Hutang Jatuh Tempo <= 7 Hari (AP Due Soon), termasuk yang sudah lewat jatuh tempo.
      */
     protected function getKpiHutangDueSoon(?int $cabangId, Carbon $today): array
     {
         $nextWeek = $today->copy()->addDays(7);
 
         $apQuery = AccountPayable::query()
-            ->whereHas('invoice', fn ($q) => $q->whereBetween('due_date', [$today, $nextWeek]))
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->whereHas('invoice', fn ($q) => $q->whereDate('due_date', '<=', $nextWeek))
             ->where('status', '!=', 'Lunas');
 
-        $nominal = (float) $apQuery->sum('remaining');
-        $supplierCount = (clone $apQuery)->distinct('supplier_id')->count('supplier_id');
-
-        $nearestDateFormatted = $nextWeek->locale('id')->isoFormat('D MMM');
-
-        if ($nominal <= 0) {
-            // Cek dari PurchaseOrder yang sedang berjalan
-            $poQuery = PurchaseOrder::query()
-                ->whereIn('status', ['approved', 'ordered', 'partial']);
-
-            $nominal = (float) $poQuery->sum('total_amount');
-            $supplierCount = (clone $poQuery)->distinct('supplier_id')->count('supplier_id');
-
-            $nearestPo = PurchaseOrder::whereNotNull('order_date')->orderBy('order_date')->first();
-            if ($nearestPo && $nearestPo->order_date) {
-                $nearestDateFormatted = Carbon::parse($nearestPo->order_date)->locale('id')->isoFormat('D MMM');
-            }
-        }
-
-        if ($nominal <= 0) {
-            $nominal = 21200000.0;
-            $supplierCount = 3;
-            $nearestDateFormatted = $today->copy()->addDays(2)->locale('id')->isoFormat('D MMM');
-        }
+        $nearest = Invoice::whereIn('id', (clone $apQuery)->select('invoice_id'))->min('due_date');
 
         return [
-            'nominal'        => $nominal,
-            'count_supplier' => max(1, $supplierCount),
-            'nearest_date'   => $nearestDateFormatted,
+            'nominal'        => (float) $apQuery->sum('remaining'),
+            'count_supplier' => (clone $apQuery)->distinct('supplier_id')->count('supplier_id'),
+            'nearest_date'   => $nearest ? Carbon::parse($nearest)->locale('id')->isoFormat('D MMM') : null,
         ];
     }
 

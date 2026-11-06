@@ -124,43 +124,6 @@ class StockMovement extends Model
         return $this->source_type_label . ' - ' . $this->source_number;
     }
 
-    public function getSourceResourceUrlAttribute(): ?string
-    {
-        $source = $this->resolveSourceModel();
-
-        if (! $source) {
-            return null;
-        }
-
-        return match ($this->from_model_type) {
-            SaleOrder::class => route('filament.admin.resources.sale-orders.view', $source->id),
-            PurchaseOrder::class => route('filament.admin.resources.purchase-orders.view', $source->id),
-            DeliveryOrder::class => route('filament.admin.resources.delivery-orders.view', $source->id),
-            DeliveryOrderItem::class => $source->deliveryOrder
-                ? route('filament.admin.resources.delivery-orders.view', $source->deliveryOrder->id)
-                : null,
-            PurchaseReceipt::class => route('filament.admin.resources.purchase-receipts.view', $source->id),
-            PurchaseReceiptItem::class => $source->purchaseReceipt
-                ? route('filament.admin.resources.purchase-receipts.view', $source->purchaseReceipt->id)
-                : null,
-            StockTransfer::class => route('filament.admin.resources.stock-transfers.view', $source->id),
-            StockTransferItem::class => $source->stockTransfer
-                ? route('filament.admin.resources.stock-transfers.view', $source->stockTransfer->id)
-                : null,
-            ManufacturingOrder::class => route('filament.admin.resources.manufacturing-orders.view', $source->id),
-            MaterialIssue::class => route('filament.admin.resources.material-issues.view', $source->id),
-            StockAdjustment::class => route('filament.admin.resources.stock-adjustments.view', $source->id),
-            QualityControl::class => route('filament.admin.resources.quality-control-manufactures.view', $source->id),
-            PurchaseReturn::class => route('filament.admin.resources.purchase-returns.view', $source->id),
-            CustomerReturn::class => route('filament.admin.resources.customer-returns.view', $source->id),
-            ReturnProduct::class => route('filament.admin.resources.return-products.view', $source->id),
-            ReturnProductItem::class => $source->returnProduct
-                ? route('filament.admin.resources.return-products.view', $source->returnProduct->id)
-                : null,
-            default => null,
-        };
-    }
-
     protected function resolveSourceModel(): ?EloquentModel
     {
         if (! $this->from_model_type || ! $this->from_model_id) {

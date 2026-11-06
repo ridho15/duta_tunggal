@@ -130,9 +130,45 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-semibold text-gray-700">Alamat Kirim</label>
-                    <input type="text" name="shipped_to" id="shippedToInput" value="{{ old('shipped_to') }}" placeholder="Otomatis dari data customer jika kosong" class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
+                {{-- Tujuan Pengiriman & Alamat Proyek (Ship-To) --}}
+                <div class="pt-3 border-t border-gray-100 flex flex-col gap-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            Tujuan Pengiriman & Alamat Penerima (Ship-To)
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="sameAsCustomer" name="same_as_customer" value="1"
+                                   {{ old('same_as_customer', (old('shipping_recipient_name', $selectedQuotation->shipping_recipient_name ?? '') || old('shipped_to', $selectedQuotation->shipped_to ?? '')) ? '0' : '1') === '1' ? 'checked' : '' }}
+                                   class="rounded border-gray-300 text-[#15803d] focus:ring-[#15803d] w-4 h-4 cursor-pointer">
+                            <span class="text-xs font-semibold text-gray-700">Sama dengan alamat kantor pembeli</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5" id="recipientContactFields">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-semibold text-gray-700">Nama Penerima / Nama Proyek</label>
+                            <input type="text" name="shipping_recipient_name" id="shippingRecipientName"
+                                   value="{{ old('shipping_recipient_name', $selectedQuotation->shipping_recipient_name ?? '') }}"
+                                   placeholder="Contoh: Proyek RSUD Hasan Sadikin / Gudang Proyek"
+                                   class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-semibold text-gray-700">PIC Proyek & No. Telepon</label>
+                            <input type="text" name="shipping_recipient_phone" id="shippingRecipientPhone"
+                                   value="{{ old('shipping_recipient_phone', $selectedQuotation->shipping_recipient_phone ?? '') }}"
+                                   placeholder="Contoh: Bpk. Hendra (0812-3456-7890)"
+                                   class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-semibold text-gray-700">Alamat Lengkap Pengiriman / Proyek</label>
+                        <input type="text" name="shipped_to" id="shippedToInput"
+                               value="{{ old('shipped_to', $selectedQuotation->shipped_to ?? '') }}"
+                               placeholder="Otomatis dari data customer jika sama"
+                               class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
+                    </div>
                 </div>
             </section>
 
@@ -760,6 +796,7 @@
                 limit: {{ (float)$c->kredit_limit }},
                 tempo: {{ (int)$c->tempo_kredit }},
                 address: "{{ addslashes($c->address ?? '') }}",
+                phone: "{{ addslashes($c->phone ?? ($c->telephone ?? '')) }}",
                 deposit: {{ (float)($c->deposit?->remaining_amount ?? 0) }}
             },
         @endforeach
@@ -779,13 +816,35 @@
         document.getElementById('valDepositBalance').innerText = formatRupiah(cust.deposit);
         document.getElementById('valTipePembayaran').innerText = cust.tipe;
 
+        const sameCheckbox = document.getElementById('sameAsCustomer');
         const shippedInput = document.getElementById('shippedToInput');
-        if (shippedInput && !shippedInput.value) {
-            shippedInput.value = cust.address;
+        const recipientName = document.getElementById('shippingRecipientName');
+        const recipientPhone = document.getElementById('shippingRecipientPhone');
+
+        if (sameCheckbox && sameCheckbox.checked) {
+            if (shippedInput) shippedInput.value = cust.address || '';
+            if (recipientName) recipientName.value = cust.name || '';
+            if (recipientPhone) recipientPhone.value = cust.phone || '';
+        } else if (shippedInput && !shippedInput.value) {
+            shippedInput.value = cust.address || '';
         }
 
         calculateTotals();
     }
+
+    document.getElementById('sameAsCustomer')?.addEventListener('change', function () {
+        const custId = document.getElementById('customerSelect')?.value;
+        const cust = customersData[custId];
+        const shippedInput = document.getElementById('shippedToInput');
+        const recipientName = document.getElementById('shippingRecipientName');
+        const recipientPhone = document.getElementById('shippingRecipientPhone');
+
+        if (this.checked && cust) {
+            if (shippedInput) shippedInput.value = cust.address || '';
+            if (recipientName) recipientName.value = cust.name || '';
+            if (recipientPhone) recipientPhone.value = cust.phone || '';
+        }
+    });
 
     document.getElementById('customerSelect')?.addEventListener('change', function () {
         handleCustomerSelectChange(this.value);

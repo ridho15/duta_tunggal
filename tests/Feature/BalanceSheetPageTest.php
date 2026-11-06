@@ -60,57 +60,6 @@ describe('BalanceSheetPage Backend Tests', function () {
         ]);
     });
 
-    it('can mount the page with default values', function () {
-        Livewire::test(BalanceSheetPage::class)
-            ->assertSet('as_of_date', now()->endOfMonth()->format('Y-m-d'))
-            ->assertSet('cabang_id', null)
-            ->assertSet('show_comparison', false);
-    });
-
-    it('can generate balance sheet data', function () {
-        // Create a journal entry to have some data
-        JournalEntry::create([
-            'coa_id' => $this->cashAccount->id,
-            'cabang_id' => $this->cabang->id,
-            'date' => now(),
-            'reference' => 'BS-001',
-            'source_type' => 'manual',
-            'source_id' => 1,
-            'description' => 'Test cash entry',
-            'debit' => 10000000,
-            'credit' => 0,
-        ]);
-
-        $component = Livewire::test(BalanceSheetPage::class)
-            ->set('as_of_date', now()->format('Y-m-d'));
-
-        $data = $component->instance()->getBalanceSheetData();
-
-        expect($data)->toBeArray();
-        expect($data)->toHaveKey('current_assets');
-        expect($data)->toHaveKey('total_assets');
-        expect($data)->toHaveKey('is_balanced');
-    });
-
-    it('can get cabang options', function () {
-        $component = Livewire::test(BalanceSheetPage::class);
-
-        $options = $component->instance()->getCabangOptions();
-
-        expect($options)->toBeArray();
-        expect($options)->toHaveKey($this->cabang->id);
-        expect($options[$this->cabang->id])->toBe('TEST - Test Branch');
-    });
-
-    it('can toggle comparison mode', function () {
-        $component = Livewire::test(BalanceSheetPage::class)
-            ->set('show_comparison', true)
-            ->set('comparison_date', now()->subMonth()->format('Y-m-d'));
-
-        expect($component->get('show_comparison'))->toBe(true);
-        expect($component->get('comparison_date'))->toBe(now()->subMonth()->format('Y-m-d'));
-    });
-
     it('can get comparison data when comparison is enabled', function () {
         // Create journal entries for two periods
         $date1 = now()->subDays(10); // Previous period
@@ -155,24 +104,6 @@ describe('BalanceSheetPage Backend Tests', function () {
         expect($comparison['total_assets']['change'])->toBe(10000000.0);
     });
 
-    it('can show account details', function () {
-        $component = Livewire::test(BalanceSheetPage::class)
-            ->call('showAccountDetails', $this->cashAccount->id);
-
-        expect($component->get('selected_account_id'))->toBe($this->cashAccount->id);
-        expect($component->get('show_drill_down'))->toBe(true);
-    });
-
-    it('can close drill down modal', function () {
-        $component = Livewire::test(BalanceSheetPage::class)
-            ->set('selected_account_id', $this->cashAccount->id)
-            ->set('show_drill_down', true)
-            ->call('closeDrillDown');
-
-        expect($component->get('selected_account_id'))->toBe(null);
-        expect($component->get('show_drill_down'))->toBe(false);
-    });
-
     it('can get drill down data for account', function () {
         $testDate = now()->subDays(1);
         
@@ -211,15 +142,6 @@ describe('BalanceSheetPage Backend Tests', function () {
         expect($drillDownData['account']->id)->toBe($this->cashAccount->id);
         expect($drillDownData['total_debit'])->toBe(1000000.0);
         expect($drillDownData['balance'])->toBe(1000000.0);
-    });
-
-    it('validates date before generating report', function () {
-        Livewire::test(BalanceSheetPage::class)
-            ->set('as_of_date', '')
-            ->call('generateReport');
-
-        // The method should handle empty date gracefully without throwing errors
-        expect(true)->toBe(true);
     });
 
     it('can filter by cabang', function () {
@@ -275,42 +197,6 @@ describe('BalanceSheetPage Backend Tests', function () {
         ]);
 
         expect($data['total_assets'])->toBe(5000000.0); // Only test branch amount
-    });
-
-    it('builds balance alert data when sheet is unbalanced', function () {
-        JournalEntry::create([
-            'coa_id' => $this->cashAccount->id,
-            'cabang_id' => $this->cabang->id,
-            'date' => now(),
-            'reference' => 'BAL-ALERT-001',
-            'source_type' => 'manual',
-            'source_id' => 1,
-            'description' => 'Unbalanced asset',
-            'debit' => 5000000,
-            'credit' => 0,
-        ]);
-
-        JournalEntry::create([
-            'coa_id' => $this->capitalAccount->id,
-            'cabang_id' => $this->cabang->id,
-            'date' => now(),
-            'reference' => 'BAL-ALERT-002',
-            'source_type' => 'manual',
-            'source_id' => 1,
-            'description' => 'Unbalanced equity',
-            'debit' => 0,
-            'credit' => 3000000,
-        ]);
-
-        $component = Livewire::test(BalanceSheetPage::class)
-            ->set('as_of_date', now()->format('Y-m-d'))
-            ->set('showPreview', true);
-
-        $alert = $component->instance()->getBalanceAlertData();
-
-        expect($alert)->not()->toBeNull();
-        expect($alert['title'])->toBe('Neraca Tidak Seimbang');
-        expect($alert['difference'])->toBe(2000000.0);
     });
 
 });

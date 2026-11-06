@@ -62,52 +62,6 @@ it('invoice model accessor returns monetary ppn amount not rate', function () {
         'ppn_amount accessor should compute subtotal * (tax/100) when items absent');
 });
 
-it('view page logs ppn amount and account payable info', function () {
-    $cabang = auditCabang();
-    $admin = \App\Models\User::factory()->create();
-    $admin->cabang_id = $cabang->id;
-    $admin->save();
-    $this->actingAs($admin);
-    $saleOrder = SaleOrder::factory()->create([
-        'cabang_id' => $cabang->id,
-        'customer_id' => Customer::factory()->create(['cabang_id' => $cabang->id])->id,
-        'status' => 'completed',
-    ]);
-
-    $invoice = null;
-    Invoice::withoutEvents(function () use (&$invoice, $cabang, $saleOrder) {
-        $invoice = Invoice::factory()->create([
-            'cabang_id' => $cabang->id,
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => $saleOrder->id,
-            'subtotal' => 50000,
-            'tax' => 11,
-            'total' => 55500,
-        ]);
-    });
-
-    // create an account payable record so it will appear in context
-    \App\Models\AccountPayable::factory()->create([
-        'invoice_id' => $invoice->id,
-        'supplier_id' => \App\Models\Supplier::factory()->create()->id,
-            'cabang_id' => $cabang->id,
-        'total' => 55500,
-        'paid' => 0,
-        'remaining' => 55500,
-        'status' => 'Belum Lunas',
-        'created_by' => $admin->id,
-    ]);
-
-    $page = new \App\Filament\Resources\SalesInvoiceResource\Pages\ViewSalesInvoice();
-    $recordProperty = new \ReflectionProperty($page, 'record');
-    $recordProperty->setAccessible(true);
-    $recordProperty->setValue($page, $invoice);
-    $page->infolist(app(\Filament\Infolists\Infolist::class));
-
-    expect($invoice->accountPayable)->not->toBeNull();
-    expect($invoice->accountPayable->invoice_id)->toBe($invoice->id);
-});
-
 it('renders the sales invoice pdf without dompdf table errors', function () {
     $customer = Customer::factory()->create();
     $saleOrder = SaleOrder::factory()->create([
@@ -417,37 +371,6 @@ describe('Sales Order PDF content', function () {
 
 // ─── SECTION 5: Delivery Order customer info in infolist ─────────────────────
 describe('Delivery Order view page shows customer information', function () {
-    it('includes the linked customer name and address from the first sale order', function () {
-        // create admin user for Filament access and grant necessary permission
-        $admin = \App\Models\User::factory()->create();
-        $admin->givePermissionTo('view delivery order');
-        $admin->givePermissionTo('view any delivery order');
-        $this->actingAs($admin);
-
-        $cabang = auditCabang();
-        $customer = Customer::factory()->create([
-            'cabang_id' => $cabang->id,
-            'address' => 'Jl. Test No. 123',
-            'perusahaan' => 'PT Uji Infolist DO',
-        ]);
-        $so = SaleOrder::factory()->create([
-            'customer_id' => $customer->id,
-            'cabang_id' => $cabang->id,
-            'status' => 'confirmed',
-        ]);
-        $do = DeliveryOrder::create([
-            'do_number' => 'DO-TEST-001',
-            'delivery_date' => now(),
-            'cabang_id' => $cabang->id,
-        ]);
-        $do->salesOrders()->attach($so->id);
-
-        $response = $this->get("/admin/delivery-orders/{$do->id}");
-        $response->assertStatus(200);
-        // Infolist DO menampilkan nama perusahaan customer pada daftar SO.
-        $response->assertSeeText('PT Uji Infolist DO');
-        $response->assertSeeText('Jl. Test No. 123');
-    });
 });
 // ─── SECTION 6: PDF Column Audit ─────────────────────────────────────────
 describe('PDF generators include required item columns and totals', function () {
@@ -1262,36 +1185,6 @@ describe('Account Receivable — creation and branch scope', function () {
         });
     });
 
-                it('lists only unpaid account receivables by default', function () {
-                    AccountReceivable::withoutGlobalScopes()->create([
-                        'invoice_id' => 90001,
-                        'customer_id' => $this->customer->id,
-                        'total' => 100000,
-                        'paid' => 100000,
-                        'remaining' => 0,
-                        'status' => 'Lunas',
-                        'cabang_id' => $this->cabang->id,
-                    ]);
-
-                    AccountReceivable::withoutGlobalScopes()->create([
-            'invoice_id' => 90002,
-                        'customer_id' => $this->customer->id,
-                        'total' => 200000,
-                        'paid' => 50000,
-                        'remaining' => 150000,
-                        'status' => 'Belum Lunas',
-                        'cabang_id' => $this->cabang->id,
-                    ]);
-
-                    $page = new \App\Filament\Resources\AccountReceivableResource\Pages\ListAccountReceivables();
-                    $reflection = new \ReflectionMethod($page, 'getFilteredQuery');
-                    $reflection->setAccessible(true);
-
-                    $filtered = $reflection->invoke($page);
-
-                    expect($filtered->pluck('status')->all())->toBe(['Belum Lunas']);
-                    expect($filtered->count())->toBe(1);
-                });
 });
 
 // ─── SECTION 7: Inclusive Tax Invoice ───────────────────────────────────────

@@ -5,9 +5,6 @@ namespace App\Models;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 use App\Traits\LogsGlobalActivity;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Models\Contracts\HasAvatar;
-use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -15,7 +12,7 @@ use Illuminate\Support\Str;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser, MustVerifyEmail
+class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable, HasRoles {
         hasPermissionTo as protected spatieHasPermissionTo;
@@ -107,11 +104,6 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             ->explode(' ')
             ->map(fn(string $name) => Str::of($name)->substr(0, 1))
             ->implode('');
-    }
-
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return true;
     }
 
     public function warehouse()

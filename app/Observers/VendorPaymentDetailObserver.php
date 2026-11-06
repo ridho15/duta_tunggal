@@ -7,9 +7,9 @@ use App\Models\AccountPayable;
 use App\Models\ChartOfAccount;
 use App\Models\Deposit;
 use App\Models\VendorPaymentDetail;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Support\Flash;
 
 class VendorPaymentDetailObserver
 {
@@ -225,12 +225,7 @@ class VendorPaymentDetailObserver
 
     protected function notifyDepositValidationFailure(string $title, string $message): void
     {
-        Notification::make()
-            ->title($title)
-            ->body($message)
-            ->danger()
-            ->persistent()
-            ->send();
+        Flash::error($title, $message);
 
         Log::warning($title . ': ' . $message);
     }

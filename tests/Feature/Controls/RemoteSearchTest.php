@@ -5,7 +5,6 @@
  * label nilai terpilih selalu pulih; NIK/NPWP dicari tetapi tidak ditampilkan; form Invoice tidak memuat seluruh tabel; pemindai pola.
  */
 
-use App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Services\RemoteSearch;
@@ -125,36 +124,3 @@ it('endpoint /api/v1/search/{type}: hasil JSON untuk yang berizin; 403 tanpa izi
     test()->getJson('/api/v1/search/customers?q=Pelanggan')->assertUnauthorized();
 });
 
-it('form Invoice tidak memuat seluruh tabel customer/produk (kueri berbatas) dan customer ke-500 dapat dipilih lewat pencarian', function () {
-    $ctx = stkContext();
-    rsCustomers(520, $ctx);
-    $user = ctlUser($ctx, 'Finance Manager', ['view any invoice', 'create invoice', 'view invoice']);
-
-    $unbounded = [];
-    DB::listen(function ($query) use (&$unbounded) {
-        if (preg_match('/from `(customers|products)`/i', $query->sql) && ! preg_match('/limit|`id` = \?|`id` in|count\(|exists/i', $query->sql)) {
-            $unbounded[] = $query->sql;
-        }
-    });
-
-    $component = Livewire::actingAs($user)->test(CreateSalesInvoice::class)->assertSuccessful();
-    expect($unbounded)->toBe([]);
-
-    $field = $component->instance()->getForm('form')->getFlatFields()['selected_customer'];
-    $results = $field->getSearchResults('Pelanggan 500');
-    expect(array_values($results))->toContain('(C-0500) Pelanggan 500 - PT Anggrek Khusus')->and(count($field->getSearchResults('Pelanggan')))->toBe(50);
-    $selected = Customer::where('code', 'C-0500')->first();
-    expect(app(RemoteSearch::class)->label('customers', $selected->id))->toBe('(C-0500) Pelanggan 500 - PT Anggrek Khusus');
-});
-
-it('pemindai: resource penjualan tidak memakai pola "Model::all() + preload" dan tidak menambah limit(50) statis baru', function () {
-    $files = ['SalesInvoiceResource', 'SaleOrderResource', 'QuotationResource', 'DeliveryOrderResource', 'CustomerReceiptResource', 'CustomerReturnResource'];
-    // utang lama yang diketahui: pilihan Cabang/Supplier/Gudang (bukan customer/produk/dokumen) — hanya boleh menyusut
-    $allowedLimit50 = ['SaleOrderResource' => 4, 'QuotationResource' => 3, 'DeliveryOrderResource' => 1, 'CustomerReturnResource' => 1];
-
-    foreach ($files as $name) {
-        $source = file_get_contents(app_path("Filament/Resources/{$name}.php"));
-        expect(preg_match('/(Customer|Product|SaleOrder|Quotation|Invoice)::all\(\)->mapWithKeys/', $source))->toBe(0, "{$name}: Model::all()->mapWithKeys");
-        expect(substr_count($source, '->limit(50)'))->toBeLessThanOrEqual($allowedLimit50[$name] ?? 0, "{$name}: limit(50) statis baru");
-    }
-});

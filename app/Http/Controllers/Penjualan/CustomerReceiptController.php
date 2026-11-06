@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Penjualan;
 
 use App\Enums\PaymentStatus;
-use App\Filament\Resources\CustomerReceiptResource;
 use App\Helpers\MoneyHelper;
 use App\Http\Controllers\Controller;
 use App\Models\AccountReceivable;
@@ -244,7 +243,7 @@ class CustomerReceiptController extends Controller
      */
     protected function getInvoicesForCustomer(int $customerId): array
     {
-        return CustomerReceiptResource::invoiceableInvoicesQuery($customerId)
+        return Invoice::invoiceableForCustomer($customerId)
             ->with(['cabang', 'accountReceivable'])
             ->orderBy('id', 'asc')
             ->get()

@@ -197,11 +197,23 @@
             <td>: {{ $doc['delivery']['tracking_number'] ?? '-' }}</td>
         </tr>
         <tr>
-            <td class="label">Customer</td>
+            <td class="label">Customer (Pembeli)</td>
             <td>: {{ implode(', ', $doc['customers']) ?: '-' }}</td>
             <td class="label">No. Jadwal</td>
             <td>: {{ $doc['delivery']['schedule_number'] ?? '-' }}@if ($doc['delivery']['departure']) ({{ $doc['delivery']['departure'] }})@endif</td>
         </tr>
+        @if (!empty($doc['recipient_names']) || !empty($doc['recipient_phones']))
+        <tr>
+            <td class="label">Tujuan / Proyek</td>
+            <td>: {{ implode(', ', $doc['recipient_names']) ?: '-' }}
+                @if (!empty($doc['recipient_phones']))
+                    <span class="muted" style="font-size: 10px;">(PIC: {{ implode(', ', $doc['recipient_phones']) }})</span>
+                @endif
+            </td>
+            <td class="label">Penerima Lapangan</td>
+            <td>: {{ implode(', ', $doc['recipient_names']) ?: '-' }}</td>
+        </tr>
+        @endif
         <tr>
             <td class="label">Alamat Pengiriman</td>
             <td colspan="3">: {{ implode(' | ', $doc['addresses']) ?: '-' }}</td>
@@ -213,6 +225,12 @@
         <div class="group-meta">
             SO: {{ implode(', ', $group['sales_orders']) ?: '-' }}
             &nbsp;|&nbsp; Customer: {{ implode(', ', $group['customers']) ?: '-' }}
+            @if (!empty($group['recipient_names']))
+                &nbsp;|&nbsp; Proyek: {{ implode(', ', $group['recipient_names']) }}
+                @if (!empty($group['recipient_phones']))
+                    (PIC: {{ implode(', ', $group['recipient_phones']) }})
+                @endif
+            @endif
             @if (count($doc['groups']) > 1 && count($group['addresses']))
                 &nbsp;|&nbsp; Alamat: {{ implode(' | ', $group['addresses']) }}
             @endif

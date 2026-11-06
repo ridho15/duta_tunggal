@@ -5,11 +5,6 @@
  * Pratinjau dibandingkan dengan HASIL NYATA eksekusi; aksi utama terlihat tanpa membuka menu, sekunder di "Lainnya".
  */
 
-use App\Filament\Resources\CreditNoteResource\Pages\ViewCreditNote;
-use App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt;
-use App\Filament\Resources\CustomerReturnResource\Pages\ViewCustomerReturn;
-use App\Filament\Resources\SalesInvoiceResource\Pages\ViewSalesInvoice;
-use App\Filament\Support\DocumentActions;
 use App\Models\AccountReceivable;
 use App\Models\ChartOfAccount;
 use App\Models\CreditNote;
@@ -19,7 +14,6 @@ use App\Models\JournalEntry;
 use App\Services\CreditNoteService;
 use App\Services\CustomerReceiptCancellation;
 use App\Services\ImpactPreview;
-use Filament\Actions\ActionGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -38,27 +32,6 @@ function ipUser(array $ctx, array $extra = []): \App\Models\User
     Auth::login($user);
 
     return $user;
-}
-
-/** @return array{0: array<int, string>, 1: array<int, string>} nama aksi tingkat atas yang terlihat, dan nama aksi di dalam menu "Lainnya" */
-function ipVisibleActions($component): array
-{
-    $top = [];
-    $grouped = [];
-    foreach ($component->instance()->getCachedHeaderActions() as $action) {
-        if ($action instanceof ActionGroup) {
-            foreach ($action->getFlatActions() as $child) {
-                $grouped[] = $child->getName();
-            }
-
-            continue;
-        }
-        if ($action->isVisible()) {
-            $top[] = $action->getName();
-        }
-    }
-
-    return [$top, $grouped];
 }
 
 it('Nota Kredit (invoice belum dibayar): pratinjau = hasil nyata (piutang, status, jurnal)', function () {
@@ -116,17 +89,6 @@ it('Nota Kredit: akun belum diatur → pratinjau memberi PERINGATAN (tidak melem
     expect(fn () => app(CreditNoteService::class)->issue($cn, $user))->toThrow(\RuntimeException::class);
 });
 
-it('modal "Terbitkan" menampilkan pratinjau dampak dengan angka yang sama', function () {
-    $ctx = stkContext();
-    $user = ipUser($ctx);
-    [$invoice, $item] = ctlCreditInvoice($ctx);
-    $cn = app(CreditNoteService::class)->draft($invoice, CreditNote::TYPE_RETURN, [$item->id => 3], 'Barang rusak dikembalikan customer', actor: $user);
-    $issuer = ipUser($ctx);
-
-    Livewire::actingAs($issuer)->test(ViewCreditNote::class, ['record' => $cn->id])->mountAction('issue')
-        ->assertSee('Dampak penerbitan Nota Kredit')->assertSee('Rp 333.000,00')->assertSee('Piutang invoice '.$invoice->invoice_number)->assertSee('Dr Retur Penjualan');
-});
-
 it('Batalkan Penerimaan: pratinjau = hasil nyata (jurnal dibalik, piutang kembali, status invoice); tidak dapat dibatalkan dua kali', function () {
     $ctx = stkContext();
     $user = ipUser($ctx);
@@ -167,77 +129,3 @@ it('klik ganda pada penerbitan Nota Kredit: dua panggilan = satu efek (jurnal, p
         ->and((float) AccountReceivable::where('invoice_id', $invoice->id)->first()->total)->toBe(999000.0);
 });
 
-it('pola aksi (D13): Invoice — aksi utama terlihat, sekunder (Ubah, Hapus, Cetak, Jurnal, Batalkan) di menu "Lainnya"', function () {
-    $ctx = stkContext();
-    $user = ipUser($ctx, ['update invoice', 'delete invoice', 'updateTaxNumber invoice']);
-    [$invoice] = ctlCreditInvoice($ctx);
-
-    [$top, $grouped] = ipVisibleActions(Livewire::actingAs($user)->test(ViewSalesInvoice::class, ['record' => $invoice->id]));
-
-    expect($top)->toContain('create_credit_note')->not->toContain('delete')->not->toContain('edit')->not->toContain('cancel_invoice')->not->toContain('print_invoice')
-        ->and($grouped)->toContain('edit')->toContain('delete')->toContain('print_invoice')->toContain('view_journal_entries')->toContain('cancel_invoice');
-});
-
-it('pola aksi (D13): Nota Kredit draf — "Terbitkan" langsung, "Hapus Draf"/Cetak/Jurnal di "Lainnya"; terbit — hanya No. Nota Retur Pajak di atas', function () {
-    $ctx = stkContext();
-    $creator = ipUser($ctx);
-    [$invoice, $item] = ctlCreditInvoice($ctx);
-    $cn = app(CreditNoteService::class)->draft($invoice, CreditNote::TYPE_RETURN, [$item->id => 3], 'Barang rusak dikembalikan customer', actor: $creator);
-    $issuer = ipUser($ctx);
-
-    [$top, $grouped] = ipVisibleActions(Livewire::actingAs($issuer)->test(ViewCreditNote::class, ['record' => $cn->id]));
-    expect($top)->toBe(['issue'])->and($grouped)->toContain('print_credit_note')->toContain('delete_draft');
-
-    app(CreditNoteService::class)->issue($cn, $issuer);
-    [$top2] = ipVisibleActions(Livewire::actingAs($issuer)->test(ViewCreditNote::class, ['record' => $cn->id]));
-    expect($top2)->toBe(['tax_document_number']);
-});
-
-it('pola aksi (D13): Retur — tiap status memperlihatkan paling banyak 3 aksi utama; Ubah/Hapus/Cetak di "Lainnya"', function () {
-    $ctx = stkContext();
-    $user = ipUser($ctx, ['update customer return', 'delete customer return', 'approve customer return', 'qc customer return']);
-    [$invoice] = ctlCreditInvoice($ctx);
-
-    foreach ([CustomerReturn::STATUS_PENDING, CustomerReturn::STATUS_RECEIVED, CustomerReturn::STATUS_QC_INSPECTION, CustomerReturn::STATUS_APPROVED, CustomerReturn::STATUS_COMPLETED] as $status) {
-        $return = CustomerReturn::create([
-            'return_number' => CustomerReturn::generateReturnNumber(), 'invoice_id' => $invoice->id, 'customer_id' => $ctx['customer']->id, 'cabang_id' => $ctx['cabang']->id,
-            'warehouse_id' => $ctx['warehouse']->id, 'return_date' => now()->toDateString(), 'reason' => 'Unit cacat produksi', 'status' => $status,
-        ]);
-        [$top, $grouped] = ipVisibleActions(Livewire::actingAs($user)->test(ViewCustomerReturn::class, ['record' => $return->id]));
-
-        expect(count($top))->toBeLessThanOrEqual(3, "status {$status}: ".implode(',', $top))->and($top)->not->toContain('edit')->not->toContain('delete')->not->toContain('print_customer_return')
-            ->and($grouped)->toContain('edit')->toContain('delete')->toContain('print_customer_return');
-    }
-});
-
-it('pola aksi (D13): Penerimaan — Cetak Kwitansi di atas; Ubah, Jurnal, Batalkan di "Lainnya"', function () {
-    $ctx = stkContext();
-    $user = ipUser($ctx, ['update customer receipt']);
-    [$invoice] = ctlCreditInvoice($ctx);
-    [$receipt] = ctlPaidReceipt($ctx, $invoice, 1332000);
-
-    [$top, $grouped] = ipVisibleActions(Livewire::actingAs($user)->test(ViewCustomerReceipt::class, ['record' => $receipt->id]));
-    expect($top)->toBe(['print_receipt'])->and($grouped)->toContain('edit')->toContain('view_journal_entries')->toContain('cancel_receipt');
-});
-
-it('penjaga klik ganda: setiap aksi berefek Nota Kredit/Penerimaan menonaktifkan tombol selama permintaan berjalan', function () {
-    $ctx = stkContext();
-    $user = ipUser($ctx);
-    [$invoice, $item] = ctlCreditInvoice($ctx);
-    $cn = app(CreditNoteService::class)->draft($invoice, CreditNote::TYPE_RETURN, [$item->id => 1], 'Retur satu unit dari invoice', actor: $user);
-
-    $actions = [
-        \App\Filament\Support\CreditNoteActions::create(\Filament\Actions\Action::make('a')),
-        \App\Filament\Support\CreditNoteActions::cancelInvoice(\Filament\Actions\Action::make('b')),
-        \App\Filament\Support\CreditNoteActions::fromReturn(\Filament\Actions\Action::make('c')),
-        \App\Filament\Support\CreditNoteActions::issue(\Filament\Actions\Action::make('d')),
-        \App\Filament\Support\CreditNoteActions::taxDocumentNumber(\Filament\Actions\Action::make('e')),
-        \App\Filament\Support\CreditNoteActions::deleteDraft(\Filament\Actions\Action::make('f')),
-        \App\Filament\Support\CustomerReceiptActions::cancel(\Filament\Actions\Action::make('g')),
-    ];
-    foreach ($actions as $action) {
-        expect($action->getExtraAttributes())->toHaveKey('wire:loading.attr', 'disabled');
-    }
-
-    expect(DocumentActions::guard(\Filament\Actions\Action::make('x'))->getExtraAttributes())->toHaveKey('wire:loading.attr', 'disabled');
-});

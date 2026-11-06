@@ -20,7 +20,6 @@ use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Filament\Resources\QualityControlPurchaseResource;
 use App\Services\BalanceSheetService;
 use App\Services\QualityControlService;
 use Database\Seeders\ChartOfAccountSeeder;
@@ -293,61 +292,6 @@ class QcBeforeReceiptTest extends TestCase
             'credit' => 80000,
             'currency_id' => $usd->id,
         ]);
-    }
-
-    #[Test]
-    public function qc_purchase_money_summary_displays_original_currency_and_idr_equivalent()
-    {
-        $usd = Currency::factory()->create([
-            'name' => 'US Dollar',
-            'symbol' => '$',
-            'code' => 'USD',
-            'to_rupiah' => 15000,
-        ]);
-
-        $po = PurchaseOrder::factory()->create([
-            'supplier_id' => $this->supplier->id,
-            'status' => 'approved',
-            'warehouse_id' => $this->warehouse->id,
-        ]);
-
-        PurchaseOrderCurrency::create([
-            'purchase_order_id' => $po->id,
-            'currency_id' => $usd->id,
-            'nominal' => 15000,
-        ]);
-
-        $poItem = PurchaseOrderItem::factory()->create([
-            'purchase_order_id' => $po->id,
-            'product_id' => $this->product->id,
-            'quantity' => 10,
-            'unit_price' => 50.67,
-            'discount' => 0,
-            'tax' => 11,
-            'tipe_pajak' => 'eklusif',
-            'currency_id' => $usd->id,
-        ]);
-
-        $qc = QualityControl::factory()->create([
-            'from_model_type' => PurchaseOrderItem::class,
-            'from_model_id' => $poItem->id,
-            'product_id' => $this->product->id,
-            'quantity_received' => 5,
-            'passed_quantity' => 5,
-            'rejected_quantity' => 0,
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 1,
-        ]);
-
-        $summary = QualityControlPurchaseResource::qcPurchaseMoneySummary($qc->fresh());
-
-        $this->assertSame('$ 50,67', $summary['unit_price']);
-        $this->assertNotSame('Rp 50,67', $summary['unit_price']);
-        $this->assertSame('USD', $summary['currency']);
-        $this->assertSame('Rp 15.000,00', $summary['exchange_rate']);
-        $this->assertSame('Rp 760.050,00', $summary['unit_price_idr']);
-        $this->assertSame('5 x $ 50,67 = $ 253,35', $summary['accepted_value']);
-        $this->assertSame('Rp 3.800.250,00', $summary['accepted_value_idr']);
     }
 
     #[Test]

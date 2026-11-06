@@ -8,11 +8,6 @@
  *           nomor resi) dan checklist kesiapan master
  */
 
-use App\Filament\Resources\DeliveryScheduleResource\Pages\CreateDeliverySchedule;
-use App\Filament\Resources\SuratJalanResource;
-use App\Filament\Resources\SuratJalanResource\Pages\EditSuratJalan;
-use App\Filament\Resources\SuratJalanResource\Pages\ListSuratJalans;
-use App\Filament\Resources\SuratJalanResource\Pages\ViewSuratJalan;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
@@ -288,72 +283,6 @@ it('Isu 6: policy — hanya Draft yang boleh diubah/dihapus; kemampuan lain meng
         ->and($viewOnly['user']->can('issue', $sj))->toBeFalse();
 });
 
-it('Isu 6: halaman Edit Surat Jalan terbit diarahkan ke halaman Lihat; Draft tetap dapat dibuka', function () {
-    $ctx = phase4Context();
-    $issued = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-701')]);
-    $draft = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-702')], SuratJalan::STATUS_DRAFT);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(EditSuratJalan::class, ['record' => $issued->getKey()])
-        ->assertRedirect(SuratJalanResource::getUrl('view', ['record' => $issued]));
-
-    Livewire::actingAs($ctx['user'])
-        ->test(EditSuratJalan::class, ['record' => $draft->getKey()])
-        ->assertSuccessful()
-        ->assertNoRedirect();
-});
-
-it('Isu 6: tabel — Ubah/Hapus hanya untuk Draft; Batalkan untuk Terbit; Terbitkan Ulang untuk Dibatalkan', function () {
-    $ctx = phase4Context();
-    $draft = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-801')], SuratJalan::STATUS_DRAFT);
-    $issued = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-802')]);
-    $cancelled = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-803')], SuratJalan::STATUS_CANCELLED);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSuratJalans::class)
-        ->assertTableActionVisible('edit', $draft)
-        ->assertTableActionVisible('delete', $draft)
-        ->assertTableActionVisible('issue', $draft)
-        ->assertTableActionHidden('cancel', $draft)
-        ->assertTableActionHidden('edit', $issued)
-        ->assertTableActionHidden('delete', $issued)
-        ->assertTableActionHidden('issue', $issued)
-        ->assertTableActionVisible('cancel', $issued)
-        ->assertTableActionVisible('upload_document', $issued)
-        ->assertTableActionHidden('reissue', $issued)
-        ->assertTableActionHidden('edit', $cancelled)
-        ->assertTableActionHidden('cancel', $cancelled)
-        ->assertTableActionHidden('upload_document', $cancelled)
-        ->assertTableActionVisible('reissue', $cancelled);
-});
-
-it('Isu 6: halaman Lihat menyembunyikan Ubah/Hapus dan menampilkan Batalkan untuk Surat Jalan terbit', function () {
-    $ctx = phase4Context();
-    $issued = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-851')]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSuratJalan::class, ['record' => $issued->getKey()])
-        ->assertActionHidden('edit')
-        ->assertActionHidden('delete')
-        ->assertActionVisible('cancel')
-        ->assertActionVisible('upload_document')
-        ->assertActionHidden('reissue')
-        ->assertActionHidden('issue');
-});
-
-it('Isu 6: hapus massal hanya menghapus Draft', function () {
-    $ctx = phase4Context();
-    $draft = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-861')], SuratJalan::STATUS_DRAFT);
-    $issued = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-862')]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSuratJalans::class)
-        ->callTableBulkAction('delete', [$draft, $issued]);
-
-    expect(SuratJalan::withTrashed()->find($draft->id)->trashed())->toBeTrue()
-        ->and(SuratJalan::withTrashed()->find($issued->id)->trashed())->toBeFalse();
-});
-
 it('Isu 6: Batalkan — alasan wajib (min 5 karakter), tercatat siapa/kapan/alasan, tidak dapat dua kali', function () {
     $ctx = phase4Context();
     $sj = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-901')]);
@@ -398,46 +327,6 @@ it('Isu 6: Batalkan ditolak selama Surat Jalan masih dipakai jadwal berjalan/sel
     DeliverySchedule::withoutGlobalScopes()->whereKey($schedule->id)->update(['status' => 'cancelled']);
     app(SuratJalanService::class)->cancel($sj->fresh(), 'Jadwal sudah dibatalkan');
     expect($sj->fresh()->status)->toBe(SuratJalan::STATUS_CANCELLED);
-});
-
-it('Isu 6: aksi Batalkan dari tabel dan halaman Lihat mewajibkan alasan dan menyimpannya', function () {
-    $ctx = phase4Context();
-    $a = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-931')]);
-    $b = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-932')]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSuratJalans::class)
-        ->callTableAction('cancel', $a, data: ['cancel_reason' => ''])
-        ->assertHasTableActionErrors(['cancel_reason' => 'required']);
-    expect($a->fresh()->status)->toBe(SuratJalan::STATUS_ISSUED);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSuratJalans::class)
-        ->callTableAction('cancel', $a, data: ['cancel_reason' => 'Salah customer'])
-        ->assertHasNoTableActionErrors();
-    expect($a->fresh()->status)->toBe(SuratJalan::STATUS_CANCELLED)->and($a->fresh()->cancel_reason)->toBe('Salah customer');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSuratJalan::class, ['record' => $b->getKey()])
-        ->callAction('cancel', data: ['cancel_reason' => 'Barang kosong'])
-        ->assertHasNoActionErrors();
-    expect($b->fresh()->status)->toBe(SuratJalan::STATUS_CANCELLED);
-});
-
-it('Isu 6: hanya dokumen bertanda tangan yang dapat diunggah pada Surat Jalan terbit', function () {
-    $ctx = phase4Context();
-    $sj = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-941')]);
-
-    Storage::fake('public');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSuratJalan::class, ['record' => $sj->getKey()])
-        ->callAction('upload_document', data: ['document_path' => UploadedFile::fake()->create('bukti.pdf', 100, 'application/pdf')])
-        ->assertHasNoActionErrors();
-
-    $after = $sj->fresh();
-    expect($after->document_path)->toStartWith('surat-jalan-documents/')
-        ->and($after->status)->toBe(SuratJalan::STATUS_ISSUED);
 });
 
 it('Isu 6: Terbitkan Draft — DO harus approved dan belum di Surat Jalan lain', function () {
@@ -519,19 +408,6 @@ it('Isu 6: Terbitkan Ulang ditolak bila DO sudah tidak approved', function () {
     expect(fn () => app(SuratJalanService::class)->reissue($old->fresh()))->toThrow(ValidationException::class, 'approved');
 });
 
-it('Isu 6: aksi Terbitkan Ulang dari tabel', function () {
-    $ctx = phase4Context();
-    $do = phase4DeliveryOrder($ctx, 'DO-P4-E01');
-    $old = phase4SuratJalan($ctx, [$do]);
-    app(SuratJalanService::class)->cancel($old, 'Perlu dicetak ulang');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSuratJalans::class)
-        ->callTableAction('reissue', $old->fresh());
-
-    expect(SuratJalan::where('status', SuratJalan::STATUS_ISSUED)->count())->toBe(1);
-});
-
 it('Isu 6: nomor Surat Jalan berurutan per hari, melanjutkan dari nomor terbesar (bukan acak)', function () {
     $ctx = phase4Context();
     $service = app(SuratJalanService::class);
@@ -547,64 +423,6 @@ it('Isu 6: nomor Surat Jalan berurutan per hari, melanjutkan dari nomor terbesar
 });
 
 // ───────────────────────────── Isu 6: halaman Lihat & daftar ─────────────────────────────
-
-it('Isu 6: halaman Lihat menampilkan status, pengiriman dari jadwal, dan DO tanpa error', function () {
-    $ctx = phase4Context();
-    $do = phase4DeliveryOrder($ctx, 'DO-P4-F01');
-    $sj = phase4SuratJalan($ctx, [$do]);
-    phase4Schedule($ctx, $sj, ['delivery_method' => 'ekspedisi', 'driver_name' => 'Ekspedisi Lancar', 'tracking_number' => 'RESI-001']);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSuratJalan::class, ['record' => $sj->getKey()])
-        ->assertSuccessful()
-        ->assertSee($sj->sj_number)
-        ->assertSee('Terbit')
-        ->assertSee('Ekspedisi Lancar')
-        ->assertSee('RESI-001')
-        ->assertSee('DO-P4-F01')
-        ->assertSee('PT Maju Bersama');
-});
-
-it('Isu 6: halaman Lihat Surat Jalan dibatalkan menampilkan bagian Pembatalan beserta alasan', function () {
-    $ctx = phase4Context();
-    $sj = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-F11')]);
-    app(SuratJalanService::class)->cancel($sj, 'Barang tidak jadi dikirim');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSuratJalan::class, ['record' => $sj->getKey()])
-        ->assertSee('Dibatalkan')
-        ->assertSee('Barang tidak jadi dikirim');
-});
-
-it('Isu 6: daftar menampilkan driver dari jadwal / "Belum dijadwalkan", badge status, dan filter Draft (0) bekerja', function () {
-    $ctx = phase4Context();
-    $scheduled = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-G01')]);
-    $unscheduled = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-G02')]);
-    $draft = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-G03')], SuratJalan::STATUS_DRAFT);
-    phase4Schedule($ctx, $scheduled, ['delivery_method' => 'ekspedisi', 'driver_name' => 'Kurir Cepat']);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSuratJalans::class)
-        ->assertTableColumnStateSet('driver_info', 'Kurir Cepat', $scheduled)
-        ->assertTableColumnStateSet('driver_info', 'Belum dijadwalkan', $unscheduled)
-        ->assertTableColumnFormattedStateSet('status', 'Terbit', $scheduled)
-        ->assertTableColumnFormattedStateSet('status', 'Draft', $draft)
-        ->filterTable('status', '0')
-        ->assertCanSeeTableRecords([$draft])
-        ->assertCanNotSeeTableRecords([$scheduled, $unscheduled]);
-});
-
-it('Isu 6: rekap Surat Jalan memakai label status Draft/Terbit/Dibatalkan', function () {
-    $ctx = phase4Context();
-    phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-H01')], SuratJalan::STATUS_CANCELLED, ['sj_number' => 'SJ-REKAP-BATAL']);
-
-    $suratJalans = ListSuratJalans::getRekapSuratJalanQuery(null, null, 'all')->get();
-    $html = view('pdf.surat-jalan-recap', [
-        'suratJalans' => $suratJalans, 'tanggalMulai' => null, 'tanggalSelesai' => null, 'statusPengiriman' => '2',
-    ])->render();
-
-    expect($html)->toContain('SJ-REKAP-BATAL')->toContain('Dibatalkan');
-});
 
 // ───────────────────────────── Isu 8: master kosong & pengirim ─────────────────────────────
 
@@ -648,80 +466,6 @@ it('Isu 8: master kosong → default metode Ekspedisi dan terdeteksi driver/kend
 
     Vehicle::factory()->create(['cabang_id' => $ctx['cabang']->id]);
     expect($service->missingFleetMasters())->toBe([])->and($service->defaultDeliveryMethod())->toBe('internal');
-});
-
-it('Isu 8: form Jadwal dengan master kosong menampilkan penjelasan dan default Ekspedisi; pengiriman ekspedisi dapat dijadwalkan tanpa driver internal', function () {
-    $ctx = phase4Context();
-    $sj = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-J01')]);
-
-    $component = Livewire::actingAs($ctx['user'])
-        ->test(CreateDeliverySchedule::class)
-        ->assertSee('Master driver dan kendaraan belum diisi')
-        ->assertFormSet(['delivery_method' => 'ekspedisi'])
-        ->fillForm([
-            'schedule_number' => DeliveryScheduleService::generateStaticScheduleNumber(),
-            'cabang_id' => $ctx['cabang']->id,
-            'suratJalan' => [$sj->id],
-            'scheduled_date' => now()->addDay()->format('Y-m-d H:i:s'),
-            'delivery_method' => 'ekspedisi',
-            'driver_name' => 'Ekspedisi Nusantara',
-            'vehicle_info' => 'Truk Box B 9999 ZZ',
-            'tracking_number' => 'ENU-2026-0001',
-            'status' => 'pending',
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $schedule = DeliverySchedule::withoutGlobalScopes()->where('driver_name', 'Ekspedisi Nusantara')->firstOrFail();
-    expect($schedule->tracking_number)->toBe('ENU-2026-0001')
-        ->and($schedule->driver_id)->toBeNull()
-        ->and($schedule->suratJalan()->pluck('surat_jalans.id')->all())->toBe([$sj->id]);
-});
-
-it('Isu 8: jadwal internal tanpa driver/kendaraan ditolak dengan pesan yang menjelaskan', function () {
-    $ctx = phase4Context();
-    $sj = phase4SuratJalan($ctx, [phase4DeliveryOrder($ctx, 'DO-P4-J11')]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateDeliverySchedule::class)
-        ->fillForm([
-            'schedule_number' => DeliveryScheduleService::generateStaticScheduleNumber(),
-            'cabang_id' => $ctx['cabang']->id,
-            'suratJalan' => [$sj->id],
-            'scheduled_date' => now()->addDay()->format('Y-m-d H:i:s'),
-            'delivery_method' => 'internal',
-            'status' => 'pending',
-        ])
-        ->call('create')
-        ->assertHasFormErrors(['driver_id' => 'required', 'vehicle_id' => 'required']);
-
-    expect(DeliverySchedule::withoutGlobalScopes()->count())->toBe(0);
-});
-
-it('Isu 8: tautan tambah master hanya untuk pengguna berizin; lainnya diminta menghubungi admin', function () {
-    $withPermission = phase4Context(array_merge(P4_SJ_PERMISSIONS, ['create driver', 'create vehicle']));
-    Livewire::actingAs($withPermission['user'])
-        ->test(CreateDeliverySchedule::class)
-        ->assertSee('Tambah Driver')
-        ->assertSee('Tambah Kendaraan')
-        ->assertDontSee('hubungi admin master data');
-
-    $without = phase4Context();
-    Livewire::actingAs($without['user'])
-        ->test(CreateDeliverySchedule::class)
-        ->assertSee('hubungi admin master data')
-        ->assertDontSee('Tambah Driver');
-});
-
-it('Isu 8: banner tidak tampil dan default Internal bila master lengkap', function () {
-    $ctx = phase4Context();
-    Driver::factory()->create(['cabang_id' => $ctx['cabang']->id]);
-    Vehicle::factory()->create(['cabang_id' => $ctx['cabang']->id]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateDeliverySchedule::class)
-        ->assertDontSee('belum diisi')
-        ->assertFormSet(['delivery_method' => 'internal']);
 });
 
 it('Isu 8: status "Sebagian Terkirim" tersedia dan berlabel; DO ikut berstatus sent (bukan completed)', function () {

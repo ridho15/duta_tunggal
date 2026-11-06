@@ -596,4 +596,60 @@ class Invoice extends Model
 
         return (float) ($this->total ?? 0);
     }
+
+    /** Invoice yang dapat dibayar oleh penerimaan customer ini (AR aktif, atau tertaut ke SO/Surat Jalan customer), masih bersisa. */
+    public function scopeInvoiceableForCustomer($query, int $customerId, array $includeInvoiceIds = [])
+    {
+        return $query
+            ->where(function ($query) use ($customerId) {
+                // Invoices with active Account Receivable for this customer
+                $query->whereExists(function ($sub) use ($customerId) {
+                    $sub->selectRaw('1')
+                        ->from('account_receivables')
+                        ->whereColumn('account_receivables.invoice_id', 'invoices.id')
+                        ->where('account_receivables.customer_id', $customerId)
+                        ->whereNull('account_receivables.deleted_at');
+                })
+                // OR legacy invoices linked to SaleOrder directly
+                ->orWhere(function ($soQuery) use ($customerId) {
+                    $soQuery->where('invoices.from_model_type', SaleOrder::class)
+                        ->whereExists(function ($sub) use ($customerId) {
+                            $sub->selectRaw('1')
+                                ->from('sale_orders')
+                                ->whereColumn('sale_orders.id', 'invoices.from_model_id')
+                                ->where('sale_orders.customer_id', $customerId)
+                                ->whereNull('sale_orders.deleted_at');
+                        });
+                })
+                // OR invoices linked to SuratJalan whose delivery order belongs to this customer
+                ->orWhere(function ($sjQuery) use ($customerId) {
+                    $sjQuery->where('invoices.from_model_type', \App\Models\SuratJalan::class)
+                        ->whereExists(function ($sub) use ($customerId) {
+                            $sub->selectRaw('1')
+                                ->from('surat_jalans')
+                                ->join('surat_jalan_delivery_orders', 'surat_jalans.id', '=', 'surat_jalan_delivery_orders.surat_jalan_id')
+                                ->join('delivery_sales_orders', 'surat_jalan_delivery_orders.delivery_order_id', '=', 'delivery_sales_orders.delivery_order_id')
+                                ->join('sale_orders', 'delivery_sales_orders.sales_order_id', '=', 'sale_orders.id')
+                                ->whereColumn('surat_jalans.id', 'invoices.from_model_id')
+                                ->where('sale_orders.customer_id', $customerId)
+                                ->whereNull('sale_orders.deleted_at');
+                        });
+                });
+            })
+            ->where(function ($query) use ($includeInvoiceIds) {
+                $query->whereExists(function ($sub) {
+                    $sub->selectRaw('1')
+                        ->from('account_receivables')
+                        ->whereColumn('account_receivables.invoice_id', 'invoices.id')
+                        ->where('account_receivables.remaining', '>', 1.00)
+                        ->whereNull('account_receivables.deleted_at');
+                });
+
+                if ($includeInvoiceIds !== []) {
+                    $query->orWhereIn('invoices.id', $includeInvoiceIds);
+                }
+            })
+            ->select('invoices.*') // Select only invoice columns to avoid conflicts
+            ->distinct(); // Ensure no duplicates
+    }
 }

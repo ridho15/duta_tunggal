@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\CustomerReceipt;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
+use App\Support\Flash;
 
 /**
  * Aturan referensi & bukti pada Penerimaan Customer non-tunai (T1.3).
@@ -62,13 +62,8 @@ class CustomerReceiptReference
             return;
         }
 
-        Notification::make()
-            ->title('Kemungkinan penerimaan ganda')
-            ->body('Referensi "'.$receipt->payment_reference.'" dengan akun dan nominal yang sama sudah tercatat pada penerimaan #'
+        Flash::warning('Kemungkinan penerimaan ganda', 'Referensi "'.$receipt->payment_reference.'" dengan akun dan nominal yang sama sudah tercatat pada penerimaan #'
                 .$duplicates->pluck('id')->implode(', #').' ('.$duplicates->map(fn ($d) => $d->customer?->name)->filter()->unique()->implode(', ').'). '
-                .'Penerimaan ini tetap tersimpan — pastikan bukan pencatatan ganda.')
-            ->warning()
-            ->persistent()
-            ->send();
+                .'Penerimaan ini tetap tersimpan, pastikan bukan pencatatan ganda.');
     }
 }

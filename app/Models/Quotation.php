@@ -144,6 +144,8 @@ class Quotation extends Model
         'exchange_rate',
         'tempo_pembayaran',
         'shipped_to',
+        'shipping_recipient_name',
+        'shipping_recipient_phone',
         'total_amount',
         'status_payment',
         'po_file_path',

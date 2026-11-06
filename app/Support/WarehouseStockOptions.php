@@ -106,4 +106,68 @@ class WarehouseStockOptions
             })
             ->toArray();
     }
+
+    /** Gudang bernilai stok bebas > 0 untuk produk (dropdown Pengeluaran Bahan), dibatasi cabang user bila tidak 'all'. */
+    public static function issueOptionsForProduct(?int $productId, ?string $search = null): array
+    {
+        if (! $productId) {
+            return [];
+        }
+
+        $warehouseIds = InventoryStock::query()
+            ->where('product_id', $productId)
+            ->whereRaw('(qty_available - qty_reserved) > 0')
+            ->distinct()
+            ->pluck('warehouse_id')
+            ->all();
+
+        if (empty($warehouseIds)) {
+            return [];
+        }
+
+        $query = Warehouse::withoutGlobalScopes()
+            ->whereIn('id', $warehouseIds)
+            ->orderBy('kode');
+
+        if (! app()->runningInConsole()) {
+            $user = Auth::user();
+            $manageType = $user?->manage_type ?? [];
+
+            if (! $user || ! is_array($manageType) || ! in_array('all', $manageType)) {
+                $query->where('cabang_id', $user?->cabang_id);
+            }
+        }
+
+        if (filled($search)) {
+            $query->where(function ($searchQuery) use ($search) {
+                $searchQuery->where('kode', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(function ($warehouse) {
+                return [$warehouse->id => "({$warehouse->kode}) {$warehouse->name}"];
+            })
+            ->toArray();
+    }
+
+    public static function issueWarehouseIdForProduct(?int $productId, ?int $preferredWarehouseId = null): ?int
+    {
+        if (! $productId) {
+            return null;
+        }
+
+        $options = self::issueOptionsForProduct($productId);
+
+        if ($preferredWarehouseId && array_key_exists($preferredWarehouseId, $options)) {
+            return $preferredWarehouseId;
+        }
+
+        $firstWarehouseId = array_key_first($options);
+
+        return $firstWarehouseId !== null ? (int) $firstWarehouseId : null;
+    }
 }

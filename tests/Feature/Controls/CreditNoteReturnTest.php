@@ -190,9 +190,3 @@ it('laporan: tanpa Nota Kredit terbit angkanya identik dengan perilaku lama dan 
         ->and(collect($queries)->filter(fn ($sql) => str_contains($sql, 'invoice_id'))->all())->toBe([]);
 });
 
-it('invoice cancelled tidak menghalangi Surat Jalannya ditagih ulang (filter status canceled/cancelled)', function () {
-    $needle = "whereNotIn('status', ['canceled', 'cancelled'])";
-    foreach (['app/Filament/Resources/SalesInvoiceResource.php', 'app/Filament/Resources/SalesInvoiceResource/Pages/CreateSalesInvoice.php', 'app/Observers/DeliveryOrderObserver.php'] as $file) {
-        expect(file_get_contents(base_path($file)))->toContain($needle);
-    }
-});

@@ -22,16 +22,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(\App\Http\Middleware\IncreaseMemoryLimit::class);
         $middleware->validateCsrfTokens(except: ['api/*']);
         // Profiler request: tidak melakukan apa pun kecuali PERF_PROFILE=true (config/perf.php).
-        // Global (bukan grup web/api): rute panel Filament memakai daftar middleware panel sendiri, bukan grup web.
+        // Global (bukan grup web/api) agar semua request terprofil.
         $middleware->append(\App\Http\Middleware\ProfileRequest::class);
-        // Lockdown Filament: alihkan seluruh akses /admin ke Dashboard Blade Native
+        // Tautan lama /admin diarahkan ke Dashboard Blade.
         $middleware->append(\App\Http\Middleware\RedirectAdminToDashboard::class);
         $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
     })
     ->withProviders([
         EventServiceProvider::class,
         \App\Providers\AuthServiceProvider::class,
-        \App\Providers\FilamentServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (\App\Exceptions\ClosedPeriodException $e, \Illuminate\Http\Request $request) {

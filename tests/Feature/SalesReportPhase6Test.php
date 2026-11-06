@@ -10,8 +10,6 @@
  */
 
 use App\Exports\SalesReportExport;
-use App\Filament\Pages\SalesReportPage;
-use App\Filament\Widgets\SoBelumSelesaiTable;
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -38,6 +36,13 @@ use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
 
 uses(RefreshDatabase::class);
+
+// Tes lama membuat DO tanpa stok; sejak Tahap 3 stok dipotong saat DO dibuat. Tunda pemotongan (perilaku sebelum Tahap 3).
+beforeEach(function () {
+    config(['sales.invoice.auto_on_do_complete' => true]);   // tes ini menguji jalur invoice otomatis (default mati sejak B25)
+    \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+        $this->beforeApplicationDestroyed(fn () => \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false);
+});
 
 function p6Context(): array
 {
@@ -440,74 +445,5 @@ it('Isu 9: PDF laporan invoice memuat kolom baru, ringkasan HPP/margin, rekonsil
 
 // ───────────────────────────── Halaman laporan ─────────────────────────────
 
-it('Isu 9: halaman laporan — default Invoice, menampilkan HPP/margin/pembayaran, dan ringkasan periode', function () {
-    $ctx = p6Context();
-    $invoice = p6Invoice($ctx);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(SalesReportPage::class)
-        ->assertSet('mode', 'invoice')
-        ->assertSee($invoice->invoice_number)
-        ->assertSee('PT Laporan Enam')
-        ->assertSee('Rp 100.000,00')          // HPP
-        ->assertSee('Rp 65.053,00')           // margin
-        ->assertSee('39,41%')
-        ->assertSee('Belum Bayar')
-        ->assertSee('Total HPP')
-        ->assertSee('Rekonsiliasi HPP dengan Jurnal');
-});
-
-it('Isu 9: satu instance SalesReportService per request — cache baris tidak dibuat ulang tiap sel', function () {
-    $ctx = p6Context();
-
-    $page = Livewire::actingAs($ctx['user'])->test(SalesReportPage::class)->instance();
-    $method = new ReflectionMethod($page, 'salesReportService');
-
-    expect($method->invoke($page))->toBe($method->invoke($page));
-});
-
-it('Isu 9: mengganti mode mereset filter status; opsi status berasal dari konstanta mode aktif', function () {
-    $ctx = p6Context();
-    p6SaleOrder($ctx, ['so_number' => 'SO-6-MODE', 'status' => 'approved']);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(SalesReportPage::class)
-        ->set('mode', 'order')
-        ->set('status', 'approved')
-        ->assertSee('SO-6-MODE')
-        ->set('mode', 'delivery')
-        ->assertSet('status', null)
-        ->assertDontSee('SO-6-MODE');
-});
-
-it('Isu 9: mode Pengiriman di halaman menampilkan DO, HPP stok, dan margin', function () {
-    $ctx = p6Context();
-    [$so, $soItem] = p6SaleOrder($ctx);
-    [$do] = p6Delivery($ctx, $so, $soItem, 'sent');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(SalesReportPage::class)
-        ->set('mode', 'delivery')
-        ->assertSee($do->do_number)
-        ->assertSee('HPP (Stok)')
-        ->assertSee('Dalam pengiriman');
-});
-
 // ───────────────────────────── Widget SO Belum Selesai ─────────────────────────────
 
-it('Isu 9: widget "SO Belum Selesai" hanya menampilkan SO yang masih berjalan', function () {
-    $ctx = p6Context();
-    [$approved] = p6SaleOrder($ctx, ['status' => 'approved']);
-    [$partial] = p6SaleOrder($ctx, ['status' => 'partially_delivered']);
-    [$draft] = p6SaleOrder($ctx, ['status' => 'draft']);
-    [$waiting] = p6SaleOrder($ctx, ['status' => 'request_approve']);
-    [$completed] = p6SaleOrder($ctx, ['status' => 'completed']);
-    [$closed] = p6SaleOrder($ctx, ['status' => 'closed']);
-    [$canceled] = p6SaleOrder($ctx, ['status' => 'canceled']);
-    [$rejected] = p6SaleOrder($ctx, ['status' => 'reject']);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(SoBelumSelesaiTable::class)
-        ->assertCanSeeTableRecords([$approved, $partial])
-        ->assertCanNotSeeTableRecords([$draft, $waiting, $completed, $closed, $canceled, $rejected]);
-});

@@ -8,9 +8,9 @@ use App\Models\MaterialIssueItem;
 use App\Models\Production;
 use App\Services\ManufacturingJournalService;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Support\Flash;
 
 class MaterialIssueObserver
 {
@@ -90,11 +90,7 @@ class MaterialIssueObserver
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            Notification::make()
-                ->title('Gagal Membuat Jurnal Material Issue')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
+            Flash::error('Gagal Membuat Jurnal Material Issue', $e->getMessage());
         }
     }
 

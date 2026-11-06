@@ -241,6 +241,15 @@
                     </a>
                 @endif
 
+                @if ($canSee(['OWN', 'GDG', 'FIN']))
+                    <a href="{{ route('gudang.adjustment.index') }}" class="{{ $itemClass(request()->is('gudang/penyesuaian*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"></path>
+                        </svg>
+                        <span>Penyesuaian Stok</span>
+                    </a>
+                @endif
+
                 @if ($canSee(['OWN', 'GDG', 'PUR', 'FIN']))
                     <a href="{{ route('gudang.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/laporan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -379,6 +388,13 @@
                             <path d="M6 6h10M6 10h10" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
                         <span>Buku Besar & Jurnal</span>
+                    </a>
+
+                    <a href="{{ route('keuangan.period.index') }}" class="{{ $itemClass(request()->is('keuangan/tutup-buku*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"></path>
+                        </svg>
+                        <span>Tutup Buku</span>
                     </a>
 
                     <a href="{{ route('master.coa.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/coa*') || request()->is('keuangan/coa*')) }}">
@@ -521,6 +537,15 @@
                     </svg>
                     <span>Pengguna & Peran</span>
                 </a>
+
+                @if ($isSuper)
+                    <a href="{{ route('settings.approval-rules.index') }}" class="{{ $itemClass(request()->is('pengaturan/aturan-persetujuan*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+                        </svg>
+                        <span>Aturan Persetujuan</span>
+                    </a>
+                @endif
             </div>
         @endif
 

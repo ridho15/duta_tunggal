@@ -1,6 +1,5 @@
 <?php
 
-use App\Filament\Resources\SalesInvoiceResource\Pages\CreateSalesInvoice;
 use App\Models\AccountReceivable;
 use App\Models\DeliveryOrder;
 use App\Models\Invoice;
@@ -99,23 +98,6 @@ it('INV-BV-02: penolakan penerbitan faktur dari Delivery Order ilegal atau belum
 
     // Validasi bisnis melarang penagihan DO yang belum selesai/dikirim
     expect(in_array($do->status, ['sent', 'delivered', 'completed']))->toBeFalse();
-});
-
-it('INV-BV-03: sistem menolak penerbitan faktur penjualan bernilai Rp 0', function () {
-    $createPage = new class extends CreateSalesInvoice {
-        public function testMutate(array $data): array {
-            return $this->mutateFormDataBeforeCreate($data);
-        }
-    };
-
-    // Percobaan membuat invoice dengan total dan subtotal 0
-    expect(function () use ($createPage) {
-        $createPage->testMutate([
-            'total' => 0,
-            'subtotal' => 0,
-            'selected_delivery_orders' => [999],
-        ]);
-    })->toThrow(ValidationException::class);
 });
 
 it('INV-BV-04: fallback aman saat exchange rate mata uang nol atau null tanpa menyebabkan crash division by zero', function () {

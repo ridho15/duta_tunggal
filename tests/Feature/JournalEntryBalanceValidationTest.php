@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\JournalEntry;
 use App\Models\ChartOfAccount;
 use App\Models\Cabang;
-use App\Filament\Resources\JournalEntryResource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use Illuminate\Support\Facades\Validator;

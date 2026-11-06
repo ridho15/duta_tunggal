@@ -17,16 +17,13 @@ use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Supplier;
 use App\Models\Warehouse;
-use App\Filament\Resources\PurchaseReturnResource\Pages\ViewPurchaseReturn;
 use App\Http\Controllers\HelperController;
 use App\Services\PurchaseReturnService;
 use App\Services\BalanceSheetService;
 use App\Services\StockService;
 use App\Services\AccountingService;
-use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -46,77 +43,6 @@ if (! function_exists('registerPurchaseReturnPermissions')) {
                 ]);
             }
         }
-    }
-}
-
-if (! function_exists('grantPurchaseReturnFilamentPermissions')) {
-    function grantPurchaseReturnFilamentPermissions(User $user): void
-    {
-        registerPurchaseReturnPermissions();
-
-        $user->givePermissionTo([
-            'view any purchase return',
-            'view purchase return',
-            'create purchase return',
-            'update purchase return',
-            'view any purchase receipt',
-            'view purchase receipt',
-            'view any purchase order',
-            'view purchase order',
-        ]);
-    }
-}
-
-if (! function_exists('createPurchaseReturnRecordForNotificationTest')) {
-    function createPurchaseReturnRecordForNotificationTest(User $user, string $status = 'draft'): PurchaseReturn
-    {
-        $purchaseOrder = PurchaseOrder::create([
-            'supplier_id' => Supplier::withoutGlobalScopes()->first()?->id,
-            'po_number' => 'PO-' . strtoupper(Str::random(6)),
-            'order_date' => now()->subDays(rand(1, 30)),
-            'status' => 'completed',
-            'received_by' => $user->id,
-            'expected_date' => now()->addDays(rand(3, 14)),
-            'total_amount' => rand(50000, 2000000),
-            'currency_id' => 1,
-            'created_by' => $user->id,
-            'is_asset' => rand(0, 1),
-            'close_reason' => null,
-            'date_approved' => now(),
-            'approved_by' => $user->id,
-            'tempo_hutang' => rand(0, 60),
-            'note' => null,
-            'close_requested_by' => $user->id,
-            'close_requested_at' => now(),
-            'closed_by' => $user->id,
-            'closed_at' => now(),
-            'completed_by' => $user->id,
-            'completed_at' => now(),
-            'refer_model_type' => null,
-            'refer_model_id' => null,
-            'is_import' => false,
-        ]);
-
-        $purchaseReceipt = PurchaseReceipt::create([
-            'purchase_order_id' => $purchaseOrder->id,
-            'receipt_number' => 'RC-' . strtoupper(Str::random(6)),
-            'receipt_date' => now()->subDays(rand(1, 7)),
-            'status' => 'completed',
-            'received_by' => $user->id,
-            'total_received' => $purchaseOrder->total_amount,
-            'cabang_id' => Cabang::first()->id,
-            'currency_id' => 1,
-            'created_by' => $user->id,
-        ]);
-
-        return PurchaseReturn::create([
-            'purchase_receipt_id' => $purchaseReceipt->id,
-            'return_date' => now(),
-            'nota_retur' => 'NR-' . now()->format('Ymd') . '-' . str_pad((string) rand(1, 9999), 4, '0', STR_PAD_LEFT),
-            'created_by' => $user->id,
-            'status' => $status,
-            'cabang_id' => Cabang::first()->id,
-        ]);
     }
 }
 
@@ -962,78 +888,6 @@ test('purchase return not created when no rejected items', function () {
     expect(PurchaseReturn::where('purchase_receipt_id', $purchaseReceipt->id)->exists())->toBeFalse();
 });
 
-test('submit action shows friendly notification when purchase return submission fails', function () {
-    test()->seed(\Database\Seeders\CabangSeeder::class);
-    test()->seed(\Database\Seeders\SupplierSeeder::class);
-
-    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
-    grantPurchaseReturnFilamentPermissions($user);
-    test()->actingAs($user);
-
-    $purchaseReturn = createPurchaseReturnRecordForNotificationTest($user, 'draft');
-
-    $service = Mockery::mock(PurchaseReturnService::class);
-    $service->shouldReceive('submitForApproval')
-        ->once()
-        ->withArgs(fn (PurchaseReturn $record) => $record->is($purchaseReturn))
-        ->andThrow(new \RuntimeException('simulated submit failure'));
-    app()->instance(PurchaseReturnService::class, $service);
-
-    Livewire::test(ViewPurchaseReturn::class, ['record' => $purchaseReturn->getKey()])
-        ->callAction('submit_for_approval')
-        ->assertNotified('Gagal Mengajukan Retur Pembelian');
-
-    expect($purchaseReturn->fresh()->status)->toBe('draft');
-});
-
-test('approve action shows friendly notification when purchase return approval fails', function () {
-    test()->seed(\Database\Seeders\CabangSeeder::class);
-    test()->seed(\Database\Seeders\SupplierSeeder::class);
-
-    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
-    grantPurchaseReturnFilamentPermissions($user);
-    test()->actingAs($user);
-
-    $purchaseReturn = createPurchaseReturnRecordForNotificationTest($user, 'pending_approval');
-
-    $service = Mockery::mock(PurchaseReturnService::class);
-    $service->shouldReceive('approve')
-        ->once()
-        ->withArgs(fn (PurchaseReturn $record, array $data) => $record->is($purchaseReturn) && ($data['approval_notes'] ?? null) === 'Perlu verifikasi')
-        ->andThrow(new \RuntimeException('simulated approve failure'));
-    app()->instance(PurchaseReturnService::class, $service);
-
-    Livewire::test(ViewPurchaseReturn::class, ['record' => $purchaseReturn->getKey()])
-        ->callAction('approve', data: ['approval_notes' => 'Perlu verifikasi'])
-        ->assertNotified('Gagal Menyetujui Retur Pembelian');
-
-    expect($purchaseReturn->fresh()->status)->toBe('pending_approval');
-});
-
-test('reject action shows friendly notification when purchase return rejection fails', function () {
-    test()->seed(\Database\Seeders\CabangSeeder::class);
-    test()->seed(\Database\Seeders\SupplierSeeder::class);
-
-    $user = User::factory()->create(['cabang_id' => 1, 'manage_type' => 'all']);
-    grantPurchaseReturnFilamentPermissions($user);
-    test()->actingAs($user);
-
-    $purchaseReturn = createPurchaseReturnRecordForNotificationTest($user, 'pending_approval');
-
-    $service = Mockery::mock(PurchaseReturnService::class);
-    $service->shouldReceive('reject')
-        ->once()
-        ->withArgs(fn (PurchaseReturn $record, array $data) => $record->is($purchaseReturn) && ($data['rejection_notes'] ?? null) === 'Dokumen belum lengkap')
-        ->andThrow(new \RuntimeException('simulated reject failure'));
-    app()->instance(PurchaseReturnService::class, $service);
-
-    Livewire::test(ViewPurchaseReturn::class, ['record' => $purchaseReturn->getKey()])
-        ->callAction('reject', data: ['rejection_notes' => 'Dokumen belum lengkap'])
-        ->assertNotified('Gagal Menolak Retur Pembelian');
-
-    expect($purchaseReturn->fresh()->status)->toBe('pending_approval');
-});
-
 test('purchase receipt rejected item sync failure sends friendly warning notification', function () {
     test()->seed(\Database\Seeders\CabangSeeder::class);
     test()->seed(\Database\Seeders\SupplierSeeder::class);
@@ -1041,6 +895,10 @@ test('purchase receipt rejected item sync failure sends friendly warning notific
     $cabang = Cabang::first();
     $user = User::factory()->create(['cabang_id' => $cabang->id]);
     test()->actingAs($user);
+
+    $request = \Illuminate\Http\Request::create('/');
+    $request->setLaravelSession(app('session.store'));
+    app()->instance('request', $request);
 
     $service = Mockery::mock(PurchaseReturnService::class);
     $service->shouldReceive('generateNotaRetur')
@@ -1096,6 +954,6 @@ test('purchase receipt rejected item sync failure sends friendly warning notific
         'reason_rejected' => 'Kemasan rusak',
     ]);
 
-    Notification::assertNotified('Sinkronisasi Retur Otomatis Belum Selesai');
+    expect(session('warning'))->toContain('Sinkronisasi Retur Otomatis Belum Selesai');
     expect(PurchaseReturn::where('purchase_receipt_id', $purchaseReceipt->id)->exists())->toBeFalse();
 });

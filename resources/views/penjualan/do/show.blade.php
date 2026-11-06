@@ -268,21 +268,27 @@
                         </a>
                     </div>
                     <div class="flex justify-between py-1 border-b border-gray-100">
-                        <span class="text-gray-500">Customer</span>
+                        <span class="text-gray-500">Customer (Pembeli)</span>
                         <span class="font-bold text-gray-900">{{ $primarySo->customer?->name ?? 'Umum' }}</span>
                     </div>
                     <div class="flex justify-between py-1 border-b border-gray-100">
                         <span class="text-gray-500">Kode Customer</span>
                         <span class="font-mono text-gray-700">{{ $primarySo->customer?->code ?? '-' }}</span>
                     </div>
+                    @if($primarySo->shipping_recipient_name && $primarySo->shipping_recipient_name !== $primarySo->customer?->name)
                     <div class="flex justify-between py-1 border-b border-gray-100">
-                        <span class="text-gray-500">Telepon</span>
-                        <span class="text-gray-700">{{ $primarySo->customer?->phone ?? '-' }}</span>
+                        <span class="text-gray-500">Tujuan / Proyek</span>
+                        <span class="font-bold text-emerald-800">{{ $primarySo->shipping_recipient_name }}</span>
+                    </div>
+                    @endif
+                    <div class="flex justify-between py-1 border-b border-gray-100">
+                        <span class="text-gray-500">Kontak / PIC</span>
+                        <span class="text-gray-700">{{ $primarySo->recipientPhone() ?? '-' }}</span>
                     </div>
                     <div class="py-1">
-                        <span class="text-gray-500 block mb-0.5">Alamat Pengiriman</span>
+                        <span class="text-gray-500 block mb-0.5">Alamat Pengiriman (Ship-To)</span>
                         <span class="text-gray-700 font-medium">
-                            {{ $primarySo->shipping_address ?? ($primarySo->customer?->address ?? 'Ambil Sendiri / Alamat Utama') }}
+                            {{ $primarySo->shippingAddress() ?? 'Ambil Sendiri / Alamat Utama' }}
                         </span>
                     </div>
                 @else

@@ -10,7 +10,6 @@ use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Filament\Resources\PurchaseOrderResource;
 use App\Services\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -180,55 +179,6 @@ test('calculateTotalAmount uses purchase order rate before global currency rate'
     ]);
 
     expect($this->service->calculateTotalAmount($purchaseOrder->fresh(['purchaseOrderItem', 'purchaseOrderCurrency'])))->toBe(15000.0);
-});
-
-test('purchase order view total summary falls back to computed item total when header is zero', function () {
-    $usd = Currency::factory()->create([
-        'code' => 'USD',
-        'name' => 'US Dollar',
-        'symbol' => 'USD',
-        'to_rupiah' => 16000,
-    ]);
-
-    $purchaseOrder = PurchaseOrder::create([
-        'supplier_id' => $this->supplier->id,
-        'po_number' => 'PO-UNIT-VIEW-001',
-        'order_date' => Carbon::now()->toDateTimeString(),
-        'status' => 'approved',
-        'expected_date' => Carbon::now()->addDays(7)->toDateTimeString(),
-        'total_amount' => 0,
-        'warehouse_id' => $this->warehouse->id,
-        'tempo_hutang' => $this->supplier->tempo_hutang,
-        'created_by' => $this->user->id,
-    ]);
-
-    PurchaseOrderCurrency::create([
-        'purchase_order_id' => $purchaseOrder->id,
-        'currency_id' => $usd->id,
-        'nominal' => 15000,
-    ]);
-
-    $purchaseOrder->purchaseOrderItem()->create([
-        'product_id' => $this->productA->id,
-        'quantity' => 10,
-        'unit_price' => 53.33,
-        'discount' => 0,
-        'tax' => 11,
-        'tipe_pajak' => 'Eklusif',
-        'currency_id' => $usd->id,
-    ]);
-
-    PurchaseOrder::withoutEvents(fn() => $purchaseOrder->update(['total_amount' => 0]));
-
-    $fresh = $purchaseOrder->fresh(['purchaseOrderItem.currency', 'purchaseOrderCurrency.currency']);
-    $totalHtml = PurchaseOrderResource::renderPurchaseOrderTotalAmountSummary($fresh);
-    $itemsHtml = PurchaseOrderResource::renderPurchaseOrderItemsTotalSummary($fresh);
-
-    expect($totalHtml)->toContain('Rp 8.879.400,00')
-        ->and($totalHtml)->toContain('Perlu sync')
-        ->and($itemsHtml)->toContain('USD 591,96')
-        ->and($itemsHtml)->toContain('Rp 8.879.400,00')
-        ->and($itemsHtml)->toContain('-&gt;');
 });
 
 test('generateInvoice creates invoice with correct totals and items', function () {

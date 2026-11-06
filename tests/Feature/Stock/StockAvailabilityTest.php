@@ -5,7 +5,6 @@
  * Kunci: SO yang menahan stok TIDAK boleh terhalang oleh reservasinya sendiri (temuan F2).
  */
 
-use App\Filament\Resources\SaleOrderResource\Pages\ListSaleOrders;
 use App\Models\Cabang;
 use App\Models\SaleOrderItemWarehouseAllocation;
 use App\Services\StockAvailability;
@@ -241,58 +240,10 @@ function listContext(): array
     return $ctx;
 }
 
-it('daftar SO: badge STOK KURANG/READY sadar reservasi sendiri; filter Status Stok konsisten', function () {
-    $ctx = listContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
-    [$holder, $holderItem] = stkSaleOrder($ctx, 20);
-    holdFor($holder, $holderItem, $ctx, 20);   // menahan 20 → tidak boleh terlihat "kurang" karena reservasinya sendiri
-    [$short] = stkSaleOrder($ctx, 15);         // sisa bebas 10 → kurang
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSaleOrders::class)
-        ->assertTableColumnStateSet('stock_status', 'STOK READY', $holder)
-        ->assertTableColumnStateSet('stock_status', 'STOK KURANG', $short)
-        ->filterTable('stock_status', 'insufficient')
-        ->assertCanSeeTableRecords([$short])
-        ->assertCanNotSeeTableRecords([$holder])
-        ->filterTable('stock_status', 'sufficient')
-        ->assertCanSeeTableRecords([$holder])
-        ->assertCanNotSeeTableRecords([$short]);
-});
-
-it('daftar SO: jumlah query pemeriksaan stok tetap sama untuk 3 maupun 25 SO', function () {
-    $ctx = listContext();
-    stkSetStock($ctx['product'], $ctx['warehouse'], 1000);
-
-    $stockQueries = function () use ($ctx) {
-        DB::flushQueryLog();
-        DB::enableQueryLog();
-        Livewire::actingAs($ctx['user'])->test(ListSaleOrders::class);
-        $count = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'inventory_stocks'))->count();
-        DB::disableQueryLog();
-
-        return $count;
-    };
-
-    foreach (range(1, 3) as $i) {
-        stkSaleOrder($ctx, 2);
-    }
-    $few = $stockQueries();
-    foreach (range(1, 22) as $i) {
-        stkSaleOrder($ctx, 2);
-    }
-    $many = $stockQueries();
-
-    expect($few)->toBeGreaterThan(0)->and($many)->toBe($few);
-});
-
 // ───────────────────────────── Pemindai: tidak ada lagi freeQtyFor tanpa add-back di jalur penjualan ─────────────────────────────
 
 it('pemindai: jalur DO/SO tidak lagi memakai InventoryStock::freeQtyFor (harus reservasi-sadar)', function () {
     $files = [
-        'app/Filament/Resources/DeliveryOrderResource.php',
-        'app/Filament/Resources/DeliveryOrderResource/Pages/CreateDeliveryOrder.php',
-        'app/Filament/Resources/DeliveryOrderResource/Pages/EditDeliveryOrder.php',
         'app/Models/SaleOrder.php',
         'app/Services/SalesOrderService.php',
     ];

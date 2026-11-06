@@ -2,25 +2,19 @@
 
 namespace App\Support;
 
-use App\Models\AppSetting;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
-use Throwable;
 
 /**
- * Pembatasan menu & halaman per peran (Spesifikasi UI/UX Bagian 5) dan
- * pengaturan Modul Aktif. Sumber data: config/menu_access.php.
+ * Pembatasan menu & halaman per peran (Spesifikasi UI/UX Bagian 5). Sumber data: config/menu_access.php.
  */
 class MenuAccess
 {
     /** Cache kode peran per objek user (WeakMap: aman untuk test & antar-request). */
     protected static ?\WeakMap $codeCache = null;
 
-    /** @var array<string, bool>|null */
-    protected static ?array $moduleCache = null;
-
     /**
-     * Apakah user yang login boleh melihat menu / membuka halaman class ini.
+     * Apakah user yang login boleh membuka menu ini. Kunci menu TIDAK boleh mengandung titik
+     * (config() membacanya sebagai kunci bersarang dan menu dianggap tidak dibatasi).
      */
     public static function allows(string $class): bool
     {
@@ -87,54 +81,9 @@ class MenuAccess
         return static::$codeCache[$user] = $codes;
     }
 
-    /**
-     * Nama modul (manufacturing, delivery_schedule, other_sales) untuk class ini, atau null.
-     */
-    public static function moduleFor(string $class): ?string
-    {
-        foreach ((array) config('menu_access.modules', []) as $module => $definition) {
-            if (in_array($class, (array) ($definition['menus'] ?? []), true)) {
-                return $module;
-            }
-        }
-
-        return null;
-    }
-
-    public static function moduleEnabled(string $module): bool
-    {
-        if (static::$moduleCache === null) {
-            static::$moduleCache = [];
-        }
-
-        if (array_key_exists($module, static::$moduleCache)) {
-            return static::$moduleCache[$module];
-        }
-
-        $default = (bool) config("menu_access.modules.{$module}.default", false);
-
-        try {
-            $value = Schema::hasTable('app_settings')
-                ? AppSetting::get("modules.{$module}", $default)
-                : $default;
-        } catch (Throwable) {
-            $value = $default;
-        }
-
-        return static::$moduleCache[$module] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-    }
-
-    public static function setModule(string $module, bool $enabled): void
-    {
-        $label = config("menu_access.modules.{$module}.label", $module);
-        AppSetting::set("modules.{$module}", $enabled ? '1' : '0', "Modul Aktif: {$label}");
-        static::$moduleCache = null;
-    }
-
     /** Dipakai di test / setelah role user berubah. */
     public static function flush(): void
     {
         static::$codeCache = null;
-        static::$moduleCache = null;
     }
 }

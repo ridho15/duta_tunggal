@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Flash;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -937,18 +937,11 @@ class HelperController extends Controller
     public static function sendNotification($isSuccess = false, $title = "", $message = "")
     {
         if ($isSuccess) {
-            return Notification::make()
-                ->body($message)
-                ->title($title)
-                ->success()
-                ->send();
-        } else {
-            return Notification::make()
-                ->body($message)
-                ->title($title)
-                ->danger()
-                ->send();
+            // Info sukses tidak perlu dipaksakan: controller Blade sudah menampilkan flash "success" sendiri.
+            return;
         }
+
+        Flash::error($title, $message);
     }
 
     public static function sendNotificationToUser() {}

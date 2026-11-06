@@ -1,7 +1,5 @@
 <?php
 
-use App\Filament\Resources\QualityControlPurchaseResource\Pages\CreateQualityControlPurchase;
-use App\Filament\Resources\VendorPaymentResource\Pages\CreateVendorPayment;
 use App\Helpers\MoneyHelper;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -428,60 +426,6 @@ describe('Poin 2: PO Price Deviation Controls', function () {
 // Point 3: Strict Locking of QC Inspector
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Poin 3: Strict QC Inspector Lock to Auth::id()', function () {
-
-    it('strictly locks inspected_by to authenticated user regardless of input payload', function () {
-        $context = createBaseControlContext();
-        $inspectorUser = User::factory()->create(['cabang_id' => $context['cabang']->id]);
-        $spoofedUser = User::factory()->create(['cabang_id' => $context['cabang']->id]);
-
-        createRoleAndAssign($inspectorUser, 'Super Admin', [
-            'view any quality control',
-            'view quality control',
-            'create quality control',
-            'create quality control purchase',
-            'update quality control',
-        ]);
-
-        $purchaseOrder = PurchaseOrder::factory()->create([
-            'supplier_id' => $context['supplier']->id,
-            'cabang_id' => $context['cabang']->id,
-            'status' => 'approved',
-            'created_by' => $inspectorUser->id,
-        ]);
-
-        $poItem = PurchaseOrderItem::factory()->create([
-            'purchase_order_id' => $purchaseOrder->id,
-            'product_id' => $context['product']->id,
-            'quantity' => 15,
-            'unit_price' => 50000,
-            'currency_id' => $context['currency']->id,
-        ]);
-
-        Livewire::actingAs($inspectorUser)
-            ->test(CreateQualityControlPurchase::class)
-            ->assertFormSet([
-                'inspected_by' => $inspectorUser->id,
-            ])
-            ->fillForm([
-                'from_model_id' => $poItem->id,
-                'qc_number' => 'QC-TEST-LOCK-001',
-                'product_id' => $context['product']->id,
-                'warehouse_id' => $context['warehouse']->id,
-                'quantity_received' => 15,
-                'passed_quantity' => 15,
-                'rejected_quantity' => 0,
-                'inspected_by' => $spoofedUser->id, // Attempt to spoof inspector
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $qc = QualityControl::where('qc_number', 'QC-TEST-LOCK-001')->first();
-        expect($qc)->not->toBeNull()
-            ->and($qc->inspected_by)->toBe($inspectorUser->id);
-    });
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Point 4: Supplier Invoice Number & Tax Invoice Number + Duplicate Prevention
 // ─────────────────────────────────────────────────────────────────────────────
@@ -895,28 +839,4 @@ describe('Poin 7: Vendor Payment Transfer Validation & Proof File', function () 
             ->and($payment->transfer_reference_number)->toBe('TRF-20260919-8888');
     });
 
-    it('requires target_bank_account and transfer_reference_number for Bank Transfer in Create form', function () {
-        $context = createBaseControlContext();
-        $user = User::factory()->create(['cabang_id' => $context['cabang']->id]);
-        createRoleAndAssign($user, 'Super Admin', [
-            'view any vendor payment',
-            'view vendor payment',
-            'create vendor payment',
-            'view any supplier',
-            'view any invoice',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(CreateVendorPayment::class)
-            ->fillForm([
-                'payment_method' => 'Bank Transfer',
-                'target_bank_account' => null,
-                'transfer_reference_number' => null,
-            ])
-            ->call('create')
-            ->assertHasFormErrors([
-                'target_bank_account' => 'required',
-                'transfer_reference_number' => 'required',
-            ]);
-    });
 });

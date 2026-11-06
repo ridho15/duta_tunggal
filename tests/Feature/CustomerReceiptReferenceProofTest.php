@@ -6,10 +6,6 @@
  * peringatan (bukan blokir) untuk kombinasi referensi+akun+nominal ganda, kolom & filter "tanpa bukti".
  */
 
-use App\Filament\Resources\CustomerReceiptResource\Pages\CreateCustomerReceipt;
-use App\Filament\Resources\CustomerReceiptResource\Pages\EditCustomerReceipt;
-use App\Filament\Resources\CustomerReceiptResource\Pages\ListCustomerReceipts;
-use App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Currency;
@@ -106,77 +102,6 @@ it('metode menentukan wajib/tidaknya referensi dan label isiannya', function () 
         ->and(CustomerReceiptReference::label('Cheque'))->toBe('No. Cek');
 });
 
-it('Transfer/Giro/Cheque tanpa referensi ditolak dan tidak ada penerimaan tersimpan', function (string $method) {
-    $ctx = rpContext();
-    $invoice = rpInvoice($ctx);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $invoice, ['payment_method' => $method]))
-        ->call('create')
-        ->assertHasFormErrors(['payment_reference' => 'required']);
-
-    expect(CustomerReceipt::count())->toBe(0);
-})->with(['Transfer', 'Giro', 'Cheque']);
-
-it('Cash tidak memerlukan referensi; referensi yang terlanjur diisi tidak disimpan untuk Cash', function () {
-    $ctx = rpContext();
-    $invoice = rpInvoice($ctx);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $invoice, ['payment_method' => 'Cash', 'coa_id' => $ctx['kas']->id, 'payment_reference' => 'SISA-ISIAN']))
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $receipt = CustomerReceipt::firstOrFail();
-
-    expect($receipt->payment_method)->toBe('Cash')->and($receipt->payment_reference)->toBeNull();
-});
-
-it('Transfer dengan referensi, bank, dan bukti tersimpan; bukti hanya di disk PRIVAT', function () {
-    Storage::fake('local');
-    Storage::fake('public');
-    $ctx = rpContext();
-    $invoice = rpInvoice($ctx);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $invoice, [
-            'payment_reference' => '  TRF-20260920-0012 ', 'bank_name' => 'BCA',
-            'proof_path' => UploadedFile::fake()->create('bukti.pdf', 200, 'application/pdf'),
-        ]))
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $receipt = CustomerReceipt::firstOrFail();
-
-    expect($receipt->payment_reference)->toBe('TRF-20260920-0012')
-        ->and($receipt->bank_name)->toBe('BCA')
-        ->and($receipt->proof_path)->toStartWith('customer-receipts/proofs/');
-
-    Storage::disk('local')->assertExists($receipt->proof_path);
-    Storage::disk('public')->assertMissing($receipt->proof_path);
-});
-
-it('berkas bukti bertipe/ukuran tidak sah ditolak', function () {
-    Storage::fake('local');
-    $ctx = rpContext();
-    $invoice = rpInvoice($ctx);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $invoice, ['payment_reference' => 'TRF-1', 'proof_path' => UploadedFile::fake()->create('bukti.exe', 100, 'application/x-msdownload')]))
-        ->call('create')
-        ->assertHasFormErrors(['proof_path']);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $invoice, ['payment_reference' => 'TRF-1', 'proof_path' => UploadedFile::fake()->create('besar.pdf', 4096, 'application/pdf')]))
-        ->call('create')
-        ->assertHasFormErrors(['proof_path']);
-});
-
 // ───────────────────────────── Rute bukti berotorisasi ─────────────────────────────
 
 it('rute bukti: pengguna berizin 200, tanpa izin 403, tamu diarahkan ke login, tanpa berkas 404', function () {
@@ -198,26 +123,24 @@ it('rute bukti: pengguna berizin 200, tanpa izin 403, tamu diarahkan ke login, t
 
 // ───────────────────────────── Peringatan duplikat ─────────────────────────────
 
-it('kombinasi referensi + akun + nominal yang sama diperingatkan, tetapi penerimaan tetap tersimpan', function () {
+it('kombinasi referensi + akun + nominal yang sama diperingatkan lewat flash, penerimaan tetap tersimpan', function () {
     $ctx = rpContext();
-    $first = rpInvoice($ctx);
-    $second = rpInvoice($ctx);
+    $request = Illuminate\Http\Request::create('/');
+    $request->setLaravelSession(app('session.store'));
+    app()->instance('request', $request);
 
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $first, ['payment_reference' => 'TRF-DUP-1']))
-        ->call('create')
-        ->assertHasNoFormErrors()
-        ->assertNotNotified('Kemungkinan penerimaan ganda');
+    $first = rpReceipt($ctx, ['payment_reference' => 'TRF-DUP-1']);
+    $service = app(CustomerReceiptReference::class);
 
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(rpForm($ctx, $second, ['payment_reference' => ' trf-dup-1 ']))
-        ->call('create')
-        ->assertHasNoFormErrors()
-        ->assertNotified('Kemungkinan penerimaan ganda');
+    $service->warnIfDuplicate($first);
+    expect(session('warning'))->toBeNull();
 
-    expect(CustomerReceipt::count())->toBe(2);
+    $second = rpReceipt($ctx, ['payment_reference' => ' trf-dup-1 ']);
+    $service->warnIfDuplicate($second);
+
+    expect(session('warning'))->toContain('Kemungkinan penerimaan ganda')
+        ->and(session('warning'))->toContain('#'.$first->id)
+        ->and(CustomerReceipt::count())->toBe(2);
 });
 
 it('duplicatesOf: nominal atau akun berbeda bukan duplikat', function () {
@@ -234,60 +157,3 @@ it('duplicatesOf: nominal atau akun berbeda bukan duplikat', function () {
 
 // ───────────────────────────── Tampilan: View, daftar, filter, Edit ─────────────────────────────
 
-it('View menampilkan referensi, bank, dan tautan bukti; non-tunai tanpa bukti menampilkan "Belum ada bukti"', function () {
-    Storage::fake('local');
-    $ctx = rpContext();
-    Storage::disk('local')->put('customer-receipts/proofs/b.pdf', 'x');
-    $withProof = rpReceipt($ctx, ['payment_reference' => 'TRF-VIEW-1', 'bank_name' => 'Mandiri', 'proof_path' => 'customer-receipts/proofs/b.pdf']);
-    $noProof = rpReceipt($ctx, ['payment_reference' => 'TRF-VIEW-2']);
-
-    Livewire::actingAs($ctx['user'])->test(ViewCustomerReceipt::class, ['record' => $withProof->getKey()])
-        ->assertSee('TRF-VIEW-1')->assertSee('Mandiri')->assertSee('Lihat bukti')->assertDontSee('Belum ada bukti');
-
-    Livewire::actingAs($ctx['user'])->test(ViewCustomerReceipt::class, ['record' => $noProof->getKey()])
-        ->assertSee('TRF-VIEW-2')->assertSee('Belum ada bukti');
-});
-
-it('penerimaan lama (kolom baru kosong, tunai) tetap tampil normal di View dan daftar', function () {
-    $ctx = rpContext();
-    $legacy = rpReceipt($ctx, ['payment_method' => 'Cash', 'coa_id' => $ctx['kas']->id]);
-
-    Livewire::actingAs($ctx['user'])->test(ViewCustomerReceipt::class, ['record' => $legacy->getKey()])->assertSuccessful()->assertDontSee('Belum ada bukti');
-    Livewire::actingAs($ctx['user'])->test(ListCustomerReceipts::class)->assertCanSeeTableRecords([$legacy]);
-});
-
-it('daftar: kolom No. Referensi dapat dicari; filter "Non-tunai tanpa bukti" hanya non-tunai yang belum berbukti', function () {
-    Storage::fake('local');
-    $ctx = rpContext();
-    $noProof = rpReceipt($ctx, ['payment_reference' => 'TRF-LIST-1']);
-    $withProof = rpReceipt($ctx, ['payment_reference' => 'TRF-LIST-2', 'proof_path' => 'customer-receipts/proofs/x.pdf']);
-    $cash = rpReceipt($ctx, ['payment_method' => 'Cash', 'coa_id' => $ctx['kas']->id]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListCustomerReceipts::class)
-        ->assertTableColumnStateSet('payment_reference', 'TRF-LIST-1', $noProof)
-        ->searchTable('TRF-LIST-2')
-        ->assertCanSeeTableRecords([$withProof])
-        ->assertCanNotSeeTableRecords([$noProof, $cash])
-        ->searchTable('')
-        ->filterTable('tanpa_bukti')
-        ->assertCanSeeTableRecords([$noProof])
-        ->assertCanNotSeeTableRecords([$withProof, $cash]);
-});
-
-it('Edit: isian terisi, referensi dapat diubah, dan tautan bukti tampil bila ada', function () {
-    Storage::fake('local');
-    $ctx = rpContext();
-    $invoice = rpInvoice($ctx);
-    $receipt = rpReceipt($ctx, ['payment_reference' => 'TRF-EDIT-1', 'bank_name' => 'BCA', 'proof_path' => 'customer-receipts/proofs/e.pdf', 'selected_invoices' => [$invoice->id], 'invoice_receipts' => [$invoice->id => 100000]]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(EditCustomerReceipt::class, ['record' => $receipt->getKey()])
-        ->assertFormSet(['payment_reference' => 'TRF-EDIT-1', 'bank_name' => 'BCA'])
-        ->assertSee('Lihat bukti')
-        ->fillForm(['payment_reference' => 'TRF-EDIT-2'])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    expect($receipt->fresh()->payment_reference)->toBe('TRF-EDIT-2');
-});

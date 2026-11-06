@@ -282,8 +282,10 @@
         if (hint) hint.style.display = 'none';
 
         const data = soDataMap[soId];
-        custName.innerText = data.customer ? data.customer.name : 'Customer';
-        custAddress.innerText = data.customer ? (data.customer.address || 'Alamat sesuai master customer') : '-';
+        const destName = data.recipient_name || (data.customer ? data.customer.name : 'Customer');
+        const destPhone = data.recipient_phone ? ` (PIC: ${data.recipient_phone})` : '';
+        custName.innerText = `${destName}${destPhone}`;
+        custAddress.innerText = data.shipped_to || (data.customer ? (data.customer.address || '-') : '-');
 
         // Tampilkan grup DO untuk SO ini
         const targetGroup = document.getElementById(`so-group-${soId}`);

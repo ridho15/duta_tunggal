@@ -9,8 +9,6 @@ use App\Models\User;
 use App\Notifications\JournalEntryCreated;
 use App\Notifications\JournalEntryUpdated;
 use App\Notifications\JournalEntryDeleted;
-use Filament\Notifications\Notification;
-use Filament\Notifications\Actions\Action;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;

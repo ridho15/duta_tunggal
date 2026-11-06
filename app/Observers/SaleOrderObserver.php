@@ -13,6 +13,7 @@ use App\Services\SalesInvoiceTaxResolver;
 use App\Support\CurrencyConversionResolver;
 use App\Helpers\MoneyHelper;
 use Illuminate\Support\Facades\Log;
+use App\Support\Flash;
 
 class SaleOrderObserver
 {
@@ -392,11 +393,7 @@ class SaleOrderObserver
 
         // Notify if some items were skipped because warehouse_id is missing
         if (!empty($skippedProducts)) {
-            \Filament\Notifications\Notification::make()
-                ->title('Perhatian: Beberapa Item Tidak Diproses')
-                ->warning()
-                ->body('Item berikut tidak memiliki gudang sehingga tidak dimasukkan ke Warehouse Confirmation: ' . implode(', ', $skippedProducts) . '. Silakan set warehouse pada item SO tersebut.')
-                ->send();
+            Flash::warning('Perhatian: Beberapa Item Tidak Diproses', 'Item berikut tidak memiliki gudang sehingga tidak dimasukkan ke Warehouse Confirmation: ' . implode(', ', $skippedProducts) . '. Silakan set warehouse pada item SO tersebut.');
         }
     }
 

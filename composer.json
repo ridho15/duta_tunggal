@@ -13,15 +13,13 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "fakerphp/faker": "^1.24",
-        "filament/filament": "^3.3",
-        "filament/notifications": "^3.3",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/flux": "^2.1.1",
+        "livewire/livewire": "^3.7",
         "livewire/volt": "^1.7.0",
         "maatwebsite/excel": "^3.1",
         "milon/barcode": "^12.0",
-        "saade/filament-autograph": "^3.2",
         "spatie/laravel-activitylog": "*",
         "spatie/laravel-permission": "^6.19"
     },
@@ -40,7 +38,10 @@
         "psr-4": {
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
-            "Database\\Seeders\\": "database/seeders/"
+            "Database\\Seeders\\": [
+                "database/seeders/",
+                "database/legacy_seeders/"
+            ]
         },
         "files": [
             "app/Helpers/helpers.php"
@@ -55,9 +56,6 @@
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
-        ],
-        "filament-upgrade": [
-            "@php artisan filament:upgrade"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"

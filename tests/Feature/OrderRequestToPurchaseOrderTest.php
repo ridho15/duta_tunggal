@@ -29,7 +29,6 @@ use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Filament\Resources\PurchaseOrderResource;
 use App\Services\OrderRequestService;
 use App\Services\PurchaseOrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,55 +117,6 @@ test('approve without selected_items creates PO with all order request items', f
     expect((float) $poItemB->quantity)->toBe(5.0);
     // itemB has unit_price=0 so should fallback to cost_price = 20000
     expect((float) $poItemB->unit_price)->toBe(20000.0);
-});
-
-test('OR item tax types are preserved when building and approving a purchase order', function () {
-    $this->itemA->update([
-        'tipe_pajak' => 'Inclusive',
-        'tax' => 11,
-    ]);
-    $this->itemB->update([
-        'tipe_pajak' => 'Eklusif',
-        'tax' => 11,
-    ]);
-    $this->orderRequest->load('orderRequestItem.product.uom');
-
-    $formItems = PurchaseOrderResource::buildOrderRequestItems(
-        $this->orderRequest,
-        $this->supplier->id,
-        null,
-        $this->currency->id,
-    );
-
-    expect(collect($formItems)->firstWhere('product_id', $this->productA->id)['tipe_pajak'])->toBe('inklusif')
-        ->and(collect($formItems)->firstWhere('product_id', $this->productB->id)['tipe_pajak'])->toBe('eklusif');
-
-    $result = $this->service->approve($this->orderRequest->fresh(), [
-        'create_purchase_order' => true,
-        'supplier_id' => $this->supplier->id,
-        'po_number' => 'PO-TAX-INHERIT-001',
-        'order_date' => Carbon::today()->toDateString(),
-        'selected_items' => [
-            [
-                'item_id' => $this->itemA->id,
-                'quantity' => 4,
-                'unit_price' => 10000,
-                'include' => true,
-            ],
-            [
-                'item_id' => $this->itemB->id,
-                'quantity' => 5,
-                'unit_price' => 20000,
-                'include' => true,
-            ],
-        ],
-    ]);
-
-    $purchaseOrder = $result->fresh('purchaseOrder.purchaseOrderItem')->purchaseOrder;
-
-    expect($purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productA->id)->tipe_pajak)->toBe('inklusif')
-        ->and($purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productB->id)->tipe_pajak)->toBe('eklusif')
-        ->and((float) $purchaseOrder->purchaseOrderItem->firstWhere('product_id', $this->productA->id)->quantity)->toBe(4.0);
 });
 
 test('purchase order item inherits tax type from referenced order request item even when payload is missing or wrong', function () {

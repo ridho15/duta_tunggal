@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\PurchaseInvoiceResource\Pages\CreatePurchaseInvoice;
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -122,59 +121,6 @@ class PurchaseInvoiceCreateErrorsTest extends TestCase
             'supplier_invoice_number' => $number,
             'status' => 'draft',
         ]);
-    }
-
-    public function test_duplicate_supplier_invoice_number_is_reported_on_the_field_and_in_a_notification(): void
-    {
-        $this->existingInvoiceWithSupplierNumber('SUP-DUP-001');
-
-        $component = Livewire::test(CreatePurchaseInvoice::class)
-            ->fillForm($this->coaIds + [
-                'selected_supplier' => $this->supplier->id,
-                'selected_purchase_orders' => [$this->purchaseOrder->id],
-                'selected_purchase_receipts' => [$this->receipt->id],
-                'invoice_number' => 'PINV-UJI-0001',
-                'supplier_invoice_number' => 'SUP-DUP-001',
-                'tax_invoice_number' => '010.000-26.00000001',
-                'invoice_date' => now()->toDateString(),
-                'due_date' => now()->addDays(30)->toDateString(),
-            ])
-            ->call('create');
-        $component->assertHasFormErrors(['supplier_invoice_number'])
-            ->assertNotified('Invoice pembelian belum dapat disimpan');
-
-        $this->assertDatabaseMissing('invoices', ['invoice_number' => 'PINV-UJI-0001']);
-    }
-
-    public function test_service_errors_get_the_data_prefix_so_livewire_can_attach_them_to_fields(): void
-    {
-        $this->existingInvoiceWithSupplierNumber('SUP-DUP-002');
-
-        $page = new class extends CreatePurchaseInvoice {
-            public function runMutate(array $data): array
-            {
-                $method = new \ReflectionMethod($this, 'mutateFormDataBeforeCreate');
-                $method->setAccessible(true);
-
-                return $method->invoke($this, $data);
-            }
-        };
-
-        try {
-            $page->runMutate([
-                'selected_supplier' => $this->supplier->id,
-                'selected_purchase_orders' => [$this->purchaseOrder->id],
-                'selected_purchase_receipts' => [$this->receipt->id],
-                'cabang_id' => $this->cabang->id,
-                'supplier_invoice_number' => 'SUP-DUP-002',
-                'invoiceItem' => [],
-            ]);
-
-            $this->fail('Nomor invoice supplier ganda seharusnya ditolak.');
-        } catch (ValidationException $exception) {
-            $this->assertSame(['data.supplier_invoice_number'], array_keys($exception->errors()));
-            $this->assertStringContainsString('sudah pernah digunakan', $exception->errors()['data.supplier_invoice_number'][0]);
-        }
     }
 
     public function test_cancelled_invoice_frees_its_receipt_and_supplier_and_tax_numbers(): void

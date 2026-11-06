@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use Filament\Notifications\Notification;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -97,19 +96,11 @@ class ProcurementFailureNotifier
             ]);
         }
 
-        Notification::make()
-            ->title($title)
-            ->body(self::message($error, $fallback))
-            ->danger()
-            ->send();
+        Flash::error($title, self::message($error, $fallback));
     }
 
     public static function warning(string $title, Throwable|string|null $error, string $fallback): void
     {
-        Notification::make()
-            ->title($title)
-            ->body(self::message($error, $fallback))
-            ->warning()
-            ->send();
+        Flash::warning($title, self::message($error, $fallback));
     }
 }

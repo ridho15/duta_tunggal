@@ -426,6 +426,29 @@ class InvoiceObserver
             ? $invoice->biayaPengirimanCoa
             : $this->resolveCoaByCodes($this->getConfiguredSalesCoaCodes('sales_shipping'), 'Expense');
 
+        // Smart Leaf Resolution: pastikan akun piutang dan pendapatan bukan akun induk (parent header)
+        if ($arCoa && $arCoa->isParent()) {
+            $leafAr = $arCoa->firstLeaf();
+            if ($leafAr) {
+                Log::info("postSalesInvoice: Akun Piutang '{$arCoa->code}' merupakan akun induk; dialihkan ke sub-akun transaksi '{$leafAr->code}'.", [
+                    'invoice_id' => $invoice->id,
+                ]);
+                $arCoa = $leafAr;
+            }
+        }
+
+        if ($revenueCoa && $revenueCoa->isParent()) {
+            $leafRev = $revenueCoa->firstLeaf();
+            if ($leafRev) {
+                $revenueCoa = $leafRev;
+            }
+        }
+
+        // Sinkronkan ar_coa_id pada invoice agar referensi ke akun piutang eksplisit
+        if ($arCoa && (! $invoice->ar_coa_id || $invoice->ar_coa_id !== $arCoa->id)) {
+            $invoice->forceFill(['ar_coa_id' => $arCoa->id])->saveQuietly();
+        }
+
         if (!$arCoa || !$revenueCoa) {
             Log::error('postSalesInvoice: essential COA mapping missing — cannot post invoice', [
                 'invoice_id'    => $invoice->id,

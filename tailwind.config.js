@@ -11,9 +11,6 @@ export default {
         './resources/css/**/*.css',
         './app/Http/Livewire/**/*.php',
         './app/Livewire/**/*.php',
-        './app/Filament/**/*.php',
-        './vendor/filament/**/*.php',
-        './vendor/filament/**/*.blade.php',
     ],
     safelist: [
         {

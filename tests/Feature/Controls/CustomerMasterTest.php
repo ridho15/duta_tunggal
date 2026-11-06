@@ -121,15 +121,3 @@ it('customers:assign-codes: dry-run tidak mengubah; --apply memberi CUST-##### m
     expect(Customer::query()->whereNull('merged_into')->orderBy('id')->pluck('code', 'id')->all())->toBe($before);   // tidak berubah
 });
 
-it('form Customer membuat customer lewat CustomerService (dedup berlaku) dan menampilkan alasannya', function () {
-    config(['sales.controls.customer_dedup' => true]);
-    $ctx = stkContext();
-    $user = ctlUser($ctx, 'Super Admin', ['create customer', 'view any customer', 'view customer']);
-    app(CustomerService::class)->create(cstData(['code' => 'C-1', 'cabang_id' => $ctx['cabang']->id]));
-
-    \Livewire\Livewire::actingAs($user)->test(\App\Filament\Resources\CustomerResource\Pages\CreateCustomer::class)
-        ->fillForm(cstData(['code' => 'C-2', 'cabang_id' => $ctx['cabang']->id]))
-        ->call('create');
-
-    expect(Customer::where('code', 'C-2')->exists())->toBeFalse();   // ditolak (halt) — tidak tersimpan
-});

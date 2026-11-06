@@ -133,6 +133,9 @@ class SuratJalanController extends Controller
                         'so_number' => $so->so_number,
                         'customer' => $so->customer,
                         'cabang' => $so->cabang,
+                        'recipient_name' => $so->recipientName(),
+                        'recipient_phone' => $so->recipientPhone(),
+                        'shipped_to' => $so->shippingAddress(),
                         'delivery_orders' => [],
                     ];
                 }

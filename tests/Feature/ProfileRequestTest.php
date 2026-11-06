@@ -223,14 +223,3 @@ it('perf:report: entri lama di luar --since diabaikan; tanpa data memberi petunj
     File::deleteDirectory($dir);
 });
 
-it('rute nyata aplikasi (halaman login panel) ikut terekam saat aktif dan tetap berfungsi normal', function () {
-    $file = perfSetup(['min_ms' => 0]);
-
-    $this->get('/admin/login')->assertOk();
-
-    $entries = perfEntries($file);
-
-    expect($entries)->not->toBeEmpty()
-        ->and($entries[0]['status'])->toBe(200)
-        ->and($entries[0]['route'])->toContain('login');
-});

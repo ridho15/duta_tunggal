@@ -12,10 +12,13 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeStockOverviewAndCardWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $authorizedUser;
     protected User $unauthorizedUser;
     protected Cabang $cabang;
@@ -39,7 +42,7 @@ class BladeStockOverviewAndCardWorkflowTest extends TestCase
 
         $this->warehouse = Warehouse::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
             ?? Warehouse::withoutGlobalScopes()->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'kode' => 'WH-TEST-01',
                 'name' => 'Gudang Utama Test',
                 'cabang_id' => $this->cabang->id,
@@ -61,7 +64,7 @@ class BladeStockOverviewAndCardWorkflowTest extends TestCase
         $perm = Permission::firstOrCreate(['name' => 'view any inventory stock', 'guard_name' => 'web']);
         $role->givePermissionTo($perm);
 
-        $this->authorizedUser = User::withoutGlobalScopes()->first() ?? User::create([
+        $this->authorizedUser = User::withoutGlobalScopes()->first() ?? User::factory()->create([
             'username' => 'stock_tester',
             'first_name' => 'Stock',
             'last_name' => 'Tester',

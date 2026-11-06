@@ -1,7 +1,5 @@
 <?php
 
-use App\Filament\Resources\QualityControlPurchaseResource;
-use App\Filament\Resources\QualityControlPurchaseResource\Pages\CreateQualityControlPurchase;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Invoice;
@@ -235,84 +233,6 @@ test('Point 1: 1 QC and 1 GRN generated for multi-item PO arrival', function () 
 // ─────────────────────────────────────────────────────────────────────────────
 // Point 2: QC Draft Mengunci Qty & Auto-Batal Saat PO Selesai/Tutup
 // ─────────────────────────────────────────────────────────────────────────────
-test('Point 2: QC draft locks quantity with clear message and auto-cancels when PO closes', function () {
-    $ctx = createFeedbackAuditContext();
-    Auth::login($ctx['userPusat']);
-
-    $po = PurchaseOrder::factory()->create([
-        'cabang_id'    => $ctx['cabangPusat']->id,
-        'warehouse_id' => $ctx['warehousePusat']->id,
-        'supplier_id'  => $ctx['supplier']->id,
-        'status'       => 'approved',
-    ]);
-
-    $poItem = PurchaseOrderItem::factory()->create([
-        'purchase_order_id' => $po->id,
-        'product_id'        => $ctx['productA']->id,
-        'quantity'          => 50,
-        'unit_price'        => 10000,
-    ]);
-
-    // Create Draft QC 1 for 20 pcs
-    $draftQc1 = QualityControl::create([
-        'qc_number'         => 'QC-P-DRAFT-001',
-        'purchase_order_id' => $po->id,
-        'product_id'        => $ctx['productA']->id,
-        'warehouse_id'      => $ctx['warehousePusat']->id,
-        'cabang_id'         => $ctx['cabangPusat']->id,
-        'inspected_by'      => $ctx['userPusat']->id,
-        'quantity_received' => 20,
-        'passed_quantity'   => 20,
-        'rejected_quantity' => 0,
-        'status'            => 0, // Draft
-    ]);
-
-    QualityControlItem::create([
-        'quality_control_id'     => $draftQc1->id,
-        'purchase_order_item_id' => $poItem->id,
-        'product_id'             => $ctx['productA']->id,
-        'quantity_received'      => 20,
-        'passed_quantity'        => 20,
-        'rejected_quantity'      => 0,
-        'status'                 => 0,
-    ]);
-
-    // Check lock info
-    $lockInfo = QualityControlPurchaseResource::draftQcLockInfo($poItem);
-    expect($lockInfo['ordered'])->toBe(50.0);
-    expect($lockInfo['locked_qty'])->toBe(20.0);
-    expect($lockInfo['remaining_allowed'])->toBe(30.0);
-    expect($lockInfo['message'])->toContain('Sisa yang bisa di-QC 30 pcs (20 pcs sedang di QC-P-DRAFT-001)');
-
-    // Trying to create a second draft QC for 35 pcs should fail validation because only 30 pcs remain
-    $page = new CreateQualityControlPurchase();
-    $reflection = new \ReflectionClass($page);
-    $mutateMethod = $reflection->getMethod('mutateFormDataBeforeCreate');
-    $mutateMethod->setAccessible(true);
-
-    expect(function () use ($mutateMethod, $page, $po, $poItem, $ctx) {
-        $mutateMethod->invoke($page, [
-            'purchase_order_id' => $po->id,
-            'items' => [
-                [
-                    'purchase_order_item_id' => $poItem->id,
-                    'product_id'             => $ctx['productA']->id,
-                    'quantity_received'      => 35,
-                    'passed_quantity'        => 35,
-                    'rejected_quantity'      => 0,
-                ]
-            ],
-        ]);
-    })->toThrow(ValidationException::class);
-
-    // Now complete the PO directly (simulate closing/cancellation)
-    $po->update(['status' => 'closed']);
-
-    // Draft QC 1 should be automatically cancelled (status = 2)
-    $draftQc1->refresh();
-    expect($draftQc1->status)->toBe(2);
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Point 3: Invoice Merefer PO + Penerimaan Tanpa OR & Tolak Duplikat
 // ─────────────────────────────────────────────────────────────────────────────
@@ -444,78 +364,6 @@ test('Point 4: PO enforces warehouse selection and locks branch to Pusat', funct
 // ─────────────────────────────────────────────────────────────────────────────
 // Point 5: Hanya Gudang di PO yang Boleh QC
 // ─────────────────────────────────────────────────────────────────────────────
-test('Point 5: Only users assigned to PO warehouse can perform QC (unless Super Admin)', function () {
-    $ctx = createFeedbackAuditContext();
-
-    $po = PurchaseOrder::factory()->create([
-        'cabang_id'    => $ctx['cabangPusat']->id,
-        'warehouse_id' => $ctx['warehousePusat']->id,
-        'supplier_id'  => $ctx['supplier']->id,
-        'status'       => 'approved',
-    ]);
-
-    $poItem = PurchaseOrderItem::factory()->create([
-        'purchase_order_id' => $po->id,
-        'product_id'        => $ctx['productA']->id,
-        'quantity'          => 10,
-    ]);
-
-    // 1. Staff from Cabang Surabaya tries to QC PO for Pusat -> Denied!
-    Auth::login($ctx['userCabang']);
-    $page = new CreateQualityControlPurchase();
-
-    $reflection = new \ReflectionClass($page);
-    $mutateMethod = $reflection->getMethod('mutateFormDataBeforeCreate');
-    $mutateMethod->setAccessible(true);
-
-    expect(function () use ($mutateMethod, $page, $po, $poItem, $ctx) {
-        $mutateMethod->invoke($page, [
-            'purchase_order_id' => $po->id,
-            'items' => [
-                [
-                    'purchase_order_item_id' => $poItem->id,
-                    'product_id'             => $ctx['productA']->id,
-                    'quantity_received'      => 10,
-                    'passed_quantity'        => 10,
-                    'rejected_quantity'      => 0,
-                ]
-            ],
-        ]);
-    })->toThrow(ValidationException::class);
-
-    // 2. Staff from Pusat -> Allowed!
-    Auth::login($ctx['userPusat']);
-    $allowedData = $mutateMethod->invoke($page, [
-        'purchase_order_id' => $po->id,
-        'items' => [
-            [
-                'purchase_order_item_id' => $poItem->id,
-                'product_id'             => $ctx['productA']->id,
-                'quantity_received'      => 10,
-                'passed_quantity'        => 10,
-                'rejected_quantity'      => 0,
-            ]
-        ],
-    ]);
-    expect($allowedData['warehouse_id'])->toBe($ctx['warehousePusat']->id);
-
-    // 3. Super Admin -> Allowed regardless of warehouse!
-    Auth::login($ctx['superAdmin']);
-    $adminData = $mutateMethod->invoke($page, [
-        'purchase_order_id' => $po->id,
-        'items' => [
-            [
-                'purchase_order_item_id' => $poItem->id,
-                'product_id'             => $ctx['productA']->id,
-                'quantity_received'      => 10,
-                'passed_quantity'        => 10,
-                'rejected_quantity'      => 0,
-            ]
-        ],
-    ]);
-    expect($adminData['warehouse_id'])->toBe($ctx['warehousePusat']->id);
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Point 6: OR Disederhanakan (required_date & purpose)
 // ─────────────────────────────────────────────────────────────────────────────

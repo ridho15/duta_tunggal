@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Filament\Resources\SalesInvoiceResource;
 use App\Models\SaleOrder;
 use App\Models\TaxSetting;
 
@@ -28,9 +27,9 @@ class SalesInvoiceTaxResolver
             ->first();
 
         if ($firstTaxType !== null && trim((string) $firstTaxType) !== '') {
-            $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $firstTaxType);
+            $resolvedTaxType = self::normalizeType((string) $firstTaxType);
         } elseif (!empty($saleOrder->tipe_pajak)) {
-            $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $saleOrder->tipe_pajak);
+            $resolvedTaxType = self::normalizeType((string) $saleOrder->tipe_pajak);
         } elseif ($resolvedTaxRate > 0) {
             $resolvedTaxType = 'Eksklusif';
         } else {
@@ -41,7 +40,7 @@ class SalesInvoiceTaxResolver
                 $normalized = strtolower(trim((string) $firstTaxType));
                 if (in_array($normalized, ['eksklusif', 'ekslusif', 'eklusif', 'exclusive'], true)) {
                     $resolvedTaxRate = (float) TaxSetting::activeRate('PPN');
-                    $resolvedTaxType = SalesInvoiceResource::normalizeInvoiceTaxTypeValue((string) $firstTaxType);
+                    $resolvedTaxType = self::normalizeType((string) $firstTaxType);
                 }
             }
         }
@@ -55,5 +54,14 @@ class SalesInvoiceTaxResolver
             'ppn_rate' => $resolvedTaxRate,
             'tipe_pajak' => $resolvedTaxType,
         ];
+    }
+
+    public static function normalizeType(?string $taxType): string
+    {
+        return match (TaxService::normalizeType($taxType)) {
+            'Inklusif' => 'Inklusif',
+            'Eksklusif' => 'Eksklusif',
+            default => 'None',
+        };
     }
 }

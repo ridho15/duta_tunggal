@@ -8,9 +8,6 @@
  *  - "Penyesuaian Sisa" tidak lagi ditampilkan; daftar invoice disaring dari AR dan cakupan cabang
  */
 
-use App\Filament\Resources\CustomerReceiptResource;
-use App\Filament\Resources\CustomerReceiptResource\Pages\CreateCustomerReceipt;
-use App\Filament\Resources\CustomerReceiptResource\Pages\EditCustomerReceipt;
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -141,14 +138,6 @@ it('Isu 7: daftar akun tidak memuat akun induk, DEPOSITO, maupun INVESTASI (jemb
         );
 });
 
-it('Isu 7: default akun hanya bila kandidatnya tepat satu; bila lebih, dikosongkan (tidak jatuh ke akun induk)', function () {
-    $coa = phase5Coa();
-
-    expect(CustomerReceiptAccounts::defaultId('Cash'))->toBe($coa['kas']->id)          // satu kandidat
-        ->and(CustomerReceiptAccounts::defaultId('Transfer'))->toBeNull()               // BCA + Mandiri
-        ->and(CustomerReceiptResource::getDefaultCoaIdByPaymentMethod('Transfer'))->toBeNull();
-});
-
 it('Isu 7: setelah ada akun bertanda is_cash_bank, HANYA akun bertanda yang dapat dipilih', function () {
     $coa = phase5Coa();
     $coa['bca']->update(['is_cash_bank' => true]);
@@ -194,11 +183,11 @@ it('Isu 7: daftar invoice disaring dari AR (sisa > 0) — invoice lunas hilang, 
     AccountReceivable::where('invoice_id', $paid->id)->update(['paid' => 50000, 'remaining' => 0]);
     $other = phase5Invoice($ctx, $ctx['a'], 70000, Customer::factory()->create(), 'INV-P5-LAIN');
 
-    $numbers = CustomerReceiptResource::invoiceableInvoicesQuery($ctx['customer']->id)->pluck('invoices.invoice_number')->all();
+    $numbers = \App\Models\Invoice::invoiceableForCustomer($ctx['customer']->id)->pluck('invoices.invoice_number')->all();
     expect($numbers)->toContain('INV-P5-TERBUKA')->not->toContain('INV-P5-LUNAS')->not->toContain('INV-P5-LAIN');
 
     // mode ubah: invoice yang sudah dipilih tetap tampil walau kini lunas
-    $withIncluded = CustomerReceiptResource::invoiceableInvoicesQuery($ctx['customer']->id, [$paid->id])->pluck('invoices.invoice_number')->all();
+    $withIncluded = \App\Models\Invoice::invoiceableForCustomer($ctx['customer']->id, [$paid->id])->pluck('invoices.invoice_number')->all();
     expect($withIncluded)->toContain('INV-P5-LUNAS');
 });
 
@@ -209,7 +198,7 @@ it('Isu 7: pengguna non-"all" tidak melihat invoice cabang lain milik customer y
     phase5Invoice($ctx, $ctx['b'], 100000, number: 'INV-P5-CAB-B');
     Auth::login($ctx['user']);
 
-    $numbers = CustomerReceiptResource::invoiceableInvoicesQuery($ctx['customer']->id)->pluck('invoices.invoice_number')->all();
+    $numbers = \App\Models\Invoice::invoiceableForCustomer($ctx['customer']->id)->pluck('invoices.invoice_number')->all();
 
     expect($numbers)->toContain('INV-P5-CAB-A')->not->toContain('INV-P5-CAB-B');
 });
@@ -334,187 +323,7 @@ it('Isu 7: akun penerima harus akun yang sah untuk metode pembayaran', function 
 
 // ───────────────────────────── Halaman Buat ─────────────────────────────
 
-it('Isu 7: penerimaan pas — cabang = cabang invoice (bukan cabang customer), AR lunas, tanpa deposit', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 100000])))
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $receipt = CustomerReceipt::withoutGlobalScopes()->latest('id')->firstOrFail();
-    expect($receipt->cabang_id)->toBe($ctx['a']->id)                 // cabang invoice, bukan cabang customer (B)
-        ->and($ctx['customer']->cabang_id)->toBe($ctx['b']->id)
-        ->and((float) $receipt->total_payment)->toBe(100000.0)
-        ->and((float) $receipt->overpayment_amount)->toBe(0.0)
-        ->and($receipt->deposit_id)->toBeNull()
-        ->and((float) AccountReceivable::where('invoice_id', $invoice->id)->value('remaining'))->toBe(0.0)
-        ->and(Deposit::count())->toBe(0);
-});
-
-it('Isu 7: kelebihan bayar tanpa opsi deposit DITOLAK — tidak ada receipt, AR tidak berubah, pesan pada field total', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000, number: 'INV-P5-LEBIH');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 130000])))
-        ->call('create')
-        ->assertHasFormErrors(['total_payment']);
-
-    expect(CustomerReceipt::withoutGlobalScopes()->count())->toBe(0)
-        ->and(Deposit::count())->toBe(0)
-        ->and((float) AccountReceivable::where('invoice_id', $invoice->id)->value('remaining'))->toBe(100000.0);
-});
-
-it('Isu 7: kelebihan bayar dengan opsi deposit → Deposit Customer + jurnal Kas/Bank debit, Deposit Pelanggan kredit (cabang invoice)', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 130000], ['overpayment_as_deposit' => true])))
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $receipt = CustomerReceipt::withoutGlobalScopes()->latest('id')->firstOrFail();
-    $deposit = Deposit::firstOrFail();
-
-    expect((float) $receipt->total_payment)->toBe(100000.0)              // hanya yang teralokasi ke invoice
-        ->and((float) $receipt->overpayment_amount)->toBe(30000.0)
-        ->and($receipt->deposit_id)->toBe($deposit->id)
-        ->and((float) $deposit->amount)->toBe(30000.0)
-        ->and((float) $deposit->remaining_amount)->toBe(30000.0)
-        ->and($deposit->from_model_type)->toBe(Customer::class)
-        ->and($deposit->from_model_id)->toBe($ctx['customer']->id)
-        ->and($deposit->status)->toBe('active')
-        ->and((float) AccountReceivable::where('invoice_id', $invoice->id)->value('remaining'))->toBe(0.0);
-
-    $entries = JournalEntry::where('source_type', Deposit::class)->where('source_id', $deposit->id)->get();
-    expect($entries)->toHaveCount(2)
-        ->and((float) $entries->firstWhere('coa_id', $ctx['coa']['bca']->id)->debit)->toBe(30000.0)
-        ->and((float) $entries->firstWhere('coa_id', $ctx['coa']['deposit_pelanggan']->id)->credit)->toBe(30000.0)
-        ->and($entries->pluck('cabang_id')->unique()->all())->toBe([$ctx['a']->id]);
-});
-
-it('Isu 7: kelebihan bayar dengan opsi deposit ditolak bila akun Deposit Pelanggan belum ada (tidak ada uang tanpa jurnal)', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-    $ctx['coa']['deposit_pelanggan']->forceDelete();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 120000], ['overpayment_as_deposit' => true])))
-        ->call('create')
-        ->assertHasFormErrors(['total_payment']);
-
-    expect(CustomerReceipt::withoutGlobalScopes()->count())->toBe(0)->and(Deposit::count())->toBe(0);
-});
-
-it('Isu 7: invoice dari dua cabang dalam satu penerimaan ditolak dengan pesan pada field Cabang', function () {
-    $ctx = phase5Context();
-    $a = phase5Invoice($ctx, $ctx['a'], 100000);
-    $b = phase5Invoice($ctx, $ctx['b'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$a->id => 100000, $b->id => 100000])))
-        ->call('create')
-        ->assertHasFormErrors(['cabang_id']);
-
-    expect(CustomerReceipt::withoutGlobalScopes()->count())->toBe(0);
-});
-
-it('Isu 7: akun induk (1110) atau DEPOSITO tidak dapat dipakai sebagai akun penerima', function (string $key) {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 100000], ['coa_id' => $ctx['coa'][$key]->id])))
-        ->call('create')
-        ->assertHasFormErrors(['coa_id']);
-
-    expect(CustomerReceipt::withoutGlobalScopes()->count())->toBe(0);
-})->with(['parent_kas_bank', 'parent_bank', 'bca_deposito', 'bca_investasi']);
-
-it('Isu 7: tanpa invoice terpilih ditolak — tidak ada lagi alokasi senyap ke invoice pertama', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, ['selected_invoices' => '[]', 'invoice_receipts' => '{}', 'total_payment' => '100000']))
-        ->call('create');
-
-    expect(CustomerReceipt::withoutGlobalScopes()->count())->toBe(0)
-        ->and((float) AccountReceivable::where('invoice_id', $invoice->id)->value('remaining'))->toBe(100000.0);
-});
-
-it('Isu 7: form Buat — cabang tidak diisi dari customer, kolom cabang tidak dapat diubah manual, dan opsi deposit tersedia', function () {
-    $ctx = phase5Context();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(['customer_id' => $ctx['customer']->id, 'payment_method' => 'Transfer'])
-        ->assertFormFieldIsDisabled('cabang_id')
-        ->assertFormFieldExists('overpayment_as_deposit')
-        ->assertFormFieldIsVisible('overpayment_as_deposit')
-        ->assertSet('data.cabang_id', null);   // customer terdaftar di cabang B, tetapi cabang mengikuti invoice
-});
-
-it('Isu 7: metode Deposit menyembunyikan opsi kelebihan-sebagai-deposit', function () {
-    $ctx = phase5Context();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(['payment_method' => 'Deposit'])
-        ->assertFormFieldIsHidden('overpayment_as_deposit');
-});
-
-it('Isu 7: pilihan COA pada form mengikuti daftar sah (tanpa induk/deposito/investasi) dan default kosong bila ambigu', function () {
-    $ctx = phase5Context();
-
-    $component = Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(['payment_method' => 'Transfer'])
-        ->assertSet('data.coa_id', null);   // BCA + Mandiri → user memilih sendiri
-
-    $options = CustomerReceiptResource::getCoaOptionsByPaymentMethod('Transfer');
-    expect(array_keys($options))->not->toContain($ctx['coa']['parent_bank']->id, $ctx['coa']['bca_deposito']->id);
-});
-
 // ───────────────────────────── Halaman Ubah ─────────────────────────────
-
-it('Isu 7: halaman Ubah menolak nominal melebihi sisa (tanpa pemotongan senyap) dan tetap memakai akun sah', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 40000])))
-        ->call('create')
-        ->assertHasNoFormErrors();
-    $receipt = CustomerReceipt::withoutGlobalScopes()->latest('id')->firstOrFail();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(EditCustomerReceipt::class, ['record' => $receipt->getKey()])
-        ->fillForm(phase5Fill([$invoice->id => 120000], ['coa_id' => $ctx['coa']['bca']->id]))
-        ->call('save')
-        ->assertHasFormErrors(['total_payment']);
-
-    expect((float) $receipt->fresh()->total_payment)->toBe(40000.0)
-        ->and((float) AccountReceivable::where('invoice_id', $invoice->id)->value('remaining'))->toBe(60000.0);
-
-    // 100.000 = 40.000 miliknya + sisa 60.000 → sah pada mode ubah
-    Livewire::actingAs($ctx['user'])
-        ->test(EditCustomerReceipt::class, ['record' => $receipt->getKey()])
-        ->fillForm(phase5Fill([$invoice->id => 100000], ['coa_id' => $ctx['coa']['bca']->id]))
-        ->call('save')
-        ->assertHasNoFormErrors();
-});
 
 // ───────────────────────────── 7.4 & 7.6 Tampilan ─────────────────────────────
 
@@ -536,32 +345,6 @@ it('Isu 7: tabel invoice tidak lagi memuat kolom Penyesuaian Sisa maupun Select2
 
     $init = file_get_contents(resource_path('views/components/customer-receipt-javascript-init.blade.php'));
     expect($init)->not->toContain('alert(`Pembayaran tidak boleh melebihi')->toContain('receipt-overpay-note');
-});
-
-it('Isu 7: teks bantuan menjelaskan perilaku sebenarnya (kelebihan ditolak / deposit)', function () {
-    $source = file_get_contents(app_path('Filament/Resources/CustomerReceiptResource.php'));
-
-    expect($source)->not->toContain('Overpayment akan dicatat sebagai customer deposit.')
-        ->toContain('tidak dipotong senyap');
-});
-
-it('Isu 7: halaman Lihat menampilkan cabang dan kelebihan yang dicatat sebagai deposit', function () {
-    $ctx = phase5Context();
-    $invoice = phase5Invoice($ctx, $ctx['a'], 100000);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(CreateCustomerReceipt::class)
-        ->fillForm(phase5Form($ctx, phase5Fill([$invoice->id => 125000], ['overpayment_as_deposit' => true])))
-        ->call('create');
-
-    $receipt = CustomerReceipt::withoutGlobalScopes()->latest('id')->firstOrFail();
-    $deposit = Deposit::firstOrFail();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(\App\Filament\Resources\CustomerReceiptResource\Pages\ViewCustomerReceipt::class, ['record' => $receipt->getKey()])
-        ->assertSee('Kelebihan Bayar')
-        ->assertSee($deposit->deposit_number)
-        ->assertSee('Cabang A');
 });
 
 // ───────────────────────────── Checklist kesiapan ─────────────────────────────

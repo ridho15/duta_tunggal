@@ -11,10 +11,13 @@ use App\Models\JournalEntry;
 use App\Models\User;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeCashBankWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
     protected Cabang $cabang;
     protected ChartOfAccount $cashCoa;
@@ -49,7 +52,7 @@ class BladeCashBankWorkflowTest extends TestCase
         }
         $role->givePermissionTo($perms);
 
-        $this->user = User::withoutGlobalScopes()->first() ?? User::create([
+        $this->user = User::withoutGlobalScopes()->first() ?? User::factory()->create([
             'username' => 'finance_test',
             'email' => 'finance-test@dutatunggal.co.id',
             'name' => 'Finance Tester',

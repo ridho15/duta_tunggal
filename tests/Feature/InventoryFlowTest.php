@@ -1,11 +1,5 @@
 <?php
 
-use App\Filament\Resources\InventoryStockResource\Pages\CreateInventoryStock;
-use App\Filament\Resources\InventoryStockResource\Pages\EditInventoryStock;
-use App\Filament\Resources\InventoryStockResource\Pages\ViewInventoryStock;
-use App\Filament\Resources\WarehouseResource\Pages\CreateWarehouse;
-use App\Filament\Resources\WarehouseResource\Pages\EditWarehouse;
-use App\Filament\Resources\WarehouseResource\Pages\ViewWarehouse;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
@@ -93,32 +87,6 @@ beforeEach(function () {
     Auth::login($this->user);
 });
 
-it('creates a warehouse through the Filament create page', function () {
-    $uniqueCode = 'WH-' . time() . '-' . rand(100, 999);
-
-    Livewire::test(CreateWarehouse::class)
-        ->fillForm([
-            'kode' => $uniqueCode,
-            'name' => 'Warehouse Test',
-            'cabang_id' => $this->cabang->id,
-            'location' => 'Test Location Address',
-            'telepon' => '081234567890',
-            'tipe' => 'Kecil',
-            'status' => true,
-            'warna_background' => '#ffffff',
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $warehouse = Warehouse::where('kode', $uniqueCode)->first();
-
-    expect($warehouse)
-        ->not->toBeNull()
-        ->and($warehouse->name)->toBe('Warehouse Test')
-        ->and($warehouse->cabang_id)->toBe($this->cabang->id)
-        ->and($warehouse->tipe)->toBe('Kecil');
-});
-
 it('creates racks for a warehouse', function () {
     $warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
 
@@ -138,33 +106,6 @@ it('creates racks for a warehouse', function () {
     $warehouse->refresh();
     expect($warehouse->rak)->toHaveCount(1);
     expect($warehouse->rak->first()->name)->toBe('Rack A1');
-});
-
-it('initializes inventory stock through Filament', function () {
-    $warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
-    $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
-
-    Livewire::test(CreateInventoryStock::class)
-        ->fillForm([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $warehouse->id,
-            'rak_id' => $rak->id,
-            'qty_available' => 100,
-            'qty_reserved' => 0,
-            'qty_min' => 10,
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
-
-    $inventoryStock = InventoryStock::where('product_id', $this->product->id)
-        ->where('warehouse_id', $warehouse->id)
-        ->first();
-
-    expect($inventoryStock)
-        ->not->toBeNull()
-        ->and($inventoryStock->qty_available)->toBe(100.0)
-        ->and($inventoryStock->qty_reserved)->toBe(0.0)
-        ->and($inventoryStock->rak_id)->toBe($rak->id);
 });
 
 it('validates stock locations and relationships', function () {
@@ -286,80 +227,6 @@ it('tests multi-warehouse support', function () {
         $q->where('cabang_id', $cabang2->id);
     })->where('product_id', $this->product->id)->sum('qty_available');
     expect($branch2Total)->toBe(25.0);
-});
-
-it('edits inventory stock through Filament', function () {
-    $warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
-    $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
-
-    $inventoryStock = InventoryStock::create([
-        'product_id' => $this->product->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
-        'qty_available' => 50,
-        'qty_reserved' => 5,
-        'qty_min' => 10,
-    ]);
-
-    Livewire::test(EditInventoryStock::class, ['record' => $inventoryStock->id])
-        ->fillForm([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $warehouse->id,
-            'rak_id' => $rak->id,
-            'qty_available' => 75,
-            'qty_reserved' => 10,
-            'qty_min' => 15,
-        ])
-        ->call('save')
-        ->assertHasNoFormErrors();
-
-    $inventoryStock->refresh();
-    expect($inventoryStock->qty_available)->toBe(75.0);
-    expect($inventoryStock->qty_reserved)->toBe(10.0);
-    expect($inventoryStock->qty_min)->toBe(15.0);
-});
-
-it('displays warehouse details on the Filament view page', function () {
-    $warehouse = Warehouse::factory()->create([
-        'cabang_id' => $this->cabang->id,
-        'name' => 'Test Warehouse View',
-        'kode' => 'WH-VIEW-' . uniqid(),
-    ]);
-
-    $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
-
-    Livewire::test(ViewWarehouse::class, ['record' => $warehouse->id])
-        ->assertOk();
-
-    // Verify warehouse data is displayed
-    expect($warehouse->name)->toBe('Test Warehouse View');
-    expect($warehouse->rak)->toHaveCount(1);
-    expect($warehouse->rak->first()->id)->toBe($rak->id);
-});
-
-it('displays inventory stock details on the Filament view page', function () {
-    $warehouse = Warehouse::factory()->create(['cabang_id' => $this->cabang->id]);
-    $rak = Rak::factory()->create(['warehouse_id' => $warehouse->id]);
-
-    $inventoryStock = InventoryStock::create([
-        'product_id' => $this->product->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => $rak->id,
-        'qty_available' => 100,
-        'qty_reserved' => 10,
-        'qty_min' => 20,
-    ]);
-
-    Livewire::test(ViewInventoryStock::class, ['record' => $inventoryStock->id])
-        ->assertOk()
-        ->assertSee('Satuan / UOM')
-        ->assertSee($this->uom->name);
-
-    // Verify relationships are loaded correctly
-    expect($inventoryStock->product->id)->toBe($this->product->id);
-    expect($inventoryStock->product->uom->id)->toBe($this->uom->id);
-    expect($inventoryStock->warehouse->id)->toBe($warehouse->id);
-    expect($inventoryStock->rak->id)->toBe($rak->id);
 });
 
 it('covers the inventory management flow through finance posting', function () {

@@ -10,7 +10,6 @@
  *   Jumlah 173.740 | Diskon 8.687 | DPP 165.053 | PPN 18.155,83 | Total 183.208,83
  */
 
-use App\Filament\Resources\SalesInvoiceResource\Pages\ViewSalesInvoice;
 use App\Helpers\MoneyHelper;
 use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
@@ -37,6 +36,11 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+    config(['sales.invoice.auto_on_do_complete' => true]);   // jalur invoice otomatis (default mati sejak B25)
+});
 
 function p5bContext(): array
 {
@@ -84,12 +88,20 @@ function p5bSaleOrder(array $ctx, string $taxType = 'Eksklusif', array $item = [
     return [$so->fresh(), $soItem];
 }
 
-/** Invoice otomatis lewat jalur Sales Order (tanpa DO): SO menjadi completed. */
+/**
+ * Invoice otomatis untuk sebuah SO. Jalur "SO selesai -> invoice" sudah dihapus (alur wajib SO -> DO -> SJ -> Invoice, lihat
+ * SaleOrderObserver), jadi invoice otomatis hanya lewat DO selesai (flag sales.invoice.auto_on_do_complete): seluruh item SO dikirim satu DO.
+ */
 function p5bInvoiceViaSaleOrder(SaleOrder $so): Invoice
 {
-    $so->update(['status' => 'completed']);
+    $soItem = $so->saleOrderItem()->firstOrFail();
+    $ctx = [
+        'cabang' => \App\Models\Cabang::findOrFail($so->cabang_id),
+        'warehouse' => \App\Models\Warehouse::findOrFail($soItem->warehouse_id),
+        'product' => \App\Models\Product::findOrFail($soItem->product_id),
+    ];
 
-    return Invoice::where('from_model_id', $so->id)->firstOrFail();
+    return p5bInvoiceViaDeliveryOrder($ctx, $so, $soItem, (float) $soItem->quantity);
 }
 
 /** Invoice otomatis lewat jalur Delivery Order (per DO): DO completed. */
@@ -387,22 +399,6 @@ it('Isu 10: PDF Sales Order dan Quotation menampilkan 183.208,83 (bukan pembulat
     expect($qHtml)->toContain('Rp 183.208,83')->not->toContain('Rp 183.209');
 });
 
-it('Isu 10: halaman Lihat invoice menampilkan rincian baris dan total yang sama dengan PDF', function () {
-    $ctx = p5bContext();
-    [$so] = p5bSaleOrder($ctx);
-    $invoice = p5bInvoiceViaSaleOrder($so);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewSalesInvoice::class, ['record' => $invoice->getKey()])
-        ->assertSuccessful()
-        ->assertSee('Rp 8.687,00')
-        ->assertSee('Rp 173.740,00')
-        ->assertSee('5,00% = Rp 8.687,00')
-        ->assertSee('Rp 165.053,00')
-        ->assertSee('11,00% = Rp 18.155,83')
-        ->assertSee('Rp 183.208,83');
-});
-
 it('Isu 10: invoice PDF tampil untuk invoice lama (rincian dihitung dari price/diskon/DPP tanpa kolom baru)', function () {
     $ctx = p5bContext();
     [$so] = p5bSaleOrder($ctx);
@@ -438,31 +434,3 @@ it('Isu 10: retur customer memakai harga bersih (setelah diskon), bukan harga gr
     expect($source)->toContain('invoiceItem?->net_unit_price')->not->toContain('invoiceItem?->price');
 });
 
-it('Isu 10: halaman Ubah invoice menampilkan rincian baris dan menyimpan ulang dengan rincian baku (header = Σ baris)', function () {
-    $ctx = p5bContext();
-    [$so] = p5bSaleOrder($ctx);
-    $invoice = p5bInvoiceViaSaleOrder($so);
-    DB::table('invoices')->where('id', $invoice->id)->update(['status' => 'draft']);   // hanya invoice Draft yang dapat diubah (InvoicePolicy)
-
-    $component = Livewire::actingAs($ctx['user'])
-        ->test(\App\Filament\Resources\SalesInvoiceResource\Pages\EditSalesInvoice::class, ['record' => $invoice->getKey()])
-        ->assertSuccessful();
-
-    $state = $component->get('data.invoiceItem');
-    $first = collect($state)->first();
-    expect($first['bd_gross'])->toBe('Rp 173.740,00')
-        ->and($first['bd_discount'])->toBe('5,00% = Rp 8.687,00')
-        ->and($first['bd_dpp'])->toBe('Rp 165.053,00')
-        ->and($first['bd_ppn'])->toBe('11,00% = Rp 18.155,83');
-
-    $component->call('save')->assertHasNoFormErrors();
-
-    $invoice->refresh();
-    $item = $invoice->invoiceItem()->firstOrFail();
-    expect((float) $item->gross_amount)->toBe(173740.0)
-        ->and((float) $item->price)->toBe(8687.0)                    // tetap gross setelah disimpan dari form
-        ->and((float) $item->subtotal)->toBe(165053.0)
-        ->and((float) $item->tax_amount)->toBe(18155.83)
-        ->and(round((float) $invoice->subtotal, 2))->toBe(165053.0)
-        ->and(round((float) $invoice->total, 2))->toBe(183208.83);
-});

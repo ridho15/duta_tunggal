@@ -5,8 +5,8 @@ namespace App\Observers;
 use App\Models\Production;
 use App\Services\ManufacturingJournalService;
 use App\Services\QualityControlService;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
+use App\Support\Flash;
 
 class ProductionObserver
 {
@@ -42,11 +42,7 @@ class ProductionObserver
         } catch (\Exception $e) {
             Log::warning("ProductionObserver: Could not post WIP journal for production {$production->id}: " . $e->getMessage());
 
-            Notification::make()
-                ->title('Gagal Membuat Jurnal Produksi')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
+            Flash::error('Gagal Membuat Jurnal Produksi', $e->getMessage());
         }
 
         if ($production->status === 'finished') {
@@ -75,11 +71,7 @@ class ProductionObserver
         } catch (\Exception $e) {
             Log::error("Failed to create QC for production ID: {$production->id}. Error: " . $e->getMessage());
 
-            Notification::make()
-                ->title('Gagal Membuat QC Produksi')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
+            Flash::error('Gagal Membuat QC Produksi', $e->getMessage());
         }
     }
 }

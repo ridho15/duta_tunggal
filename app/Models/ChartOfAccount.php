@@ -119,6 +119,42 @@ class ChartOfAccount extends Model
         return $this->hasMany(ChartOfAccount::class, 'parent_id');
     }
 
+    public function isParent(): bool
+    {
+        return $this->children()->where('id', '!=', $this->id)->exists();
+    }
+
+    public function isLeaf(): bool
+    {
+        return ! $this->isParent();
+    }
+
+    /**
+     * Mengembalikan diri sendiri bila sudah merupakan akun detail/leaf;
+     * bila akun induk, secara rekursif mencari sub-akun transaksi aktif pertama.
+     */
+    public function firstLeaf(): ?ChartOfAccount
+    {
+        if ($this->isLeaf()) {
+            return $this;
+        }
+
+        $activeChildren = $this->children()
+            ->where('id', '!=', $this->id)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
+
+        foreach ($activeChildren as $child) {
+            $leaf = $child->firstLeaf();
+            if ($leaf !== null) {
+                return $leaf;
+            }
+        }
+
+        return null;
+    }
+
     public function journalEntries()
     {
         return $this->hasMany(JournalEntry::class, 'coa_id');

@@ -6,9 +6,6 @@
  *  - Isu 2: angka di modal "Buat Sales Order dari Quotation" tidak boleh melompat 100x
  */
 
-use App\Filament\Resources\QuotationResource;
-use App\Filament\Resources\QuotationResource\Pages\ListQuotations;
-use App\Filament\Resources\QuotationResource\Pages\ViewQuotation;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
@@ -228,47 +225,6 @@ it('Isu 1: API update tidak menghapus catatan bila klien tidak mengirim notes', 
 
 // ───────────────────────────── Isu 2: angka modal ─────────────────────────────
 
-it('Isu 2: format angka preview memakai 2 desimal dan bukan mask (contoh UAT)', function () {
-    expect(QuotationResource::formatCurrencyPreviewState(18155.83, 1))->toBe('18.155,83')
-        ->and(QuotationResource::formatCurrencyPreviewState(183208.83, 1))->toBe('183.208,83')
-        ->and(QuotationResource::formatCurrencyPreviewState('183208.83', 1))->toBe('183.208,83')
-        ->and(QuotationResource::formatCurrencyPreviewState(160000, 1))->toBe('160.000,00');
-});
-
-it('Isu 2: state awal modal di halaman View menampilkan PPN 18.155,83 dan subtotal 183.208,83', function () {
-    $ctx = phase1Context();
-
-    $page = Livewire::actingAs($ctx['user'])
-        ->test(ViewQuotation::class, ['record' => $ctx['quotation']->getKey()])
-        ->mountAction('create_sale_order');
-
-    $actions = $page->instance()->mountedActionsData;
-    $data = $actions[array_key_last($actions)];
-    $item = collect($data['saleOrderItems'] ?? [])->first();
-
-    expect($item)->not->toBeNull()
-        ->and($item['tax_nominal'])->toBe('18.155,83')
-        ->and($item['subtotal'])->toBe('183.208,83')
-        ->and($item['unit_price'])->toBe('8.687,00')
-        ->and($data['shipped_to'])->toBe('Jl. Master Customer No. 1, Jakarta');
-});
-
-it('Isu 2: state awal modal aksi tabel sama persis dengan halaman View (satu definisi)', function () {
-    $ctx = phase1Context();
-
-    $table = Livewire::actingAs($ctx['user'])
-        ->test(ListQuotations::class)
-        ->mountTableAction('create_sale_order', $ctx['quotation']);
-
-    $actions = $table->instance()->mountedTableActionsData;
-    $data = $actions[array_key_last($actions)];
-    $item = collect($data['saleOrderItems'] ?? [])->first();
-
-    expect($item)->not->toBeNull()
-        ->and($item['tax_nominal'])->toBe('18.155,83')
-        ->and($item['subtotal'])->toBe('183.208,83');
-});
-
 // ───────────────────── Pembuatan SO dari kedua jalur: data identik ─────────────────────
 
 /**
@@ -285,67 +241,6 @@ function phase1ModalData(array $extra = []): array
         'notes' => '',
     ], $extra);
 }
-
-it('Isu 1: SO dari halaman View — tempo, mata uang, alamat, catatan tersalin; status Draft', function () {
-    $ctx = phase1Context(quotation: ['tempo_pembayaran' => 0]);
-    $data = phase1ModalData();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewQuotation::class, ['record' => $ctx['quotation']->getKey()])
-        ->callAction('create_sale_order', data: $data)
-        ->assertHasNoActionErrors();
-
-    $so = SaleOrder::withoutGlobalScopes()->where('so_number', $data['so_number'])->firstOrFail();
-    expect($so->status)->toBe('draft')
-        ->and((int) $so->tempo_pembayaran)->toBe(0)
-        ->and($so->currency_id)->toBe($ctx['idr']->id)
-        ->and($so->shipped_to)->toBe('Jl. Master Customer No. 1, Jakarta')
-        ->and($so->notes)->toBe('Catatan penawaran Fase 1')
-        ->and($so->quotation_id)->toBe($ctx['quotation']->id)
-        ->and($so->saleOrderItem()->count())->toBe(1)
-        ->and(round((float) $so->total_amount, 2))->toBe(183208.83);
-});
-
-it('Isu 1: SO dari aksi tabel — data identik dengan halaman View; status Draft (D10, flag mati)', function () {
-    $ctx = phase1Context();
-    $data = phase1ModalData();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListQuotations::class)
-        ->callTableAction('create_sale_order', $ctx['quotation'], data: $data)
-        ->assertHasNoTableActionErrors();
-
-    $so = SaleOrder::withoutGlobalScopes()->where('so_number', $data['so_number'])->firstOrFail();
-    expect($so->status)->toBe('draft')
-        ->and((int) $so->tempo_pembayaran)->toBe(30)
-        ->and($so->currency_id)->toBe($ctx['idr']->id)
-        ->and($so->shipped_to)->toBe('Jl. Master Customer No. 1, Jakarta')
-        ->and($so->notes)->toBe('Catatan penawaran Fase 1')
-        ->and(round((float) $so->total_amount, 2))->toBe(183208.83);
-});
-
-it('Isu 1: SO dari aksi tabel langsung Approved bila flag config sales.so_from_quotation_auto_approve menyala', function () {
-    config(['sales.so_from_quotation_auto_approve' => true]);
-    $ctx = phase1Context();
-    $data = phase1ModalData();
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListQuotations::class)
-        ->callTableAction('create_sale_order', $ctx['quotation'], data: $data)
-        ->assertHasNoTableActionErrors();
-
-    $so = SaleOrder::withoutGlobalScopes()->where('so_number', $data['so_number'])->firstOrFail();
-    expect($so->status)->toBe('approved');
-});
-
-it('Isu 1: alamat kirim wajib diisi di modal (tidak boleh kosong / placeholder)', function () {
-    $ctx = phase1Context(customer: ['address' => ''], quotation: ['shipped_to' => null]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewQuotation::class, ['record' => $ctx['quotation']->getKey()])
-        ->callAction('create_sale_order', data: phase1ModalData(['shipped_to' => '']))
-        ->assertHasActionErrors(['shipped_to' => 'required']);
-});
 
 // ───────────────────────────── Backfill data lama ─────────────────────────────
 
@@ -396,31 +291,3 @@ it('Backfill: dry-run tidak mengubah apa pun; --apply hanya mengisi kolom kosong
     }
 });
 
-it('Isu 1: handler bersama menyalin item dari quotation bila data repeater tidak tersedia', function () {
-    $ctx = phase1Context();
-
-    $so = QuotationResource::createSaleOrderFromQuotation($ctx['quotation'], [
-        'so_number' => 'SO-FALLBACK-P1',
-        'order_date' => now()->format('Y-m-d'),
-        'tipe_pengiriman' => 'Ambil Sendiri',
-    ], autoApprove: false);
-
-    expect($so->saleOrderItem()->count())->toBe(1)
-        ->and((int) $so->tempo_pembayaran)->toBe(30)
-        ->and($so->shipped_to)->toBe('Jl. Master Customer No. 1, Jakarta')   // fallback dari mapping
-        ->and($so->notes)->toBe('Catatan penawaran Fase 1')
-        ->and($so->status)->toBe('draft');
-});
-
-it('Isu 1: pembuatan SO atomik — bila item gagal, SO tidak tersisa setengah jadi', function () {
-    $ctx = phase1Context();
-
-    expect(fn () => QuotationResource::createSaleOrderFromQuotation($ctx['quotation'], [
-        'so_number' => 'SO-ATOMIC-P1',
-        'order_date' => now()->format('Y-m-d'),
-        'tipe_pengiriman' => 'Kirim Langsung',
-        'saleOrderItems' => [['quantity' => 1]],   // product_id hilang -> gagal
-    ]))->toThrow(\ErrorException::class);   // dilempar SETELAH SO dibuat -> transaksi harus rollback
-
-    expect(SaleOrder::withoutGlobalScopes()->where('so_number', 'SO-ATOMIC-P1')->exists())->toBeFalse();
-});

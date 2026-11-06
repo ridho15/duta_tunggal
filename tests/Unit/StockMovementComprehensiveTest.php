@@ -385,22 +385,22 @@ class StockMovementComprehensiveTest extends TestCase
                 case PurchaseReceiptItem::class:
                     $sourceType = 'Purchase Receipt';
                     $sourceNumber = $model->purchaseReceipt->receipt_number ?? 'N/A';
-                    $sourceLink = route('filament.admin.resources.purchase-receipts.view', $model->purchaseReceipt->id);
+                    $sourceLink = route('pembelian.receipts.show', $model->purchaseReceipt->id);
                     break;
                 case DeliveryOrderItem::class:
                     $sourceType = 'Delivery Order';
                     $sourceNumber = $model->deliveryOrder->do_number ?? 'N/A';
-                    $sourceLink = route('filament.admin.resources.delivery-orders.view', $model->deliveryOrder->id);
+                    $sourceLink = route('penjualan.do.show', $model->deliveryOrder->id);
                     break;
                 case StockTransferItem::class:
                     $sourceType = 'Stock Transfer';
                     $sourceNumber = $model->stockTransfer->transfer_number ?? 'N/A';
-                    $sourceLink = route('filament.admin.resources.stock-transfers.view', $model->stockTransfer->id);
+                    $sourceLink = route('gudang.transfer.show', $model->stockTransfer->id);
                     break;
                 case StockAdjustmentItem::class:
                     $sourceType = 'Stock Adjustment';
                     $sourceNumber = $model->stockAdjustment->adjustment_number ?? 'N/A';
-                    $sourceLink = route('filament.admin.resources.stock-adjustments.view', $model->stockAdjustment->id);
+                    $sourceLink = url('/gudang/penyesuaian/'.$model->stockAdjustment->id);
                     break;
                 default:
                     $sourceType = get_class($model);

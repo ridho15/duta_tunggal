@@ -179,12 +179,4 @@ class OrderRequestApiTest extends TestCase
         ]);
     }
 
-    public function test_legacy_filament_order_request_urls_redirect_to_dashboard_under_lockdown()
-    {
-        $user = User::first() ?? User::factory()->create();
-        $orderRequest = OrderRequest::first() ?? OrderRequest::factory()->create();
-
-        $this->actingAs($user)->get('/admin/order-requests/create')->assertRedirect(route('dashboard'));
-        $this->actingAs($user)->get("/admin/order-requests/{$orderRequest->id}/edit")->assertRedirect(route('dashboard'));
-    }
 }

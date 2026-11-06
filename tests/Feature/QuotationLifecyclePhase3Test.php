@@ -8,10 +8,6 @@
  *  - T1: API tidak lagi dapat melewati alur persetujuan
  */
 
-use App\Filament\Resources\QuotationResource;
-use App\Filament\Resources\QuotationResource\Pages\EditQuotation;
-use App\Filament\Resources\QuotationResource\Pages\ListQuotations;
-use App\Filament\Resources\QuotationResource\Pages\ViewQuotation;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
@@ -149,82 +145,6 @@ it('Isu 4: policy revise — hanya Approved/Expired yang belum digantikan, dan b
 
 // ───────────────────────────── Kunci status: halaman & tabel ─────────────────────────────
 
-it('Isu 4: halaman Edit quotation terkunci diarahkan ke halaman Lihat, Draft tetap dapat dibuka', function () {
-    $locked = phase3Context('approve');
-
-    Livewire::actingAs($locked['user'])
-        ->test(EditQuotation::class, ['record' => $locked['quotation']->getKey()])
-        ->assertRedirect(QuotationResource::getUrl('view', ['record' => $locked['quotation']]));
-
-    $draft = phase3Context('draft');
-    Livewire::actingAs($draft['user'])
-        ->test(EditQuotation::class, ['record' => $draft['quotation']->getKey()])
-        ->assertSuccessful()
-        ->assertNoRedirect();
-});
-
-it('Isu 4: halaman Lihat menyembunyikan Ubah/Hapus dan menampilkan Buat Revisi untuk quotation Approved', function () {
-    $ctx = phase3Context('approve');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewQuotation::class, ['record' => $ctx['quotation']->getKey()])
-        ->assertActionHidden('edit')
-        ->assertActionHidden('delete')
-        ->assertActionVisible('revise');
-});
-
-it('Isu 4: halaman Lihat quotation Draft menampilkan Ubah/Hapus dan tidak menampilkan Buat Revisi', function () {
-    $ctx = phase3Context('draft');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewQuotation::class, ['record' => $ctx['quotation']->getKey()])
-        ->assertActionVisible('edit')
-        ->assertActionVisible('delete')
-        ->assertActionHidden('revise');
-});
-
-it('Isu 4: tabel — Ubah/Hapus hanya tampil untuk Draft/Ditolak, Buat Revisi untuk Approved/Kedaluwarsa', function () {
-    $draft = phase3Context('draft');
-    $approved = Quotation::create([
-        'quotation_number' => 'QO-P3-APP-' . uniqid(), 'customer_id' => $draft['customer']->id, 'cabang_id' => $draft['cabang']->id,
-        'date' => now(), 'valid_until' => now()->addDays(10), 'currency_id' => $draft['idr']->id, 'exchange_rate' => 1,
-        'status' => 'approve', 'total_amount' => 1000,
-    ]);
-    $expired = Quotation::create([
-        'quotation_number' => 'QO-P3-EXP-' . uniqid(), 'customer_id' => $draft['customer']->id, 'cabang_id' => $draft['cabang']->id,
-        'date' => now()->subDays(40), 'valid_until' => now()->subDays(10), 'currency_id' => $draft['idr']->id, 'exchange_rate' => 1,
-        'status' => 'expired', 'total_amount' => 1000,
-    ]);
-
-    Livewire::actingAs($draft['user'])
-        ->test(ListQuotations::class)
-        ->assertTableActionVisible('edit', $draft['quotation'])
-        ->assertTableActionVisible('delete', $draft['quotation'])
-        ->assertTableActionHidden('revise', $draft['quotation'])
-        ->assertTableActionHidden('edit', $approved)
-        ->assertTableActionHidden('delete', $approved)
-        ->assertTableActionVisible('revise', $approved)
-        ->assertTableActionHidden('edit', $expired)
-        ->assertTableActionVisible('revise', $expired);
-});
-
-it('Isu 4: hapus massal hanya menghapus quotation yang masih dapat diubah', function () {
-    $ctx = phase3Context('draft');
-    $approved = Quotation::create([
-        'quotation_number' => 'QO-P3-BULK-' . uniqid(), 'customer_id' => $ctx['customer']->id, 'cabang_id' => $ctx['cabang']->id,
-        'date' => now(), 'valid_until' => now()->addDays(10), 'currency_id' => $ctx['idr']->id, 'exchange_rate' => 1,
-        'status' => 'approve', 'total_amount' => 1000,
-    ]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListQuotations::class)
-        ->callTableBulkAction('delete', [$ctx['quotation'], $approved]);
-
-    // withoutGlobalScopes() juga melepas SoftDeletingScope, jadi baris terhapus dicek lewat trashed()
-    expect(Quotation::withoutGlobalScopes()->find($ctx['quotation']->id)->trashed())->toBeTrue()
-        ->and(Quotation::withoutGlobalScopes()->find($approved->id)->trashed())->toBeFalse();
-});
-
 // ───────────────────────────── Kedaluwarsa ─────────────────────────────
 
 it('Isu 4: batas kedaluwarsa — valid_until hari ini masih berlaku, kemarin sudah kedaluwarsa', function () {
@@ -239,12 +159,6 @@ it('Isu 4: batas kedaluwarsa — valid_until hari ini masih berlaku, kemarin sud
     // Tanpa valid_until = tidak pernah kedaluwarsa
     $ctx['quotation']->update(['valid_until' => null]);
     expect($ctx['quotation']->fresh()->isExpired())->toBeFalse();
-});
-
-it('Isu 4: label status Kedaluwarsa dan status lain memakai satu peta label', function () {
-    expect(Quotation::STATUS_LABELS['expired'])->toBe('Kedaluwarsa')
-        ->and(QuotationResource::quotationStatusLabel('expired'))->toBe('Kedaluwarsa')
-        ->and(QuotationResource::quotationStatusLabel('approve'))->toBe('Disetujui');
 });
 
 it('Isu 4: scope usable — hanya Approved, belum digantikan, dan belum kedaluwarsa', function () {
@@ -305,27 +219,6 @@ it('Isu 4: job quotations:expire terdaftar di scheduler harian (routes/console.p
 
     expect($events)->toHaveCount(1)
         ->and($events->first()->expression)->toBe('10 0 * * *');
-});
-
-it('Isu 4: quotation kedaluwarsa tidak dapat dijadikan SO — tombol, handler, dan daftar pilihan', function () {
-    $ctx = phase3Context('approve', ['valid_until' => now()->subDay()->toDateString()]);   // status masih approve, job belum jalan
-
-    expect(QuotationResource::canCreateSaleOrder($ctx['quotation']->fresh()))->toBeFalse();
-
-    expect(fn () => QuotationResource::createSaleOrderFromQuotation($ctx['quotation']->fresh(), [
-        'so_number' => 'SO-EXP-1', 'order_date' => now()->format('Y-m-d'), 'tipe_pengiriman' => 'Kirim Langsung',
-        'shipped_to' => 'Alamat', 'notes' => '',
-    ]))->toThrow(ValidationException::class);
-
-    expect(SaleOrder::withoutGlobalScopes()->where('so_number', 'SO-EXP-1')->exists())->toBeFalse();
-});
-
-it('Isu 4: aksi "Buat Sales Order" di tabel tidak tampil untuk quotation kedaluwarsa', function () {
-    $ctx = phase3Context('expired', ['valid_until' => now()->subDays(5)->toDateString()]);
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListQuotations::class)
-        ->assertTableActionHidden('create_sale_order', $ctx['quotation']);
 });
 
 it('Isu 4: approve quotation yang sudah lewat masa berlaku ditolak', function () {
@@ -527,44 +420,6 @@ it('Isu 4: tidak boleh ada dua revisi terbuka; setelah revisi ditolak dan dihapu
     $first->delete();
     $second = $service->createRevision($ctx['quotation']->fresh());
     expect($second->quotation_number)->toBe($ctx['quotation']->quotation_number . '-R2');
-});
-
-it('Isu 4: revisi yang DISETUJUI menggantikan versi lama; versi lama tak dapat dijadikan SO dan tak dapat direvisi lagi', function () {
-    $ctx = phase3Context('approve');
-    $service = app(QuotationService::class);
-
-    $revision = $service->createRevision($ctx['quotation']);
-    expect($ctx['quotation']->fresh()->superseded_at)->toBeNull()
-        ->and(QuotationResource::canCreateSaleOrder($ctx['quotation']->fresh()))->toBeTrue();   // versi lama tetap berlaku selama revisi belum disetujui
-
-    $service->requestApprove($revision);
-    $service->approve($revision->fresh());
-
-    $old = $ctx['quotation']->fresh();
-    expect($old->superseded_at)->not->toBeNull()
-        ->and($old->unusableReasonForSaleOrder())->toContain('digantikan')
-        ->and(QuotationResource::canCreateSaleOrder($old))->toBeFalse()
-        ->and($ctx['user']->can('revise', $old))->toBeFalse()
-        ->and(Quotation::withoutGlobalScopes()->usable()->pluck('id')->all())->toContain($revision->id)->not->toContain($old->id);
-
-    expect(fn () => $service->createRevision($old))->toThrow(ValidationException::class);
-
-    // Revisi berikutnya berasal dari versi terbaru dan tetap memakai nomor dasar yang sama
-    $next = $service->createRevision($revision->fresh());
-    expect($next->quotation_number)->toBe($ctx['quotation']->quotation_number . '-R2')
-        ->and($next->revision_no)->toBe(2);
-});
-
-it('Isu 4: aksi Buat Revisi dari halaman Lihat membuat Draft dan mengarahkan ke halaman Ubah', function () {
-    $ctx = phase3Context('approve');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ViewQuotation::class, ['record' => $ctx['quotation']->getKey()])
-        ->callAction('revise')
-        ->assertHasNoActionErrors();
-
-    $revision = Quotation::withoutGlobalScopes()->where('revision_of_id', $ctx['quotation']->id)->firstOrFail();
-    expect($revision->status)->toBe('draft')->and($revision->quotation_number)->toEndWith('-R1');
 });
 
 // ───────────────────────────── created_by ─────────────────────────────

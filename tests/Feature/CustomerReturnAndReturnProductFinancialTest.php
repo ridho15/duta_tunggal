@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\CustomerReturnResource\Pages\ViewCustomerReturn;
-use App\Filament\Resources\ReturnProductResource\Pages\EditReturnProduct;
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
@@ -237,77 +235,6 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
         $this->assertEquals(100000.0, (float) $ar->total);
     }
 
-    public function test_customer_return_approval_blocked_if_any_item_lacks_qc_result(): void
-    {
-        $so = SaleOrder::create([
-            'so_number' => 'SO-QC-' . uniqid(),
-            'customer_id' => $this->customer->id,
-            'cabang_id' => $this->cabang->id,
-            'order_date' => now(),
-            'status' => 'approved',
-            'total_amount' => 100000,
-        ]);
-
-        $invoice = Invoice::create([
-            'invoice_number' => 'INV-QC-' . uniqid(),
-            'from_model_type' => SaleOrder::class,
-            'from_model_id' => $so->id,
-            'cabang_id' => $this->cabang->id,
-            'customer_name' => $this->customer->name,
-            'customer_phone' => $this->customer->phone,
-            'invoice_date' => now(),
-            'due_date' => now()->addDays(30),
-            'status' => 'unpaid',
-            'subtotal' => 100000,
-            'total' => 100000,
-        ]);
-
-        $invItem = InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'product_id' => $this->product->id,
-            'quantity' => 1,
-            'price' => 100000,
-            'subtotal' => 100000,
-            'total' => 100000,
-        ]);
-
-        $customerReturn = CustomerReturn::create([
-            'return_number' => CustomerReturn::generateReturnNumber(),
-            'invoice_id' => $invoice->id,
-            'customer_id' => $this->customer->id,
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouse->id,
-            'return_date' => now(),
-            'reason' => 'Barang rusak',
-            'status' => CustomerReturn::STATUS_QC_INSPECTION,
-        ]);
-
-        // Item created without qc_result
-        CustomerReturnItem::create([
-            'customer_return_id' => $customerReturn->id,
-            'product_id' => $this->product->id,
-            'invoice_item_id' => $invItem->id,
-            'quantity' => 1,
-            'problem_description' => 'Rusak',
-            'qc_result' => null,
-            'decision' => CustomerReturnItem::DECISION_REPLACE,
-        ]);
-
-        $this->actingAs($this->user);
-
-        // Attempting to approve via ViewCustomerReturn page must be rejected
-        Livewire::test(ViewCustomerReturn::class, ['record' => $customerReturn->getKey()])
-            ->callAction('approve');
-
-        $customerReturn->refresh();
-        $this->assertEquals(CustomerReturn::STATUS_QC_INSPECTION, $customerReturn->status, 'Status tidak boleh berubah jika hasil QC kosong.');
-
-        // Attempting processCompletion directly must also throw
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('belum memiliki hasil pemeriksaan QC');
-        app(CustomerReturnService::class)->processCompletion($customerReturn);
-    }
-
     public function test_return_product_for_uninvoiced_do_credits_goods_delivery_account(): void
     {
         $so = SaleOrder::create([
@@ -538,77 +465,4 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
         $this->assertEquals(100000.0, (float) $draftInvoice->total, 'Invoice DRAFT harus berkurang totalnya saat retur.');
     }
 
-    public function test_edit_return_product_loads_max_quantity_and_blocks_over_return(): void
-    {
-        $so = SaleOrder::create([
-            'so_number' => 'SO-EDIT-' . uniqid(),
-            'customer_id' => $this->customer->id,
-            'cabang_id' => $this->cabang->id,
-            'order_date' => now(),
-            'status' => 'approved',
-            'total_amount' => 500000,
-        ]);
-
-        // Stok fisik terpotong saat item DO dibuat (Tahap 3) → sediakan stok di gudang DO.
-        InventoryStock::updateOrCreate(
-            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null],
-            ['qty_available' => 50, 'qty_reserved' => 0]
-        );
-
-        $do = DeliveryOrder::create([
-            'do_number' => 'DO-EDIT-' . uniqid(),
-            'sale_order_id' => $so->id,
-            'customer_id' => $this->customer->id,
-            'warehouse_id' => $this->warehouse->id,
-            'cabang_id' => $this->cabang->id,
-            'status' => 'confirmed',
-            'delivery_date' => now(),
-        ]);
-
-        $doItem = DeliveryOrderItem::create([
-            'delivery_order_id' => $do->id,
-            'product_id' => $this->product->id,
-            'quantity' => 5, // Source quantity is 5
-        ]);
-
-        $returnProduct = ReturnProduct::create([
-            'return_number' => 'RET-EDIT-' . strtoupper(substr(uniqid(), -4)),
-            'from_model_type' => DeliveryOrder::class,
-            'from_model_id' => $do->id,
-            'warehouse_id' => $this->warehouse->id,
-            'status' => 'draft',
-            'reason' => 'Draft retur',
-        ]);
-
-        $retItem = ReturnProductItem::create([
-            'return_product_id' => $returnProduct->id,
-            'from_item_model_type' => DeliveryOrderItem::class,
-            'from_item_model_id' => $doItem->id,
-            'product_id' => $this->product->id,
-            'quantity' => 2,
-            'condition' => 'good',
-        ]);
-
-        $this->actingAs($this->user);
-
-        // Edit page must populate max_quantity as 5
-        $livewire = Livewire::test(EditReturnProduct::class, ['record' => $returnProduct->getKey()]);
-        $formData = $livewire->get('data');
-        $this->assertNotEmpty($formData['returnProductItem']);
-        $itemKey = array_key_first($formData['returnProductItem']);
-        $this->assertEquals(5.0, (float) $formData['returnProductItem'][$itemKey]['max_quantity']);
-
-        // Attempting to set quantity to 10 (exceeding 5)
-        $formData['returnProductItem'][$itemKey]['quantity'] = 10;
-        $livewire->fillForm($formData);
-        
-        // Either afterStateUpdated auto-clamps it to 5, or save fails with form error
-        $savedQty = (float) ($livewire->get('data')['returnProductItem'][$itemKey]['quantity'] ?? 0);
-        if ($savedQty > 5) {
-            $livewire->call('save')->assertHasFormErrors();
-        } else {
-            // Reactive afterStateUpdated clamped it to max_quantity (5.0)
-            $this->assertEquals(5.0, $savedQty);
-        }
-    }
 }

@@ -211,20 +211,5 @@ class StockReportPreviewTest extends TestCase
 
         $response->assertOk();
     }
-
-    #[Test]
-    public function it_can_render_the_filament_stock_report_page(): void
-    {
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-
-        $user = User::factory()->create();
-        // Give necessary permissions to access stock report and inventory stocks
-        $user->givePermissionTo('view any inventory stock');
-        $this->actingAs($user);
-
-        $response = $this->get(\App\Filament\Resources\Reports\StockReportResource::getUrl('index'));
-
-        $response->assertOk();
-    }
 }
 

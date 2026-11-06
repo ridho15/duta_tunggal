@@ -442,25 +442,6 @@ it('jadwal dari alur lama pending → failed tanpa berangkat tidak mengubah DO',
     expect($do->fresh()->status)->toBe('approved');
 });
 
-it('helper UI jadwal: penolakan menjadi notifikasi, bukan galat, dan status tidak berubah', function () {
-    [$ctx, , , $do] = trxReady();
-    $schedule = stkSchedule($ctx, $do);
-
-    \App\Filament\Resources\DeliveryScheduleResource::changeScheduleStatus($schedule, 'delivered');
-
-    expect($schedule->fresh()->status)->toBe('pending');
-});
-
-it('form Buat Jadwal: status selain Menunggu dipaksa Menunggu Keberangkatan (D5)', function () {
-    $page = new \App\Filament\Resources\DeliveryScheduleResource\Pages\CreateDeliverySchedule;
-    $mutate = new ReflectionMethod($page, 'mutateFormDataBeforeCreate');
-    $mutate->setAccessible(true);
-
-    $data = $mutate->invoke($page, ['status' => 'delivered', 'delivery_method' => 'ekspedisi', 'driver_name' => 'JNE', 'schedule_number' => 'SCH-X']);
-
-    expect($data['status'])->toBe('pending');
-});
-
 // ------------------------------------------------------------------ perintah & flag mati
 
 it('delivery-orders:resync-item-status melaporkan lalu memperbaiki status item yang tertinggal', function () {

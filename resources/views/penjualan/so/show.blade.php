@@ -202,13 +202,22 @@
                 </div>
             </section>
 
-            <!-- Card Informasi Customer -->
+            <!-- Card Informasi Customer & Ship-To -->
             <section class="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col gap-2.5 text-xs text-gray-600">
-                <h3 class="font-bold text-gray-900 text-sm border-b border-gray-100 pb-2">Info Customer</h3>
-                <div><span class="font-semibold text-gray-800">Nama:</span> {{ $saleOrder->customer?->name }}</div>
-                <div><span class="font-semibold text-gray-800">Telepon:</span> {{ $saleOrder->customer?->telephone ?? '-' }}</div>
+                <h3 class="font-bold text-gray-900 text-sm border-b border-gray-100 pb-2">Info Pembeli & Pengiriman</h3>
+                <div><span class="font-semibold text-gray-800">Pembeli:</span> {{ $saleOrder->customer?->name }}</div>
+                <div><span class="font-semibold text-gray-800">Telepon:</span> {{ $saleOrder->customer?->telephone ?? ($saleOrder->customer?->phone ?? '-') }}</div>
                 <div><span class="font-semibold text-gray-800">Tipe Bayar:</span> {{ $saleOrder->customer?->tipe_pembayaran ?? 'Tunai' }} (Tempo: {{ $saleOrder->tempo_pembayaran }} hari)</div>
-                <div><span class="font-semibold text-gray-800">Alamat:</span> {{ $saleOrder->shipped_to ?? $saleOrder->customer?->address ?? '-' }}</div>
+                <div class="pt-2 border-t border-gray-100 mt-1">
+                    <span class="font-semibold text-gray-800 block text-[11px] uppercase tracking-wider text-gray-500 mb-1">Tujuan / Ship-To:</span>
+                    @if(filled($saleOrder->shipping_recipient_name))
+                        <div><span class="font-semibold text-gray-800">Proyek/Penerima:</span> {{ $saleOrder->shipping_recipient_name }}</div>
+                    @endif
+                    @if(filled($saleOrder->shipping_recipient_phone))
+                        <div><span class="font-semibold text-gray-800">PIC Lapangan:</span> {{ $saleOrder->shipping_recipient_phone }}</div>
+                    @endif
+                    <div><span class="font-semibold text-gray-800">Alamat Kirim:</span> {{ $saleOrder->shippingAddress() ?? '-' }}</div>
+                </div>
             </section>
         </aside>
     </div>

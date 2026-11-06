@@ -4,7 +4,6 @@
  * T1.5 — kolom "Sisa Belum Dikirim" di daftar SO: benar dan dihitung batch (jumlah query tetap, bukan per baris).
  */
 
-use App\Filament\Resources\SaleOrderResource\Pages\ListSaleOrders;
 use App\Models\Cabang;
 use App\Models\Customer;
 use App\Models\DeliveryOrder;
@@ -68,37 +67,6 @@ function rqDeliver(array $ctx, SaleOrder $saleOrder, SaleOrderItem $item, float 
     return $deliveryOrder;
 }
 
-it('SO 20 dengan DO 12 terkirim menampilkan sisa 8; SO tanpa DO menampilkan 20; draft/selesai tanpa angka', function () {
-    $ctx = rqContext();
-
-    [$partial, $partialItem] = rqSaleOrder($ctx);
-    rqDeliver($ctx, $partial, $partialItem, 12, 'completed');
-
-    [$untouched] = rqSaleOrder($ctx);
-    [$draft] = rqSaleOrder($ctx, 'draft');
-    [$done, $doneItem] = rqSaleOrder($ctx, 'completed');
-    rqDeliver($ctx, $done, $doneItem, 20, 'completed');
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSaleOrders::class)
-        ->assertTableColumnStateSet('remaining_qty', 8.0, $partial->fresh())
-        ->assertTableColumnStateSet('remaining_qty', 20.0, $untouched)
-        ->assertTableColumnStateSet('remaining_qty', null, $draft)
-        ->assertTableColumnStateSet('remaining_qty', null, $done)
-        ->assertTableColumnFormattedStateSet('remaining_qty', '8', $partial->fresh())
-        ->assertTableColumnFormattedStateSet('remaining_qty', '–', $draft);
-});
-
-it('DO yang belum berangkat (draft) tidak mengurangi sisa belum dikirim', function () {
-    $ctx = rqContext();
-    [$saleOrder, $item] = rqSaleOrder($ctx);
-    rqDeliver($ctx, $saleOrder, $item, 12, 'draft');   // terikat ke SO, tetapi belum keluar gudang
-
-    Livewire::actingAs($ctx['user'])
-        ->test(ListSaleOrders::class)
-        ->assertTableColumnStateSet('remaining_qty', 20.0, $saleOrder);
-});
-
 it('forSaleOrders sama persis dengan forSaleOrder per SO', function () {
     $ctx = rqContext();
     [$a, $itemA] = rqSaleOrder($ctx);
@@ -117,30 +85,3 @@ it('forSaleOrders sama persis dengan forSaleOrder per SO', function () {
         ->and($service->forSaleOrders([]))->toBe([]);
 });
 
-it('jumlah query progres pengiriman di daftar SO tetap sama untuk 3 maupun 25 SO', function () {
-    $ctx = rqContext();
-
-    $progressQueries = function () use ($ctx) {
-        DB::flushQueryLog();
-        DB::enableQueryLog();
-        Livewire::actingAs($ctx['user'])->test(ListSaleOrders::class);
-        $count = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'delivery_order_items'))->count();
-        DB::disableQueryLog();
-
-        return $count;
-    };
-
-    foreach (range(1, 3) as $i) {
-        [$so, $item] = rqSaleOrder($ctx);
-        rqDeliver($ctx, $so, $item, 2, 'sent');
-    }
-    $few = $progressQueries();
-
-    foreach (range(1, 22) as $i) {
-        [$so, $item] = rqSaleOrder($ctx);
-        rqDeliver($ctx, $so, $item, 2, 'sent');
-    }
-    $many = $progressQueries();
-
-    expect($few)->toBeGreaterThan(0)->and($many)->toBe($few);
-});

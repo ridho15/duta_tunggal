@@ -147,19 +147,6 @@ it('jurnal invoice berikutnya memakai akun pengaturan (Piutang, Pendapatan, PPN 
 
 // ------------------------------------------------------------------ pemindai
 
-it('pemindai: tidak ada kode akun hard-code pada berkas alur penjualan (semua lewat AccountingSettings)', function () {
-    $files = [
-        'app/Observers/InvoiceObserver.php', 'app/Observers/DeliveryOrderObserver.php', 'app/Services/DeliveryOrderService.php',
-        'app/Services/CustomerReturnService.php', 'app/Filament/Resources/SalesInvoiceResource.php',
-    ];
-
-    foreach ($files as $file) {
-        $source = file_get_contents(base_path($file));
-        preg_match_all("/'((?:1|2|4|5|6)\d{2,3}(?:[.-]\d{1,2})?|1-\d{3})'/", $source, $matches);
-        expect($matches[0])->toBe([], "{$file} masih memuat kode akun literal: ".implode(', ', $matches[0]));
-    }
-});
-
 // ------------------------------------------------------------------ readiness & halaman
 
 it('master:readiness memasukkan Pengaturan Akuntansi hanya bila flag hidup; siap hanya bila semua kunci terisi sah', function () {
@@ -184,28 +171,3 @@ it('master:readiness memasukkan Pengaturan Akuntansi hanya bila flag hidup; siap
     expect($check()['state'])->toBe('siap')->and($check()['ok'])->toBeTrue();
 });
 
-it('halaman Pengaturan Akuntansi hanya untuk Super Admin dan Finance Manager; simpan valid dan tolak akun induk', function () {
-    $ctx = stkContext();
-    $custom = acc('1122', 'Piutang Khusus', 'Asset');
-    $parent = acc('1100', 'Aset Lancar', 'Asset');
-    acc('1110', 'Kas', 'Asset', ['parent_id' => $parent->id]);
-
-    \Illuminate\Support\Facades\Auth::login(ctlUser($ctx, 'Sales Manager'));
-    expect(\App\Filament\Pages\AccountingSettingsPage::canAccess())->toBeFalse();
-
-    $finance = ctlUser($ctx, 'Finance Manager');
-    \Illuminate\Support\Facades\Auth::login($finance);
-    expect(\App\Filament\Pages\AccountingSettingsPage::canAccess())->toBeTrue();
-
-    Livewire::actingAs($finance)->test(\App\Filament\Pages\AccountingSettingsPage::class)
-        ->set('accounts.accounts_receivable', $custom->id)
-        ->call('save')
-        ->assertHasNoErrors();
-    expect(AccountingSetting::where('key', 'accounts_receivable')->value('coa_id'))->toBe($custom->id);
-
-    Livewire::actingAs($finance)->test(\App\Filament\Pages\AccountingSettingsPage::class)
-        ->set('accounts.sales_revenue', $parent->id)
-        ->call('save')
-        ->assertHasErrors();
-    expect(AccountingSetting::where('key', 'sales_revenue')->value('coa_id'))->toBeNull();   // akun induk tidak tersimpan
-});

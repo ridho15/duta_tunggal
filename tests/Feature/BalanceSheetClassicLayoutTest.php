@@ -1,13 +1,13 @@
 <?php
 
-use App\Filament\Resources\Reports\BalanceSheetResource\Pages\ViewBalanceSheet;
+use App\Services\Reports\BalanceSheetReportData;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\Cabang;
 
 /**
  * Tests for the Classic Two-Column Balance Sheet layout feature.
- * Uses direct instantiation following ViewBalanceSheetPrintTest.php pattern.
+ * Uses direct instantiation following BalanceSheetReportDataPrintTest.php pattern.
  */
 describe('Classic Balance Sheet Layout', function () {
 
@@ -69,9 +69,9 @@ describe('Classic Balance Sheet Layout', function () {
             ]);
         }
 
-        /** @return ViewBalanceSheet */
+        /** @return BalanceSheetReportData */
         $this->makePage = function (string $date = '2026-04-30', bool $showZero = false) {
-            $page = new ViewBalanceSheet();
+            $page = new BalanceSheetReportData();
             $page->as_of_date = $date;
             $page->include_zero_balances = $showZero;
             return $page;

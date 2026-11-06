@@ -51,6 +51,18 @@ class SuratJalanDocumentBuilder
 
         $delivery = $this->delivery($suratJalan);
 
+        $recipientNames = $groups->flatMap(fn ($g) => $g['recipient_names'])->unique()->values()->all();
+        $recipientPhones = $groups->flatMap(fn ($g) => $g['recipient_phones'])->unique()->values()->all();
+        $addresses = $groups->flatMap(fn ($g) => $g['addresses'])->unique()->values()->all();
+        $customers = $groups->flatMap(fn ($g) => $g['customers'])->unique()->values()->all();
+
+        $destName = ! empty($recipientNames) ? implode(', ', $recipientNames) : (implode(', ', $customers) ?: '-');
+        if (! empty($recipientPhones)) {
+            $destName .= ' (PIC: ' . implode(', ', $recipientPhones) . ')';
+        }
+        $delivery['destination_name'] = $destName;
+        $delivery['destination_address'] = implode(' | ', $addresses) ?: '-';
+
         return [
             'company' => $this->company($suratJalan),
             'number' => $suratJalan->sj_number,
@@ -63,8 +75,10 @@ class SuratJalanDocumentBuilder
             'cancelled_by' => $suratJalan->cancelled_by ? $suratJalan->cancelledBy->name : null,
             'cancel_reason' => $suratJalan->cancel_reason,
             'branch' => $this->issuingBranch($suratJalan)->nama ?: null,
-            'customers' => $groups->flatMap(fn ($g) => $g['customers'])->unique()->values()->all(),
-            'addresses' => $groups->flatMap(fn ($g) => $g['addresses'])->unique()->values()->all(),
+            'customers' => $customers,
+            'recipient_names' => $recipientNames,
+            'recipient_phones' => $recipientPhones,
+            'addresses' => $addresses,
             'delivery_order_numbers' => $groups->pluck('do_number')->all(),
             'sales_order_numbers' => $groups->flatMap(fn ($g) => $g['sales_orders'])->unique()->values()->all(),
             'delivery' => $delivery,
@@ -182,11 +196,21 @@ class SuratJalanDocumentBuilder
             })
             ->all();
 
+        $recipientNames = $salesOrders->map(function ($so) {
+            return filled($so->shipping_recipient_name) ? trim($so->shipping_recipient_name) : null;
+        })->filter()->unique()->values()->all();
+
+        $recipientPhones = $salesOrders->map(function ($so) {
+            return filled($so->shipping_recipient_phone) ? trim($so->shipping_recipient_phone) : null;
+        })->filter()->unique()->values()->all();
+
         return [
             'do_number' => $deliveryOrder->do_number,
             'do_status' => DeliveryOrder::statusLabel($deliveryOrder->status),
             'sales_orders' => $salesOrders->pluck('so_number')->filter()->unique()->values()->all(),
             'customers' => $this->customerNames($salesOrders),
+            'recipient_names' => $recipientNames,
+            'recipient_phones' => $recipientPhones,
             'addresses' => $salesOrders->map(function ($so) {
                     $addr = filled($so->shipped_to) ? $so->shipped_to : ($so->customer?->address ?? null);
                     return DeliveryOrderSourceValidator::normalizeAddress($addr) === '' ? null : trim((string) $addr);

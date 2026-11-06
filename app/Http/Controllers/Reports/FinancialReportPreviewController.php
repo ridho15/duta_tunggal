@@ -19,17 +19,17 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
-use App\Filament\Resources\Reports\BalanceSheetResource\Pages\ViewBalanceSheet;
-use App\Filament\Resources\Reports\ProfitAndLossResource\Pages\ViewProfitAndLoss;
-use App\Filament\Resources\Reports\CashFlowResource\Pages\ViewCashFlow;
-use App\Filament\Resources\Reports\HppResource\Pages\ViewHpp;
+use App\Services\Reports\BalanceSheetReportData;
+use App\Services\Reports\CashFlowReportData;
+use App\Services\Reports\HppReportData;
+use App\Services\Reports\ProfitAndLossReportData;
 
 class FinancialReportPreviewController extends Controller
 {
     // ── Balance Sheet ──────────────────────────────────────────────────────────
     public function balanceSheet(Request $request)
     {
-        $page = new ViewBalanceSheet();
+        $page = new BalanceSheetReportData();
         $page->as_of_date          = $request->input('as_of_date', now()->toDateString());
         $page->cabang_id           = $request->input('cabang_id');
         $page->branches            = (array) $request->input('branches', []);
@@ -134,7 +134,7 @@ class FinancialReportPreviewController extends Controller
     // ── Profit & Loss ──────────────────────────────────────────────────────────
     public function profitAndLoss(Request $request)
     {
-        $page = new ViewProfitAndLoss();
+        $page = new ProfitAndLossReportData();
         $page->startDate        = $request->input('startDate', now()->startOfMonth()->toDateString());
         $page->endDate          = $request->input('endDate',   now()->endOfMonth()->toDateString());
         $page->cabang_id        = $request->input('cabang_id');
@@ -192,7 +192,7 @@ class FinancialReportPreviewController extends Controller
     // ── Cash Flow ──────────────────────────────────────────────────────────────
     public function cashFlow(Request $request)
     {
-        $page = new ViewCashFlow();
+        $page = new CashFlowReportData();
         $page->startDate = $request->input('startDate', now()->startOfMonth()->toDateString());
         $page->endDate   = $request->input('endDate',   now()->endOfMonth()->toDateString());
         $page->method    = $request->input('method', 'direct');
@@ -218,7 +218,7 @@ class FinancialReportPreviewController extends Controller
     // ── HPP (Cost of Goods Manufactured) ──────────────────────────────────────
     public function hpp(Request $request)
     {
-        $page = new ViewHpp();
+        $page = new HppReportData();
         $page->startDate = $request->input('startDate', now()->startOfMonth()->toDateString());
         $page->endDate   = $request->input('endDate',   now()->endOfMonth()->toDateString());
         $page->branchIds = (array) $request->input('branchIds', []);

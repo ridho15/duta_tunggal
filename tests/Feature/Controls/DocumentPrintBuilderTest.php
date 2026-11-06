@@ -148,22 +148,3 @@ it('bingkai invoice: meta, pelanggan dari SO, watermark status, Nota Kredit terb
     expect($builder->invoice($invoice->fresh())['watermark'])->toBe('DIBATALKAN');
 });
 
-it('Pengaturan Aplikasi: kop global tersimpan (kolom kosong dibersihkan, rekening tidak lengkap dibuang)', function () {
-    $ctx = stkContext();
-    $admin = ctlUser($ctx, 'Super Admin', []);
-    Auth::login($admin);
-
-    Livewire::actingAs($admin)->test(\App\Filament\Pages\AppSettingsPage::class)
-        ->set('company_legal_name', 'PT Global Legal')
-        ->set('company_npwp', '99.999.999.9-999.000')
-        ->set('company_address', 'Jl. Global No. 5')
-        ->set('company_bank_accounts', [['bank' => 'BCA', 'number' => '111', 'holder' => 'PT G', 'branch' => null], ['bank' => 'BRI', 'number' => '', 'holder' => null, 'branch' => null]])
-        ->call('save')
-        ->assertHasNoErrors();
-
-    expect(AppSetting::get('company_legal_name'))->toBe('PT Global Legal')->and(AppSetting::get('company_npwp'))->toBe('99.999.999.9-999.000')
-        ->and(json_decode((string) AppSetting::get('company_bank_accounts'), true))->toBe([['bank' => 'BCA', 'number' => '111', 'holder' => 'PT G', 'branch' => null]]);
-
-    $company = (new DocumentPrintBuilder)->company(dpCabang(['alamat' => '', 'telepon' => '']));
-    expect($company['name'])->toBe('PT Global Legal')->and($company['address'])->toBe('Jl. Global No. 5');
-});

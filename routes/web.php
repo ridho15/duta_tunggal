@@ -389,6 +389,20 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/transfer/{transfer}/reject', [\App\Http\Controllers\Gudang\StockTransferController::class, 'reject'])->name('transfer.reject');
         Route::get('/transfer/{transfer}/pdf', [\App\Http\Controllers\Gudang\StockTransferController::class, 'pdf'])->name('transfer.pdf');
         Route::get('/transfer-available-products/{warehouse}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'availableProducts'])->name('transfer.available-products');
+
+        // Penyesuaian Stok
+        Route::get('/penyesuaian', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'index'])->name('adjustment.index');
+        Route::get('/penyesuaian/create', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'create'])->name('adjustment.create');
+        Route::get('/penyesuaian/produk', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'products'])->name('adjustment.products');
+        Route::get('/penyesuaian/rak', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'raks'])->name('adjustment.raks');
+        Route::get('/penyesuaian/stok', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'stock'])->name('adjustment.stock');
+        Route::post('/penyesuaian', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'store'])->name('adjustment.store');
+        Route::get('/penyesuaian/{adjustment}', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'show'])->name('adjustment.show');
+        Route::get('/penyesuaian/{adjustment}/edit', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'edit'])->name('adjustment.edit');
+        Route::put('/penyesuaian/{adjustment}', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'update'])->name('adjustment.update');
+        Route::delete('/penyesuaian/{adjustment}', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'destroy'])->name('adjustment.destroy');
+        Route::post('/penyesuaian/{adjustment}/approve', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'approve'])->name('adjustment.approve');
+        Route::post('/penyesuaian/{adjustment}/reject', [\App\Http\Controllers\Gudang\StockAdjustmentController::class, 'reject'])->name('adjustment.reject');
         Route::get('/warehouse-raks/{warehouse}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'warehouseRaks'])->name('warehouse-raks');
 
         // Stock Opname & Penyesuaian Persediaan
@@ -521,6 +535,15 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
 
     // Modul Keuangan & Akuntansi
     Route::prefix('keuangan')->name('keuangan.')->group(function () {
+        // Tutup Buku (periode akuntansi)
+        Route::get('/tutup-buku', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'index'])->name('period.index');
+        Route::get('/tutup-buku/create', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'create'])->name('period.create');
+        Route::post('/tutup-buku', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'store'])->name('period.store');
+        Route::get('/tutup-buku/{period}/tutup', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'closeForm'])->name('period.close.form');
+        Route::post('/tutup-buku/{period}/tutup', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'close'])->name('period.close');
+        Route::post('/tutup-buku/{period}/buka', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'reopen'])->name('period.reopen');
+        Route::delete('/tutup-buku/{period}', [\App\Http\Controllers\Keuangan\AccountingPeriodController::class, 'destroy'])->name('period.destroy');
+
         // Kas & Bank (Mutasi Masuk & Keluar)
         Route::get('/kas-bank', [\App\Http\Controllers\Keuangan\CashBankController::class, 'index'])->name('cashbank.index');
         Route::get('/kas-bank/create', [\App\Http\Controllers\Keuangan\CashBankController::class, 'create'])->name('cashbank.create');
@@ -684,6 +707,10 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::resource('pengguna', \App\Http\Controllers\Pengaturan\UserController::class)
             ->names('users')
             ->parameters(['pengguna' => 'user']);
+        Route::resource('aturan-persetujuan', \App\Http\Controllers\Pengaturan\ApprovalRuleController::class)
+            ->only(['index', 'create', 'store', 'edit', 'update'])
+            ->names('approval-rules')
+            ->parameters(['aturan-persetujuan' => 'approvalRule']);
     });
 
     // Modul Manufaktur & Produksi

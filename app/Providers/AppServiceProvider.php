@@ -72,12 +72,6 @@ use Illuminate\Foundation\AliasLoader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\TextInput\Mask;
-use Filament\Tables\Columns\Summarizers\Sum;
 use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
@@ -98,126 +92,6 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment(['local', 'testing']) && class_exists(\Laravel\Dusk\DuskServiceProvider::class)) {
             $this->app->register(\Laravel\Dusk\DuskServiceProvider::class);
         }
-
-        // Ensure Filament classes are loaded before registering macros
-        class_exists(\Filament\Forms\Components\TextInput::class);
-        class_exists(\Filament\Tables\Table::class);
-
-        // Register Filament macros
-        $this->registerFilamentMacros();
-    }
-
-    protected function registerFilamentMacros(): void
-    {
-        // Pastikan tampilan angka uang di Table menggunakan format Indonesia
-        Table::$defaultCurrency = 'IDR';
-        Table::$defaultNumberLocale = 'id';
-
-        // ---------------------------------------------------------------
-        // Pencarian dropdown sisi-server (T7.2): Select::make('customer_id')->remoteSearch('customers')
-        // Menggantikan "muat semua + preload"/limit(50) statis; nilai terpilih selalu berlabel.
-        // ---------------------------------------------------------------
-        \Filament\Forms\Components\Select::macro('remoteSearch', function (string $type, array $filters = []) {
-            /** @var \Filament\Forms\Components\Select $this */
-            $service = fn () => app(\App\Services\RemoteSearch::class);
-
-            return $this->searchable()
-                ->searchDebounce(300)
-                ->getSearchResultsUsing(fn (string $search): array => $service()->options($type, $search, $filters))
-                ->getOptionLabelUsing(fn ($value): ?string => $service()->label($type, $value))
-                ->searchPrompt(\App\Services\RemoteSearch::HINT)
-                ->noSearchResultsMessage('Tidak ada hasil. Coba nama, kode, atau nomor lain.');
-        });
-
-        // ---------------------------------------------------------------
-        // Rupiah macro for TextColumn (Table columns)
-        // Usage: TextColumn::make('price')->rupiah()
-        // ---------------------------------------------------------------
-        TextColumn::macro('rupiah', function (): TextColumn {
-            /** @var TextColumn $this */
-            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
-        });
-
-        // ---------------------------------------------------------------
-        // Rupiah macro for TextEntry (Infolist entries)
-        // Usage: TextEntry::make('total')->rupiah()
-        // ---------------------------------------------------------------
-        TextEntry::macro('rupiah', function (): TextEntry {
-            /** @var TextEntry $this */
-            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
-        });
-
-        // ---------------------------------------------------------------
-        // Rupiah macro for Sum Summarizer (Table column summaries)
-        // Usage: TextColumn::make('amount')->summarize(Sum::make()->rupiah())
-        // ---------------------------------------------------------------
-        \Filament\Tables\Columns\Summarizers\Sum::macro('rupiah', function () {
-            /** @var \Filament\Tables\Columns\Summarizers\Sum $this */
-            return $this->formatStateUsing(fn($state) => MoneyHelper::rupiah($state));
-        });
-
-        // ---------------------------------------------------------------
-        // indonesianMoney macro for TextInput (Form inputs)
-        // Usage: TextInput::make('amount')->indonesianMoney()
-        //
-        // Behaviour:
-        //  - JS mask: real-time Indonesian money formatting while user types
-        //  - formatStateUsing: loads DB numeric value as formatted string
-        //  - dehydrateStateUsing: parses user input back to float for DB storage
-        // ---------------------------------------------------------------
-        TextInput::macro('indonesianMoney', function (): TextInput {
-            /** @var TextInput $this */
-
-            return $this
-                ->prefix('Rp')
-                ->placeholder('0,00')
-                ->mask(\Filament\Support\RawJs::make(<<<'JS'
-            $money($input, ',', '.', 2)
-        JS))
-                ->extraInputAttributes([
-                    'x-on:blur' => <<<'JS'
-                        let value = ($event.target.value || '').trim()
-
-                        if (value !== '') {
-                            if (value.includes(',')) {
-                                let parts = value.split(',')
-                                let integer = parts.shift()
-                                let decimal = (parts.join('') || '').replace(/\D/g, '').slice(0, 2).padEnd(2, '0')
-                                $event.target.value = `${integer},${decimal}`
-                            } else {
-                                $event.target.value = `${value},00`
-                            }
-
-                            $dispatch('input', $event.target.value)
-                        }
-                    JS,
-                ])
-                ->formatStateUsing(function ($state) {
-                    if ($state === null || $state === '') {
-                        return '';
-                    }
-
-                    return number_format(\App\Helpers\MoneyHelper::safeParse($state), 2, ',', '.');
-                })
-                ->rules([function () {
-                    return function ($attribute, $value, $fail) {
-                        if ($value === null || $value === '') {
-                            return;
-                        }
-                        $parsed = \App\Helpers\MoneyHelper::safeParse($value);
-                        if (! is_numeric($parsed)) {
-                            $fail('Nilai nominal tidak valid. Contoh format: 1.000.000,00');
-                        }
-                    };
-                }])
-                ->dehydrateStateUsing(function ($state) {
-                    if ($state === null || $state === '') {
-                        return null;
-                    }
-
-                    return \App\Helpers\MoneyHelper::safeParse($state);
-                });
-        });
     }
 
     /**

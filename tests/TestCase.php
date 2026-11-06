@@ -76,7 +76,8 @@ abstract class TestCase extends BaseTestCase
 
         $database = (string) DB::connection()->getDatabaseName();
 
-        if ($database !== '' && str_ends_with($database, '_test')) {
+        // `*_test` (satu proses) atau `*_test_<n>` (database per proses pada `php artisan test --parallel`).
+        if ($database !== '' && preg_match('/_test(_\d+)?$/', $database)) {
             return;
         }
 

@@ -55,16 +55,3 @@ it('anggaran: Jadwal Mulai/Selesai (rantai DO → stok → jurnal → invoice), 
         ->and($issue)->toBeLessThanOrEqual(45, "Nota Kredit Terbit: {$issue} kueri");
 });
 
-it('daftar Sales Order: jumlah kueri TIDAK bertambah per baris (10 vs 25 baris) dan tetap di bawah anggaran', function () {
-    $ctx = stkContext();
-    for ($i = 0; $i < 30; $i++) {
-        stkSaleOrder($ctx, 2);
-    }
-    $viewer = ctlUser($ctx, 'Super Admin', ['view any sale order', 'view sale order', 'create purchase order']);
-
-    $render = fn (int $perPage) => qbCount(fn () => Livewire::actingAs($viewer)->test(\App\Filament\Resources\SaleOrderResource\Pages\ListSaleOrders::class)->set('tableRecordsPerPage', $perPage)->assertSuccessful());
-    $ten = $render(10);
-    $twentyFive = $render(25);
-
-    expect($twentyFive - $ten)->toBeLessThanOrEqual(3, "10 baris = {$ten} kueri, 25 baris = {$twentyFive} kueri (N+1?)")->and($twentyFive)->toBeLessThanOrEqual(60);
-});

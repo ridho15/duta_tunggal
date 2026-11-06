@@ -1,20 +1,5 @@
 # syntax=docker/dockerfile:1.7
 
-# Paket Filament dibutuhkan saat build tema Vite (vendor/ di-ignore oleh .dockerignore)
-FROM composer:2 AS filament-vendor
-
-WORKDIR /app
-
-COPY composer.json composer.lock ./
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --no-progress \
-    --prefer-dist \
-    --no-scripts \
-    --no-autoloader \
-    --ignore-platform-reqs
-
 FROM node:20-alpine AS frontend
 
 WORKDIR /app
@@ -27,8 +12,6 @@ COPY public ./public
 COPY vite.config.js ./
 COPY tailwind.config.js ./
 COPY postcss.config.cjs ./
-# Tema Filament (resources/css/filament/admin) meng-import CSS & preset Tailwind dari vendor/filament
-COPY --from=filament-vendor /app/vendor/filament ./vendor/filament
 
 RUN npm run build
 

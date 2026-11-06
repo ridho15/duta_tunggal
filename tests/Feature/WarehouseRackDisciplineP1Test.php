@@ -2,11 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\DeliveryOrderResource;
-use App\Filament\Resources\QualityControlManufactureResource;
-use App\Filament\Resources\QualityControlPurchaseResource;
-use App\Filament\Resources\QualityControlPurchaseResource\Pages\CreateQualityControlPurchase;
-use App\Filament\Resources\WarehouseConfirmationResource;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Product;
@@ -18,7 +13,6 @@ use App\Models\Supplier;
 use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
-use Filament\Forms\Components\Select;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -122,156 +116,6 @@ class WarehouseRackDisciplineP1Test extends TestCase
             'uom_id' => $this->uom->id,
             'cabang_id' => $this->cabang->id,
         ]);
-    }
-
-    public function test_qc_purchase_blocks_submission_when_warehouse_has_racks_and_rack_is_empty(): void
-    {
-        $po = PurchaseOrder::create([
-            'po_number' => 'PO-TEST-001',
-            'supplier_id' => $this->supplier->id,
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouseWithRacks->id,
-            'currency_id' => $this->currency->id,
-            'status' => 'approved',
-            'tipe_pembelian' => 'trade',
-            'order_date' => now(),
-        ]);
-
-        $poItem = PurchaseOrderItem::create([
-            'purchase_order_id' => $po->id,
-            'product_id' => $this->product->id,
-            'currency_id' => $this->currency->id,
-            'quantity' => 10,
-            'unit_price' => 15000,
-            'subtotal' => 150000,
-        ]);
-
-        // Submit form with warehouse that has racks, but rak_id is left null
-        Livewire::actingAs($this->user)
-            ->test(CreateQualityControlPurchase::class)
-            ->fillForm([
-                'purchase_order_id' => $po->id,
-                'warehouse_id' => $this->warehouseWithRacks->id,
-                'inspected_by' => $this->user->id,
-                'items' => [
-                    [
-                        'purchase_order_item_id' => $poItem->id,
-                        'product_id' => $this->product->id,
-                        'remaining_allowed' => 10,
-                        'quantity_received' => 10,
-                        'passed_quantity' => 10,
-                        'rejected_quantity' => 0,
-                        'failed_qc_action' => 'wait_next_delivery',
-                        'rak_id' => null, // empty rack
-                    ],
-                ],
-            ])
-            ->call('create')
-            ->assertHasFormErrors(['items.0.rak_id' => 'required']);
-    }
-
-    public function test_qc_purchase_succeeds_when_rack_is_selected_for_warehouse_with_racks(): void
-    {
-        $po = PurchaseOrder::create([
-            'po_number' => 'PO-TEST-002',
-            'supplier_id' => $this->supplier->id,
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouseWithRacks->id,
-            'currency_id' => $this->currency->id,
-            'status' => 'approved',
-            'tipe_pembelian' => 'trade',
-            'order_date' => now(),
-        ]);
-
-        $poItem = PurchaseOrderItem::create([
-            'purchase_order_id' => $po->id,
-            'product_id' => $this->product->id,
-            'currency_id' => $this->currency->id,
-            'quantity' => 10,
-            'unit_price' => 15000,
-            'subtotal' => 150000,
-        ]);
-
-        // Submit form with valid rak_id
-        Livewire::actingAs($this->user)
-            ->test(CreateQualityControlPurchase::class)
-            ->fillForm([
-                'purchase_order_id' => $po->id,
-                'warehouse_id' => $this->warehouseWithRacks->id,
-                'inspected_by' => $this->user->id,
-                'items' => [
-                    [
-                        'purchase_order_item_id' => $poItem->id,
-                        'product_id' => $this->product->id,
-                        'remaining_allowed' => 10,
-                        'quantity_received' => 10,
-                        'passed_quantity' => 10,
-                        'rejected_quantity' => 0,
-                        'failed_qc_action' => 'wait_next_delivery',
-                        'rak_id' => $this->rak1->id, // valid rack
-                    ],
-                ],
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $qc = QualityControl::where('purchase_order_id', $po->id)->first();
-        $this->assertNotNull($qc);
-        $this->assertEquals($this->warehouseWithRacks->id, $qc->warehouse_id);
-
-        $qcItem = $qc->items()->first();
-        $this->assertNotNull($qcItem);
-        $this->assertEquals($this->rak1->id, $qcItem->rak_id);
-    }
-
-    public function test_qc_purchase_allows_submission_without_rack_when_warehouse_has_no_racks(): void
-    {
-        $po = PurchaseOrder::create([
-            'po_number' => 'PO-TEST-003',
-            'supplier_id' => $this->supplier->id,
-            'cabang_id' => $this->cabang->id,
-            'warehouse_id' => $this->warehouseWithoutRacks->id,
-            'currency_id' => $this->currency->id,
-            'status' => 'approved',
-            'tipe_pembelian' => 'trade',
-            'order_date' => now(),
-        ]);
-
-        $poItem = PurchaseOrderItem::create([
-            'purchase_order_id' => $po->id,
-            'product_id' => $this->product->id,
-            'currency_id' => $this->currency->id,
-            'quantity' => 10,
-            'unit_price' => 15000,
-            'subtotal' => 150000,
-        ]);
-
-        // Flat warehouse without racks: rak_id remains optional
-        Livewire::actingAs($this->user)
-            ->test(CreateQualityControlPurchase::class)
-            ->fillForm([
-                'purchase_order_id' => $po->id,
-                'warehouse_id' => $this->warehouseWithoutRacks->id,
-                'inspected_by' => $this->user->id,
-                'items' => [
-                    [
-                        'purchase_order_item_id' => $poItem->id,
-                        'product_id' => $this->product->id,
-                        'remaining_allowed' => 10,
-                        'quantity_received' => 10,
-                        'passed_quantity' => 10,
-                        'rejected_quantity' => 0,
-                        'failed_qc_action' => 'wait_next_delivery',
-                        'rak_id' => null, // allowed because warehouse has no racks
-                    ],
-                ],
-            ])
-            ->call('create')
-            ->assertHasNoFormErrors();
-
-        $qc = QualityControl::where('purchase_order_id', $po->id)->first();
-        $this->assertNotNull($qc);
-        $this->assertEquals($this->warehouseWithoutRacks->id, $qc->warehouse_id);
     }
 
     public function test_delivery_order_source_rack_field_is_conditionally_required(): void

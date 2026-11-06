@@ -25,6 +25,12 @@ use Illuminate\Support\Facades\Auth;
 
 uses(RefreshDatabase::class);
 
+// Tes lama membuat DO tanpa stok; sejak Tahap 3 stok dipotong saat DO dibuat. Tunda pemotongan (perilaku sebelum Tahap 3).
+beforeEach(function () {
+    \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
+        $this->beforeApplicationDestroyed(fn () => \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false);
+});
+
 beforeEach(function () {
     $this->user = User::factory()->create();
     Auth::login($this->user);

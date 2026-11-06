@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\PurchaseInvoiceResource\Pages\ViewPurchaseInvoice;
-use App\Filament\Resources\VendorPaymentResource;
 use App\Http\Controllers\HelperController;
 use App\Models\AccountPayable;
 use App\Models\Cabang;
@@ -216,61 +214,6 @@ class PurchaseInvoiceCancellationTest extends TestCase
 
         $this->assertSame(Invoice::STATUS_SENT, $invoice->fresh()->status);
         $this->assertSame(0, JournalEntry::where('source_id', $invoice->id)->where('is_reversal', true)->count());
-    }
-
-    public function test_cancelled_invoice_is_never_payable(): void
-    {
-        $invoice = $this->service->cancel($this->postedInvoice(), 'Batal uji', null, $this->user->id);
-
-        $this->assertSame(0.0, PaymentRequest::getInvoiceRemainingPayable($invoice));
-        $this->assertSame(0.0, VendorPaymentResource::resolveInvoiceRemainingAmount($invoice));
-    }
-
-    public function test_view_page_action_cancels_a_posted_invoice(): void
-    {
-        $invoice = $this->postedInvoice();
-
-        Livewire::test(ViewPurchaseInvoice::class, ['record' => $invoice->getRouteKey()])
-            ->assertActionVisible('cancel_invoice')
-            ->callAction('cancel_invoice', ['reversal_date' => now()->toDateString(), 'reason' => 'Faktur supplier salah'])
-            ->assertNotified('Invoice Dibatalkan');
-
-        $this->assertSame(Invoice::STATUS_CANCELLED, $invoice->fresh()->status);
-
-        // Halaman lihat menampilkan siapa, kapan, dan mengapa invoice dibatalkan.
-        $this->get(\App\Filament\Resources\PurchaseInvoiceResource::getUrl('view', ['record' => $invoice]))
-            ->assertOk()
-            ->assertSee('Dibatalkan')
-            ->assertSee('Faktur supplier salah')
-            ->assertSee($this->user->name);
-    }
-
-    public function test_view_page_action_reports_why_an_invoice_cannot_be_cancelled(): void
-    {
-        $invoice = $this->postedInvoice(['status' => Invoice::STATUS_PARTIALLY_PAID], paid: 10000);
-
-        Livewire::test(ViewPurchaseInvoice::class, ['record' => $invoice->getRouteKey()])
-            ->assertActionVisible('cancel_invoice')
-            ->callAction('cancel_invoice', ['reversal_date' => now()->toDateString(), 'reason' => 'Coba batal'])
-            ->assertNotified('Invoice Belum Dapat Dibatalkan');
-
-        $this->assertSame(Invoice::STATUS_PARTIALLY_PAID, $invoice->fresh()->status);
-    }
-
-    public function test_view_page_action_is_hidden_for_drafts_cancelled_invoices_and_users_without_permission(): void
-    {
-        $draft = $this->postedInvoice(['status' => Invoice::STATUS_DRAFT]);
-        $cancelled = $this->service->cancel($this->postedInvoice(), 'Batal uji', null, $this->user->id);
-
-        Livewire::test(ViewPurchaseInvoice::class, ['record' => $draft->getRouteKey()])->assertActionHidden('cancel_invoice');
-        Livewire::test(ViewPurchaseInvoice::class, ['record' => $cancelled->getRouteKey()])->assertActionHidden('cancel_invoice');
-
-        $viewer = User::factory()->create(['manage_type' => 'all']);
-        $viewer->givePermissionTo(['view any invoice', 'view invoice']);
-        $posted = $this->postedInvoice();
-
-        $this->actingAs($viewer);
-        Livewire::test(ViewPurchaseInvoice::class, ['record' => $posted->getRouteKey()])->assertActionHidden('cancel_invoice');
     }
 
     public function test_overdue_check_is_scheduled_daily(): void

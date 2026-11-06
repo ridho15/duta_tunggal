@@ -896,7 +896,7 @@ class LedgerPostingService
             // For customer receipt: Debit Cash/Bank, Credit Account Receivable (Piutang Dagang)
             // T3.4 (flag accounting_settings): akun Pengaturan Akuntansi didahulukan; tanpa pengaturan = perilaku lama.
             $settings = app(AccountingSettings::class);
-            $piutangCoa = $settings->explicit('accounts_receivable') ?? ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
+            $piutangCoa = $this->resolveCustomerReceiptPiutangCoa($receipt, $settings);
             $defaultBankCoa = $receipt->coa_id ? $receipt->coa : ($settings->explicit('cash_bank_default') ?? ChartOfAccount::where('code', config('coa.cash_and_bank'))->first());
 
             $entries = [];
@@ -1431,6 +1431,94 @@ class LedgerPostingService
             'currency_id' => $currencyId,
             'exchange_rate' => $exchangeRate,
         ];
+    }
+
+    /**
+     * Resolusi cerdas akun Piutang Dagang (AR) untuk penerimaan customer:
+     * 1. Prioritaskan akun eksplisit di AccountingSettings (bila diatur & valid leaf).
+     * 2. Cari akun piutang dari invoice yang sedang dibayar (ar_coa_id atau jurnal invoice) agar Debit Faktur == Kredit Pelunasan.
+     * 3. Ambil konfigurasi default (config/coa.accounts_receivable). Bila akun tersebut adalah akun induk (punya anak),
+     *    otomatis turunkan ke sub-akun transaksi (firstLeaf) agar tidak ditolak validasi jurnal.
+     */
+    protected function resolveCustomerReceiptPiutangCoa(\App\Models\CustomerReceipt $receipt, AccountingSettings $settings): ?ChartOfAccount
+    {
+        // 1. Akun eksplisit dari Pengaturan Akuntansi
+        $explicit = $settings->explicit('accounts_receivable');
+        if ($explicit) {
+            return $explicit->isLeaf() ? $explicit : ($explicit->firstLeaf() ?? $explicit);
+        }
+
+        // 2. Prioritaskan akun piutang dari invoice yang dibayar
+        $invoiceIds = collect($receipt->selected_invoices ?? [])
+            ->map(fn ($item) => is_array($item) ? ($item['invoice_id'] ?? null) : $item)
+            ->filter()
+            ->values();
+
+        if ($invoiceIds->isEmpty() && $receipt->customerReceiptItem()->exists()) {
+            $invoiceIds = $receipt->customerReceiptItem()
+                ->whereNotNull('invoice_id')
+                ->pluck('invoice_id')
+                ->filter()
+                ->values();
+        }
+
+        if ($invoiceIds->isEmpty() && $receipt->invoice_id) {
+            $invoiceIds = collect([$receipt->invoice_id]);
+        }
+
+        if ($invoiceIds->isNotEmpty()) {
+            $invoiceWithArCoa = \App\Models\Invoice::withoutGlobalScopes()
+                ->whereIn('id', $invoiceIds)
+                ->whereNotNull('ar_coa_id')
+                ->with('arCoa')
+                ->first();
+
+            if ($invoiceWithArCoa && $invoiceWithArCoa->arCoa) {
+                $invCoa = $invoiceWithArCoa->arCoa;
+                $leaf = $invCoa->isLeaf() ? $invCoa : $invCoa->firstLeaf();
+                if ($leaf) {
+                    return $leaf;
+                }
+            }
+
+            $postedArEntry = JournalEntry::withoutGlobalScopes()
+                ->where('source_type', \App\Models\Invoice::class)
+                ->whereIn('source_id', $invoiceIds)
+                ->where('debit', '>', 0)
+                ->where('journal_type', 'sales')
+                ->with('coa')
+                ->first();
+
+            if ($postedArEntry && $postedArEntry->coa) {
+                $entryCoa = $postedArEntry->coa;
+                $leaf = $entryCoa->isLeaf() ? $entryCoa : $entryCoa->firstLeaf();
+                if ($leaf) {
+                    return $leaf;
+                }
+            }
+        }
+
+        // 3. Konfigurasi default (config/coa.php)
+        $defaultCoa = ChartOfAccount::where('code', config('coa.accounts_receivable'))->first();
+        if ($defaultCoa) {
+            if ($defaultCoa->isLeaf()) {
+                return $defaultCoa;
+            }
+
+            $leaf = $defaultCoa->firstLeaf();
+            if ($leaf) {
+                Log::info("Akun Piutang '{$defaultCoa->code}' merupakan akun induk; otomatis dialihkan ke sub-akun transaksi '{$leaf->code} - {$leaf->name}'.", [
+                    'receipt_id' => $receipt->id,
+                    'parent_coa' => $defaultCoa->code,
+                    'resolved_leaf_coa' => $leaf->code,
+                ]);
+                return $leaf;
+            }
+
+            return $defaultCoa;
+        }
+
+        return null;
     }
 
     /**

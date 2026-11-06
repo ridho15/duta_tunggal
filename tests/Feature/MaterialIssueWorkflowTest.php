@@ -16,7 +16,6 @@ use App\Models\UnitOfMeasure;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\Rak;
-use App\Filament\Resources\MaterialIssueResource;
 
 function createMaterialIssueWorkflowContext(string $suffix): array
 {
@@ -206,42 +205,5 @@ test('confirmed manufacturing warehouse confirmation consumes stock and resolves
     expect($movement->source_type_label)->toBe('Material Issue');
     expect($movement->source_number)->toBe($materialIssue->issue_number);
     expect($movement->source_display)->toBe('Material Issue - ' . $materialIssue->issue_number);
-    expect($movement->source_resource_url)->toContain('/material-issues/' . $materialIssue->id);
 });
 
-test('material issue stock metrics include own reservation in effective stock', function () {
-    $context = createMaterialIssueWorkflowContext((string) (now()->timestamp + 2));
-    $materialIssue = $context['materialIssue'];
-    $rawMaterial = $context['rawMaterial'];
-    $warehouse = $context['warehouse'];
-
-    StockReservation::create([
-        'material_issue_id' => $materialIssue->id,
-        'product_id' => $rawMaterial->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => null,
-        'quantity' => 50,
-    ]);
-
-    $otherIssue = MaterialIssue::factory()->create([
-        'warehouse_id' => $warehouse->id,
-        'type' => 'issue',
-        'status' => MaterialIssue::STATUS_APPROVED,
-    ]);
-
-    StockReservation::create([
-        'material_issue_id' => $otherIssue->id,
-        'product_id' => $rawMaterial->id,
-        'warehouse_id' => $warehouse->id,
-        'rak_id' => null,
-        'quantity' => 40,
-    ]);
-
-    $metrics = MaterialIssueResource::getStockMetrics($rawMaterial->id, $warehouse->id, $materialIssue);
-
-    expect($metrics['physical'])->toBe(100.0);
-    expect($metrics['reserved'])->toBe(90.0);
-    expect($metrics['free'])->toBe(10.0);
-    expect($metrics['own_reserved'])->toBe(50.0);
-    expect($metrics['effective'])->toBe(60.0);
-});

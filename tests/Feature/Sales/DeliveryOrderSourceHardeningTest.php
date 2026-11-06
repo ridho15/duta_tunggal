@@ -21,10 +21,8 @@ use App\Models\Rak;
 use App\Models\ReturnProduct;
 use App\Models\ReturnProductItem;
 use App\Models\Warehouse;
-use App\Filament\Resources\DeliveryOrderResource\Pages\CreateDeliveryOrder;
 use App\Services\ReturnProductService;
 use App\Services\StockAvailability;
-use Filament\Facades\Filament;
 use Livewire\Livewire;
 use App\Services\DeliveryOrderTransitions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -189,82 +187,6 @@ class DeliveryOrderSourceHardeningTest extends TestCase
 
         $this->assertSame($rakB->id, app(StockAvailability::class)->bestRakId($this->product->id, $this->warehouse1->id));
         $this->assertNull(app(StockAvailability::class)->bestRakId($this->product->id, $this->warehouse2->id));
-    }
-
-    public function test_create_delivery_order_failure_during_stock_deduction_rolls_back_everything_and_notifies(): void
-    {
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $user = User::factory()->create(['cabang_id' => $this->cabang->id, 'manage_type' => 'all']);
-        \Spatie\Permission\Models\Role::findOrCreate('Super Admin', 'web');
-        $user->assignRole('Super Admin');
-        $this->actingAs($user);
-
-        $this->stock($this->warehouse1->id, 10);
-        [$so, $soItem] = $this->approvedSo(12, 'SO-A1-ROLLBACK');
-
-        // Tiap sumber (6) lolos pemeriksaan awal terhadap stok 10, tetapi totalnya (12) melebihi stok:
-        // pemotongan stok gagal pada sumber ke-2, saat relasi disimpan.
-        $component = Livewire::test(CreateDeliveryOrder::class)
-            ->fillForm([
-                'do_number' => 'DO-A1-ROLLBACK',
-                'salesOrders' => [$so->id],
-                'cabang_id' => $this->cabang->id,
-                'delivery_date' => now()->addDay()->toDateTimeString(),
-                'deliveryOrderItem' => [[
-                    'options_from' => 2,
-                    'sale_order_item_id' => $soItem->id,
-                    'product_id' => $this->product->id,
-                    'quantity' => 12,
-                    'warehouseSources' => [
-                        ['warehouse_id' => $this->warehouse1->id, 'quantity' => 6],
-                        ['warehouse_id' => $this->warehouse1->id, 'quantity' => 6],
-                    ],
-                ]],
-            ])
-            ->call('create');
-
-        $component->assertNotified('Delivery Order Gagal Dibuat');
-        $this->assertDatabaseMissing('delivery_orders', ['do_number' => 'DO-A1-ROLLBACK']);
-        $this->assertSame(0, DeliveryOrderItem::count());
-        $this->assertSame(0, StockMovement::where('type', 'sales')->count());
-        $this->assertEquals(10, InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouse1->id)->value('qty_available'));
-    }
-
-
-    public function test_create_delivery_order_deducts_only_selected_source_warehouse_not_header_warehouse(): void
-    {
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $user = User::factory()->create(['cabang_id' => $this->cabang->id, 'manage_type' => 'all']);
-        \Spatie\Permission\Models\Role::findOrCreate('Super Admin', 'web');
-        $user->assignRole('Super Admin');
-        $this->actingAs($user);
-
-        // Gudang header DO (dari item SO) = gudang1 yang stoknya KOSONG; user memilih sumber gudang2 yang berstok.
-        $this->stock($this->warehouse1->id, 0);
-        $this->stock($this->warehouse2->id, 20);
-        [$so, $soItem] = $this->approvedSo(8, 'SO-A1-HEADER');
-        $soItem->update(['warehouse_id' => $this->warehouse1->id]);
-
-        Livewire::test(CreateDeliveryOrder::class)
-            ->fillForm([
-                'do_number' => 'DO-A1-HEADER',
-                'salesOrders' => [$so->id],
-                'cabang_id' => $this->cabang->id,
-                'delivery_date' => now()->addDay()->toDateTimeString(),
-                'deliveryOrderItem' => [[
-                    'options_from' => 2,
-                    'sale_order_item_id' => $soItem->id,
-                    'product_id' => $this->product->id,
-                    'quantity' => 8,
-                    'warehouseSources' => [['warehouse_id' => $this->warehouse2->id, 'quantity' => 8]],
-                ]],
-            ])
-            ->call('create');
-
-        $this->assertDatabaseHas('delivery_orders', ['id' => DeliveryOrder::where('do_number', 'like', 'DO-%')->value('id')]);
-        $this->assertEquals(0, InventoryStock::where('warehouse_id', $this->warehouse1->id)->value('qty_available'));
-        $this->assertEquals(12, InventoryStock::where('warehouse_id', $this->warehouse2->id)->value('qty_available'));
-        $this->assertEquals(8, StockMovement::where('type', 'sales')->sum('quantity'));
     }
 
     public function test_free_for_delivery_order_source_adds_back_stock_already_deducted_by_the_same_do_item(): void

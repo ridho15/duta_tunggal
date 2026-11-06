@@ -17,10 +17,13 @@ use App\Models\User;
 use App\Models\Warehouse;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BladeStockOpnameWorkflowTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $authorizedUser;
     protected User $unauthorizedUser;
     protected Cabang $cabang;
@@ -41,7 +44,7 @@ class BladeStockOpnameWorkflowTest extends TestCase
         ]);
 
         $this->warehouse = Warehouse::withoutGlobalScopes()->where('cabang_id', $this->cabang->id)->first()
-            ?? Warehouse::create([
+            ?? Warehouse::factory()->create([
                 'kode' => 'WH-OPN-TEST',
                 'name' => 'Gudang Opname Test',
                 'cabang_id' => $this->cabang->id,
@@ -86,7 +89,7 @@ class BladeStockOpnameWorkflowTest extends TestCase
             $role->givePermissionTo($perm);
         }
 
-        $this->authorizedUser = User::withoutGlobalScopes()->first() ?? User::create([
+        $this->authorizedUser = User::withoutGlobalScopes()->first() ?? User::factory()->create([
             'username' => 'opn_tester',
             'first_name' => 'Opname',
             'last_name' => 'Tester',
@@ -103,7 +106,7 @@ class BladeStockOpnameWorkflowTest extends TestCase
         $this->unauthorizedUser = User::withoutGlobalScopes()
             ->where('id', '!=', $this->authorizedUser->id)
             ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'Super Admin'))
-            ->first() ?? User::create([
+            ->first() ?? User::factory()->create([
                 'username' => 'unauth_user_opn',
                 'first_name' => 'Unauth',
                 'last_name' => 'Opname',

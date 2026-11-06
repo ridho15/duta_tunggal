@@ -1,11 +1,9 @@
 <?php
 
 /**
- * Isu 8 — Status jatuh tempo otomatis + notifikasi ke finance: `invoices:check-overdue` (terjadwal harian, lihat
- * routes/console.php) mengubah status invoice yang lewat jatuh tempo dan MASIH bersisa menjadi Terlambat, lalu
- * mengirim notifikasi database Filament ke pengguna berizin `view account payable` (hutang) / `view account
- * receivable` (piutang). Migrasi `notifications` (dulu ada di DB tetapi tidak pernah tercatat sebagai migrasi)
- * dibuktikan idempoten dan dapat dibangun dari kosong.
+ * Isu 8 — Status jatuh tempo otomatis: `invoices:check-overdue` (terjadwal harian, lihat routes/console.php) mengubah
+ * status invoice yang lewat jatuh tempo dan MASIH bersisa menjadi Terlambat. Pengingat untuk finance tampil di
+ * Dashboard Eksekutif (kartu Piutang lewat jatuh tempo dan Hutang jatuh tempo <= 7 hari), bukan notifikasi database.
  */
 
 use App\Models\AccountPayable;
@@ -17,25 +15,13 @@ use App\Models\PurchaseOrder;
 use App\Models\SaleOrder;
 use App\Models\Supplier;
 use App\Models\User;
-use App\Services\OverdueInvoiceNotifier;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
-use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
-
-function overdueUser(array $permissions = []): User
-{
-    $user = User::factory()->create();
-    foreach ($permissions as $permission) {
-        Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
-        $user->givePermissionTo($permission);
-    }
-
-    return $user;
-}
 
 /** Invoice pembelian (hutang) $days hari lewat jatuh tempo, masih bersisa $remaining dari $total. */
 function overdueApInvoice(string $number, int $days, float $total = 1000000, ?float $remaining = null): Invoice
@@ -80,93 +66,57 @@ it('migrasi notifications: dapat dibangun dari kosong dan idempoten bila tabel s
     expect(Schema::hasTable('notifications'))->toBeTrue();
 });
 
-it('invoice hutang lewat jatuh tempo: status jadi Terlambat + notifikasi ke pengguna berizin "view account payable" saja', function () {
-    $finance = overdueUser(['view account payable']);
-    $sales = overdueUser(['view account receivable']);   // berizin piutang, BUKAN hutang — tidak boleh dapat notifikasi ini
-    $invoice = overdueApInvoice('PINV-OD-1', days: 5, total: 1000000, remaining: 1000000);
+it('invoice hutang dan piutang lewat jatuh tempo berubah menjadi Terlambat', function () {
+    $ap = overdueApInvoice('PINV-OD-1', days: 5, total: 1000000);
+    $ar = overdueArInvoice('INV-OD-1', days: 22, total: 2000000);
 
     Artisan::call('invoices:check-overdue');
 
-    expect($invoice->fresh()->status)->toBe(Invoice::STATUS_OVERDUE)
-        ->and($finance->fresh()->unreadNotifications()->count())->toBe(1)
-        ->and($sales->fresh()->unreadNotifications()->count())->toBe(0);
-
-    $data = $finance->fresh()->unreadNotifications()->first()->data;
-    expect($data['title'])->toContain('Hutang')->toContain('1')->and($data['body'])->toContain('PINV-OD-1')->toContain('Rp 1.000.000');
+    expect($ap->fresh()->status)->toBe(Invoice::STATUS_OVERDUE)
+        ->and($ar->fresh()->status)->toBe(Invoice::STATUS_OVERDUE);
 });
 
-it('invoice piutang lewat jatuh tempo: status jadi Terlambat + notifikasi ke pengguna berizin "view account receivable" saja', function () {
-    $sales = overdueUser(['view account receivable']);
-    $finance = overdueUser(['view account payable']);
-    $invoice = overdueArInvoice('INV-OD-1', days: 22, total: 2000000, remaining: 2000000);
-
-    Artisan::call('invoices:check-overdue');
-
-    expect($invoice->fresh()->status)->toBe(Invoice::STATUS_OVERDUE)
-        ->and($sales->fresh()->unreadNotifications()->count())->toBe(1)
-        ->and($finance->fresh()->unreadNotifications()->count())->toBe(0);
-
-    $data = $sales->fresh()->unreadNotifications()->first()->data;
-    expect($data['title'])->toContain('Piutang')->and($data['body'])->toContain('INV-OD-1')->toContain('Rp 2.000.000');
-});
-
-it('hutang dan piutang jatuh tempo BERSAMAAN dalam satu jalankan: masing-masing hanya masuk kelompok notifikasi miliknya', function () {
-    $finance = overdueUser(['view account payable']);
-    $sales = overdueUser(['view account receivable']);
-    overdueApInvoice('PURCHASE-MIX-001', days: 5, total: 1000000);
-    overdueArInvoice('SALES-MIX-001', days: 22, total: 2000000);
-
-    Artisan::call('invoices:check-overdue');
-
-    $financeBody = $finance->fresh()->unreadNotifications()->first()->data['body'];
-    $salesBody = $sales->fresh()->unreadNotifications()->first()->data['body'];
-
-    expect($finance->fresh()->unreadNotifications()->count())->toBe(1)->and($financeBody)->toContain('PURCHASE-MIX-001')->not->toContain('SALES-MIX-001')
-        ->and($sales->fresh()->unreadNotifications()->count())->toBe(1)->and($salesBody)->toContain('SALES-MIX-001')->not->toContain('PURCHASE-MIX-001');
-});
-
-it('--dry-run: status TIDAK berubah dan TIDAK ada notifikasi terkirim', function () {
-    $finance = overdueUser(['view account payable']);
+it('--dry-run: status TIDAK berubah', function () {
     $invoice = overdueApInvoice('PINV-OD-DRY', days: 5);
 
     Artisan::call('invoices:check-overdue', ['--dry-run' => true]);
 
-    expect($invoice->fresh()->status)->not->toBe(Invoice::STATUS_OVERDUE)
-        ->and($finance->fresh()->notifications()->count())->toBe(0);
+    expect($invoice->fresh()->status)->not->toBe(Invoice::STATUS_OVERDUE);
 });
 
-it('idempoten: menjalankan dua kali hanya mengirim notifikasi SEKALI (bukan setiap hari selama masih Terlambat)', function () {
-    $finance = overdueUser(['view account payable']);
-    overdueApInvoice('PINV-OD-TWICE', days: 5);
+it('menjalankan dua kali tidak error dan status tetap Terlambat', function () {
+    $invoice = overdueApInvoice('PINV-OD-TWICE', days: 5);
 
     Artisan::call('invoices:check-overdue');
-    Artisan::call('invoices:check-overdue');
-
-    expect($finance->fresh()->notifications()->count())->toBe(1);
-});
-
-it('tidak ada pengguna berizin: tidak mengirim notifikasi dan tidak error', function () {
-    overdueApInvoice('PINV-OD-NOONE', days: 5);
-
     $exitCode = Artisan::call('invoices:check-overdue');
 
-    expect($exitCode)->toBe(0);
+    expect($exitCode)->toBe(0)->and($invoice->fresh()->status)->toBe(Invoice::STATUS_OVERDUE);
 });
 
-it('lebih dari 5 invoice: nomor dipotong dan diberi keterangan "dan N lainnya"; total sisa dijumlah benar', function () {
-    $finance = overdueUser(['view account payable']);
-    foreach (range(1, 7) as $i) {
-        overdueApInvoice("PINV-OD-MANY-{$i}", days: 3, total: 100000, remaining: 100000);
-    }
+function overdueExecutiveDashboard(): \Illuminate\Testing\TestResponse
+{
+    Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $user = User::factory()->create(['cabang_id' => null, 'manage_type' => 'all']);
+    $user->assignRole('Super Admin');
 
-    Artisan::call('invoices:check-overdue');
+    return test()->actingAs($user)->get(route('dashboard', ['refresh' => 1]));
+}
 
-    $data = $finance->fresh()->unreadNotifications()->first()->data;
-    expect($data['title'])->toContain('7 invoice')->and($data['body'])->toContain('dan 2 lainnya')->toContain('Rp 700.000');
+it('dashboard: tanpa piutang/hutang jatuh tempo, kartu menampilkan nol, bukan angka karangan', function () {
+    overdueExecutiveDashboard()
+        ->assertOk()
+        ->assertSee('Tidak ada piutang terlambat')
+        ->assertSee('Tidak ada hutang jatuh tempo');
 });
 
-it('OverdueInvoiceNotifier::notify: koleksi kosong tidak melempar dan tidak mengirim apa pun', function () {
-    overdueUser(['view account payable']);
-    app(OverdueInvoiceNotifier::class)->notify(collect());
-    expect(User::whereHas('notifications')->count())->toBe(0);
+it('dashboard: piutang dan hutang yang lewat jatuh tempo muncul di kartu dengan jumlah nyata', function () {
+    overdueArInvoice('INV-DASH-1', days: 10, total: 2000000);
+    overdueApInvoice('PINV-DASH-1', days: 3, total: 1000000);
+
+    overdueExecutiveDashboard()
+        ->assertOk()
+        ->assertSee('1 customer')
+        ->assertSee('1 supplier')
+        ->assertDontSee('Tidak ada piutang terlambat')
+        ->assertDontSee('Tidak ada hutang jatuh tempo');
 });
