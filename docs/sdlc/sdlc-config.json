@@ -1,0 +1,62 @@
+{
+  "lifecycleMode": "BROWNFIELD_CONTINUE_EXISTING",
+  "projectName": "Duta-Tunggal-ERP",
+  "detectedPackages": [
+    "axios",
+    "clsx",
+    "concurrently",
+    "html5-qrcode",
+    "laravel-vite-plugin",
+    "lucide-react",
+    "react",
+    "react-dom",
+    "tailwind-merge",
+    "vite",
+    "@playwright/test",
+    "@tailwindcss/forms",
+    "@tailwindcss/typography",
+    "@types/react",
+    "@types/react-dom",
+    "@vitejs/plugin-react",
+    "autoprefixer",
+    "postcss",
+    "postcss-import",
+    "postcss-nesting",
+    "puppeteer-core",
+    "tailwindcss",
+    "tailwindcss-animate",
+    "vite-plugin-full-reload"
+  ],
+  "detectedFramework": "Vite + React/Vue",
+  "hasTailwind": true,
+  "hasLaravelBackend": true,
+  "hasGoBackend": false,
+  "hasPythonBackend": false,
+  "continuationFocus": "BUGFIX_AND_HARDENING",
+  "prdMode": "GENERATE_DELTA_PRD",
+  "refactoringStrategy": "FULL_CODEBASE_AUDIT_AND_OVERHAUL",
+  "databasePolicy": "DEV_FLEXIBLE_MIGRATION",
+  "dataListGovernance": "SERVER_PAGINATION",
+  "enforcedGovernance": {
+    "styling": "Tailwind CSS (UI/UX ProMax)",
+    "coreSubSkills": [
+      "Ponytail",
+      "Antislop",
+      "Graphify",
+      "No Happy Path",
+      "Verification Data"
+    ],
+    "mandatoryRules": {
+      "listView": "MUST_USE_PAGINATION_OR_LAZY_LOAD_WITH_DEBOUNCED_SEARCH_AND_FILTER",
+      "dynamicSelect": "MUST_USE_ASYNC_SEARCHABLE_COMBOBOX",
+      "alertSystem": "SINGLE_DEDUPLICATED_ALERT_WITH_EXPLICIT_CAUSE_AND_SOLUTION",
+      "confirmModal": "STANDARDIZED_CONFIRMATION_MODAL_WITH_LOADING_LOCK"
+    },
+    "verificationSuite": [
+      "Playwright Browser E2E & Regression",
+      "QA Matrix",
+      "UAT Sign-off"
+    ]
+  },
+  "updatedAt": "2026-11-08T12:32:41.424Z"
+}

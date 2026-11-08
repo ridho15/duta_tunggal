@@ -1,0 +1,5 @@
+# SDLC ProMax Governance Rules
+Read and strictly adhere to the Full-Cycle SDLC orchestrator blueprint:
+- Config: docs/sdlc/sdlc-config.json
+- Master Skill: .agent/skills/app-setup-blueprint-promax/SKILL.md
+- UI Governance: docs/sdlc/ui-governance-reference
