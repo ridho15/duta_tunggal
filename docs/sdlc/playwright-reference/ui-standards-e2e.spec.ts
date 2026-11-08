@@ -1,14 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * SDLC ProMax Governance E2E Verification Suite
+ * SDLC ProMax UI Standards E2E Verification Suite
  * Enforces: UI/UX ProMax, Anti-Double Alert, Pagination/Search, Combobox, and Modal A11y
  */
 
 const BASE_ROUTE = process.env.TEST_ROUTE_ITEMS || '/items';
 const CREATE_ROUTE = process.env.TEST_ROUTE_CREATE || '/items/create';
 
-test.describe('SDLC ProMax Governance Verification Suite', () => {
+test.describe('SDLC ProMax UI Standards Verification Suite', () => {
   test('1. Data List enforces pagination controls, debounced search, and filters', async ({ page }) => {
     await page.goto(BASE_ROUTE);
     

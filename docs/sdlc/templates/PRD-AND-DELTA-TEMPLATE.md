@@ -35,7 +35,7 @@ Setiap User Story wajib mendefinisikan skenario kegagalan (*No Happy Path*) seca
 
 ---
 
-## 4. UI & Data Governance Compliance Matrix
+## 4. Matriks Kepatuhan Standar UI & Data
 Semua tampilan halaman antarmuka wajib menerapkan 4 pilar tata kelola:
 
 | Nama Halaman / Rute | Strategi List Data (Server Pagination / Cursor Lazy) | Kolom Search (Debounced 350ms) & Multi-Filter | Dynamic Async Combobox (Relasi DB) | Aksi Wajib Modal Konfirmasi |

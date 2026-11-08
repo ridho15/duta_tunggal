@@ -1,17 +1,17 @@
 # QA Test Matrix & UAT Sign-off Protocol
 
-Matriks Pengujian Jaminan Mutu (*Quality Assurance*) dan Berita Acara Uji Keberterimaan Pengguna (*User Acceptance Testing*). Standar pengujian ketat berbasis **No Happy Path**, **UI/UX ProMax Governance**, dan **Verifikasi Dua Arah**.
+Matriks Pengujian Jaminan Mutu (*Quality Assurance*) dan Berita Acara Uji Keberterimaan Pengguna (*User Acceptance Testing*). Standar pengujian ketat berbasis **No Happy Path**, **Standar UI/UX ProMax**, dan **Verifikasi Dua Arah**.
 
 ---
 
-## Bagian A: Matriks Pengujian Teknis QA (Governance & No Happy Path)
+## Bagian A: Matriks Pengujian Teknis QA (Standar UI & No Happy Path)
 
 | Test ID | Modul / Komponen | Skenario Uji (Skenario Ekstrem & Edge Cases) | Kategori | Hasil yang Diharapkan | Status | Catatan Temuan |
 | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
-| **QA-01** | List Data & Tabel | Ketik kata kunci cepat di kolom pencarian, ubah filter status, dan klik halaman ke-3. | Governance | • Request terkirim debounced (300-500ms).<br>• URL query sinkron (`?page=3&search=...`).<br>• Loading skeleton tampil tanpa layout shift. | [ ] | |
-| **QA-02** | Async Combobox | Buka dropdown relasi database, ketik kata kunci yang tidak ada, lalu ketik kata kunci yang valid. | Governance | • Menampilkan status loading spinner.<br>• Menampilkan pesan *"Data tidak ditemukan"* jika kosong.<br>• Keyboard ArrowUp/Down/Enter berfungsi lancar. | [ ] | |
+| **QA-01** | List Data & Tabel | Ketik kata kunci cepat di kolom pencarian, ubah filter status, dan klik halaman ke-3. | Standar UI | • Request terkirim debounced (300-500ms).<br>• URL query sinkron (`?page=3&search=...`).<br>• Loading skeleton tampil tanpa layout shift. | [ ] | |
+| **QA-02** | Async Combobox | Buka dropdown relasi database, ketik kata kunci yang tidak ada, lalu ketik kata kunci yang valid. | Standar UI | • Menampilkan status loading spinner.<br>• Menampilkan pesan *"Data tidak ditemukan"* jika kosong.<br>• Keyboard ArrowUp/Down/Enter berfungsi lancar. | [ ] | |
 | **QA-03** | Alert Deduplication | Kirim form dengan data tidak valid dan klik tombol submit 3x secara cepat (*rapid multi-click*). | No Happy Path | • Tombol submit langsung terkunci (*disabled*).<br>• Hanya 1 alert yang muncul di layar (*anti-double alert*).<br>• Alert memuat konteks aksi, alasan server, dan solusi. | [ ] | |
-| **QA-04** | Confirm Modal | Klik aksi destruktif (Hapus / Batalkan Transaksi), tekan tombol `Escape`, lalu coba klik konfirmasi. | Governance | • Modal tampil menyebut nama/ID entitas secara spesifik.<br>• Tekan `Escape` menutup modal.<br>• Tombol konfirmasi terkunci state loading selama request. | [ ] | |
+| **QA-04** | Confirm Modal | Klik aksi destruktif (Hapus / Batalkan Transaksi), tekan tombol `Escape`, lalu coba klik konfirmasi. | Standar UI | • Modal tampil menyebut nama/ID entitas secara spesifik.<br>• Tekan `Escape` menutup modal.<br>• Tombol konfirmasi terkunci state loading selama request. | [ ] | |
 | **QA-05** | Aksesibilitas (A11y)| Navigasi modal hanya menggunakan keyboard (`Tab` dan `Shift+Tab`). | A11y | • Fokus Tab terkunci di dalam modal (*Focus Trap*).<br>• Latar belakang halaman tidak bisa di-scroll (*Scroll Lock*). | [ ] | |
 | **QA-06** | RBAC Guardrails | Akses rute/tombol terlarang menggunakan akun dengan role User biasa. | Security | • Tombol aksi tidak dirender atau disabled.<br>• Akses rute langsung mengarah ke halaman `403 Forbidden` ramah pengguna. | [ ] | |
 | **QA-07** | Session Expiry | Biarkan token auth kedaluwarsa lalu kirim mutasi data di halaman form. | No Happy Path | • Request ditolak dengan ramah (401).<br>• Data isian form dipertahankan (tidak hilang).<br>• User diarahkan ke login atau refresh token tanpa crash. | [ ] | |

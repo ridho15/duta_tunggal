@@ -36,8 +36,8 @@
   "prdMode": "GENERATE_DELTA_PRD",
   "refactoringStrategy": "FULL_CODEBASE_AUDIT_AND_OVERHAUL",
   "databasePolicy": "DEV_FLEXIBLE_MIGRATION",
-  "dataListGovernance": "SERVER_PAGINATION",
-  "enforcedGovernance": {
+  "dataListStandard": "SERVER_PAGINATION",
+  "enforcedStandards": {
     "styling": "Tailwind CSS (UI/UX ProMax)",
     "coreSubSkills": [
       "Ponytail",
@@ -58,5 +58,5 @@
       "UAT Sign-off"
     ]
   },
-  "updatedAt": "2026-11-08T12:32:41.424Z"
+  "updatedAt": "2026-11-08T12:42:43.907Z"
 }
