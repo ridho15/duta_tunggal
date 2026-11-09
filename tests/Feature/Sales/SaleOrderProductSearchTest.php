@@ -48,7 +48,7 @@ it('pencarian produk: cocok nama/SKU, SKU persis didahulukan, berisi harga/stok/
     expect($json['success'])->toBeTrue()
         ->and($json['products'][0]['sku'])->toBe('KBL-001')           // persis di atas yang hanya mengandung
         ->and($json['products'][0]['sell_price'])->toEqual(12500)
-        ->and($json['products'][0]['bottom_price'])->toEqual(0)   // kolom products.bottom_price belum ada; perilaku lama (selalu 0) dipertahankan
+        ->and($json['products'][0]['bottom_price'])->toEqual(\App\Support\ProductPriceLimitation::getMinimumAllowedPrice($ctx['product']->fresh()))   // batas harga master produk (dulu selalu 0)
         ->and($json['products'][0]['free_stock'])->toEqual(15)
         ->and($json['products'][0]['uom'])->toBe('pcs');
 

@@ -129,6 +129,15 @@ class SalesOrderService
 
     public function cancel($salesOrder)
     {
+        // Keputusan Ko Handy 09 Nov 2026: SO yang sudah punya DO dibatalkan lewat pembatalan/penghapusan DO-nya lebih dulu.
+        $openDeliveryOrders = $salesOrder->deliveryOrder()->whereNotIn('delivery_orders.status', ['closed', 'reject'])->pluck('do_number');
+        if ($openDeliveryOrders->isNotEmpty()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'status' => "SO {$salesOrder->so_number} masih punya Perintah Kirim aktif ({$openDeliveryOrders->implode(', ')}). "
+                    .'Batalkan Perintah Kirim tersebut lebih dulu, baru SO dapat dibatalkan.',
+            ]);
+        }
+
         DB::transaction(function () use ($salesOrder) {
             // Buku besar aktif: SaleOrderObserver melepas SEMUA reservasi SO/DO-nya lewat StockReservationLedger (tercatat sebagai event).
             // Alur lama (semua flag mati): reservasi dihapus di sini agar qty_reserved turun.

@@ -298,6 +298,31 @@ class SaleOrderController extends Controller
         ])->values();
     }
 
+    /**
+     * Harga efektif (setelah diskon) per produk dari Penawaran yang SUDAH di-approve — jalur sah untuk harga di bawah batas.
+     *
+     * @return array<int, float> product_id => harga efektif terendah yang disetujui
+     */
+    private function approvedQuotationEffectivePrices($quotationId): array
+    {
+        if (! $quotationId) {
+            return [];
+        }
+
+        $quotation = Quotation::query()->with('quotationItem')->find($quotationId);
+        if (! $quotation || $quotation->status !== Quotation::STATUS_APPROVE) {
+            return [];
+        }
+
+        $prices = [];
+        foreach ($quotation->quotationItem as $qi) {
+            $effective = (float) $qi->unit_price * (1 - max(0.0, min(100.0, (float) ($qi->discount ?? 0))) / 100);
+            $prices[(int) $qi->product_id] = min($prices[(int) $qi->product_id] ?? INF, $effective);
+        }
+
+        return $prices;
+    }
+
     private function activeProducts()
     {
         return Product::query()->with('uom')->where(fn ($q) => $q->whereNull('is_active')->orWhere('is_active', true));
@@ -317,7 +342,7 @@ class SaleOrderController extends Controller
             'sku' => $p->sku,
             'name' => $p->name,
             'sell_price' => (float) $p->sell_price,
-            'bottom_price' => (float) ($p->bottom_price ?? 0),
+            'bottom_price' => ProductPriceLimitation::getMinimumAllowedPrice($p),
             'free_stock' => max(0.0, (float) ($freeStock[$p->id] ?? 0)),
             'uom' => $p->uom?->abbreviation ?? 'PCS',
         ])->values();
@@ -363,22 +388,31 @@ class SaleOrderController extends Controller
         $exchangeRate = (float) ($validated['exchange_rate'] ?? ($currency?->to_rupiah ?? 1.0));
         $shippingCost = (float) ($validated['shipping_cost'] ?? 0);
 
-        // Hitung estimasi total & periksa pelanggaran batas harga bawah
-        $hasPriceViolation = false;
+        // Batas harga (keputusan Ko Handy 09 Nov 2026): harga di bawah batas DITOLAK saat simpan. Harga di bawah batas hanya sah bila
+        // berasal dari Penawaran yang sudah di-approve (penawaran adalah jalur persetujuannya).
+        $approvedQuotePrices = $this->approvedQuotationEffectivePrices($validated['quotation_id'] ?? null);
+        $priceErrors = [];
         $totalItemsAmount = 0;
 
-        foreach ($validated['items'] as $item) {
+        foreach ($validated['items'] as $idx => $item) {
             $product = Product::find($item['product_id']);
             $unitPrice = (float) $item['unit_price'];
             $disc = (float) ($item['discount'] ?? 0);
             $qty = (float) $item['quantity'];
 
-            if ($product && ProductPriceLimitation::validatePrice($product, $unitPrice, $disc)) {
-                $hasPriceViolation = true;
+            $message = $product ? ProductPriceLimitation::validatePrice($product, $unitPrice, $disc) : null;
+            $effective = $unitPrice * (1 - max(0.0, min(100.0, $disc)) / 100);
+            $approvedFloor = $approvedQuotePrices[(int) $item['product_id']] ?? null;
+            if ($message && ($approvedFloor === null || $effective + 0.005 < $approvedFloor)) {
+                $priceErrors["items.{$idx}.unit_price"] = $message.' Harga di bawah batas hanya bisa lewat Penawaran yang sudah di-approve.';
             }
 
             $subtotal = HelperController::hitungSubtotal($qty, $unitPrice, $disc, 0, 'None');
             $totalItemsAmount += (float) $subtotal;
+        }
+
+        if ($priceErrors !== []) {
+            return redirect()->back()->withInput()->withErrors($priceErrors);
         }
 
         $grandTotalIdr = CurrencyConversionResolver::convertToIdr(

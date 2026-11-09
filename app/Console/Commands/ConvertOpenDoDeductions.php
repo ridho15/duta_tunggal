@@ -27,6 +27,7 @@ class ConvertOpenDoDeductions extends Command
 {
     protected $signature = 'stock:convert-open-do-deductions
         {--apply : Kerjakan konversi. Default: dry-run (tidak mengubah apa pun)}
+        {--force : Izinkan --apply pada tanggal akhir bulan}
         {--do= : Batasi ke satu DO (id atau nomor DO)}
         {--no-csv : Jangan tulis CSV}
         {--out-dir= : Folder CSV (default storage/app/audits)}';
@@ -38,6 +39,14 @@ class ConvertOpenDoDeductions extends Command
     public function handle(DeliveryShipments $shipments, DeliveryOrderReservations $reservations): int
     {
         $apply = (bool) $this->option('apply');
+
+        // Keputusan Ko Handy 09 Nov 2026: rapikan di luar jam operasional, KECUALI tanggal akhir bulan (laporan stok/HPP ditarik).
+        if ($apply && now()->isLastOfMonth() && ! $this->option('force')) {
+            $this->error('Hari ini tanggal akhir bulan: laporan stok/HPP periode ini sedang ditarik. Jalankan besok, atau pakai --force bila sudah disetujui.');
+
+            return self::FAILURE;
+        }
+
         $this->info('KONVERSI POTONGAN STOK DO TERBUKA → KUNCI STOK'.($apply ? ' [APPLY]' : ' [DRY-RUN — tidak ada yang diubah]'));
 
         $rows = [];

@@ -176,16 +176,27 @@ terbuka · retur ganda dari QC reject · escaping JSON di `x-data` form GRN.
 
 ---
 
-## 8. Keputusan yang Menunggu Klien
+## 8. Keputusan Ko Handy — 09 Nov 2026
 
-1. **Harga di bawah batas** — (A) tolak saat simpan, atau (B) simpan lalu eskalasi approval. Mockup memakai B.
-2. **Visibilitas PO per peran** — usulan: user gudang hanya melihat PO tujuan gudangnya.
-   Ini **memblokir kasus salah kirim**: user gudang B tak bisa menerima barang yang mendarat
-   di B. Opsi: (a) "Ajukan terima di gudang saya" dengan approval, atau (b) salah kirim
-   hanya ditangani user senior.
-3. Apakah reject QC mengurangi hutang (AP)?
-4. Penyesuaian stok bertambah ke pendapatan lain — konfirmasi akuntan.
-5. "Permintaan Pembayaran" vs "Pengajuan Voucher" — fungsinya sama? Bila ya, digabung.
+Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* = kondisi kode di branch ini.
+
+| # | Topik | Keputusan | Status |
+|---|---|---|---|
+| 1 | Kapan stok keluar | Stok terpotong saat **Surat Jalan** keluar (1 SJ boleh berisi beberapa DO dari SO yang sama). Selama masih DO, stok hanya terkunci. Stok terpotong **sesuai tanggal jadwal pengiriman**: SJ dibuat 9 Nov, jadwal kirim 10 Nov → stok terpotong 10 Nov. Saat SJ keluar juga **timbul piutang**. | **Sebagian.** Kunci saat DO + potong saat SJ terbit: sudah. Tanggal potong mengikuti jadwal kirim: **belum** (sekarang tanggal SJ terbit). Piutang saat SJ: **belum** (invoice masih manual dari SJ) — perlu klarifikasi, lihat bawah. |
+| 2 | Merapikan data stok lama | Setelah jam operasional, **kecuali tanggal akhir bulan** (laporan stok/HPP ditarik). | **Sudah.** `stock:convert-open-do-deductions --apply` menolak jalan di tanggal akhir bulan kecuali `--force`. |
+| 3 | Retur | Retur by DO = **internal**, saat checker/sales memeriksa sebelum SJ. Retur by SJ = **eksternal** (toko vs pembeli, sebelum invoice). Retur = setelah invoice (salah order/berubah pikiran). **Semua retur dicatat barang keluar lalu masuk kembali.** | **Retur by DO sudah** dicatat keluar lalu kembali. Retur by SJ & Retur setelah invoice: belum diverifikasi terhadap aturan "keluar lalu kembali". |
+| 4 | SO dibatalkan | SO tanpa DO hanya boleh dihapus **Manager/Super Admin**. SO yang sudah ber-DO dibatalkan lewat **hapus DO**. Pengajuan pembatalan DO oleh Sales/pembuat DO/atasannya/Super Admin; yang **menghapus** hanya **Gudang/Manager/Super Admin**. | **Sebagian.** Pengaman: SO tidak bisa dibatalkan selama masih punya DO aktif. Belum ada: tombol hapus/batal SO di UI Blade (memang belum ada sama sekali), hak akses Manager/Super Admin, alur "ajukan batal DO → gudang menghapus". |
+| 5 | Harga di bawah batas | **(A) Sistem menolak.** Harga di bawah batas hanya lewat **Quotation yang di-approve**, baru jadi SO. | **Sudah.** SO ditolak saat simpan kecuali harga ≥ harga Penawaran yang sudah di-approve; peringatan di form hidup. Catatan: produk tanpa harga batas (0) memakai **harga jual** sebagai batas. |
+| 6 | Siapa melihat PO | PO ber-harga: **tidak ada staf gudang** yang boleh melihat. Daftar barang yang akan diterima: Super Admin, Manager, Purchasing, staf gudang tujuan (ship-to) PO. Salah gudang: yang menerima hanya keempat peran itu, **lalu dimutasi ke gudang yang salah**. | **Belum.** Dan *bertentangan* dengan keputusan 2 Nov (GRN dicatat di gudang tempat barang mendarat). Perlu klarifikasi, lihat bawah. |
+| 7 | Barang reject dari supplier | Reject saat serah terima langsung dikembalikan ke kurir supplier; hanya qty lolos QC yang diterima → **Purchase Invoice < PO**. Kirim susulan → QC ke-2, PI ke-2 untuk PO yang sama. Tidak ada susulan → PO ditutup. Setelah PI: Retur Pembelian (keluar barang, SJ, **Invoice Retur** = nota kredit supplier yang memotong pembayaran). | **Belum diverifikasi.** Sistem sekarang otomatis membuat 1 Retur Pembelian dari qty reject QC — perlu dicocokkan. |
+| 8 | Akuntan (nilai persediaan, penyesuaian ke pendapatan lain) | Belum dijawab. | Menunggu. |
+| 9 | Pengajuan Pembayaran & Voucher | **Satu menu Pengajuan Pembayaran**, dua jenis: (A) hutang pembelian **barang dagang** — pilih supplier → centang invoice belum lunas (no PO, no invoice, sisa, jatuh tempo) → metode bayar (cash/transfer/cek-giro) → rekening tujuan dari master → tanggal efektif → request ke akuntan/direktur → cetak **VOUCHER** bertanda tangan pembuat/approver/direktur; saat pelunasan cukup pakai no. pengajuan. (B) **non-barang** (alat kantor, plastik, jasa, sparepart kendaraan; tanpa PO), alur sama. | **Belum.** Spesifikasi fitur baru; "Pengajuan Voucher" = cetakan dari Pengajuan Pembayaran → digabung. |
+
+**Perlu klarifikasi ulang ke Ko Handy**
+
+- *Butir 1 — piutang saat SJ keluar*: sekarang invoice (dan piutang) dibuat manual dari SJ, sesuai keputusan UAT 13 Okt (invoice tidak terbit otomatis). Apakah piutang kini harus otomatis tercatat saat SJ keluar, atau maksudnya invoice memang dibuat dari SJ?
+- *Butir 1 — jadwal kirim*: apakah tanggal jadwal pengiriman diisi saat SJ dibuat? Bila SJ terbit tanpa jadwal, stok dipotong tanggal berapa?
+- *Butir 6 — salah gudang*: 2 Nov diputuskan GRN dicatat di gudang **tempat barang mendarat** (+ alasan, + tombol pindah ke gudang tujuan PO). Jawaban 9 Nov: diterima di gudang **tujuan PO** lalu dimutasi ke gudang yang salah. Mana yang berlaku?
 
 ---
 

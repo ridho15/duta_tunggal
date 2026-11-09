@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Artisan;
 
 uses(RefreshDatabase::class);
 
+// Tanggal tetap di pertengahan bulan: --apply ditolak pada tanggal akhir bulan (tes terakhir mengujinya sendiri).
+beforeEach(fn () => $this->travelTo(now()->startOfMonth()->addDays(14)->setTime(20, 0)));
+
 /** Ubah DO yang baru dibuat (terkunci) menjadi keadaan warisan aturan lama: stok fisik terpotong, tanpa reservasi DO. */
 function legacyDeducted(DeliveryOrder $do, array $ctx, float $qty): void
 {
@@ -74,4 +77,19 @@ it('--do membatasi konversi ke satu DO', function () {
     expect(stkReserved(null, $a))->toBe(3.0)
         ->and(stkReserved(null, $b))->toBe(0.0)
         ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(28.0);
+});
+
+it('--apply ditolak pada tanggal akhir bulan kecuali --force', function () {
+    $ctx = stkContext();
+    stkSetStock($ctx['product'], $ctx['warehouse'], 30);
+    [$so, $item] = stkSaleOrder($ctx, 20);
+    $do = stkDeliveryOrder($ctx, $so, $item, 3);
+    legacyDeducted($do, $ctx, 3);
+
+    $this->travelTo(now()->endOfMonth()->setTime(20, 0));
+    expect(Artisan::call('stock:convert-open-do-deductions', ['--apply' => true, '--no-csv' => true]))->toBe(1)
+        ->and(stkReserved(null, $do))->toBe(0.0);
+
+    expect(Artisan::call('stock:convert-open-do-deductions', ['--apply' => true, '--no-csv' => true, '--force' => true]))->toBe(0)
+        ->and(stkReserved(null, $do))->toBe(3.0);
 });
