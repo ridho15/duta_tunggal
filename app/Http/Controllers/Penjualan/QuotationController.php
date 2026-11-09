@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
@@ -131,7 +132,7 @@ class QuotationController extends Controller
         $quotations = $query->orderByDesc('id')->paginate(15)->withQueryString();
 
         // Master data untuk dropdown filter
-        $customers = Customer::query()->orderBy('name')->get(['id', 'name', 'perusahaan']);
+        $customers = CustomerPicker::prefill([$customerId]); // pencarian lewat AJAX; master customer tidak dimuat
         $cabangs = $canAccessAll ? Cabang::query()->orderBy('nama')->get(['id', 'nama', 'kode']) : collect();
         $cabangNama = (! $canAccessAll && $cabangId) ? (Cabang::find($cabangId)?->nama ?? 'Pusat') : 'Semua Cabang';
 
@@ -171,9 +172,7 @@ class QuotationController extends Controller
 
         $nextNumber = $this->quotationService->generateCode($selectedCabangId);
 
-        $customers = Customer::query()->orderBy('name')->get([
-            'id', 'name', 'perusahaan', 'address', 'phone', 'telephone', 'tempo_kredit', 'tipe_pembayaran'
-        ]);
+        $customers = CustomerPicker::prefill([old('customer_id')]);
 
         $currencies = Currency::query()->orderBy('name')->get(['id', 'name', 'code', 'symbol', 'to_rupiah']);
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR') ?? $currencies->first()?->id ?? 1;
@@ -357,9 +356,7 @@ class QuotationController extends Controller
         $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
 
         $cabangs = Cabang::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
-        $customers = Customer::query()->orderBy('name')->get([
-            'id', 'name', 'perusahaan', 'address', 'phone', 'telephone', 'tempo_kredit', 'tipe_pembayaran'
-        ]);
+        $customers = CustomerPicker::prefill([old('customer_id', $quotation->customer_id)]);
         $currencies = Currency::query()->orderBy('name')->get(['id', 'name', 'code', 'symbol', 'to_rupiah']);
 
         $products = Product::query()

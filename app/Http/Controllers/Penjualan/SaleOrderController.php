@@ -8,6 +8,7 @@ use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -181,14 +182,6 @@ class SaleOrderController extends Controller
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
             ?? Currency::query()->orderBy('id')->value('id');
 
-        $customers = Customer::query()
-            ->with(['deposit'])
-            ->orderBy('name')
-            ->get([
-                'id', 'code', 'name', 'perusahaan', 'address', 'telephone',
-                'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe'
-            ]);
-
         // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
         $selectedQuotationId = $request->query('quotation_id');
         $prefillIds = collect(old('items', []))->pluck('product_id')
@@ -209,6 +202,9 @@ class SaleOrderController extends Controller
                 ->with(['customer', 'quotationItem.product.uom'])
                 ->find($selectedQuotationId);
         }
+
+        // Master customer TIDAK dikirim di halaman ini: hanya customer terpilih (input lama / penawaran); sisanya dicari lewat AJAX (searchCustomers).
+        $customers = CustomerPicker::prefill([old('customer_id'), $selectedQuotation?->customer_id]);
 
         $nextSoNumber = $this->salesOrderService->generateSoNumber($canAccessAll ? null : $user?->cabang_id);
 

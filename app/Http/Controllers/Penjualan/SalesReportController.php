@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Penjualan;
 
 use App\Exports\SalesReportExport;
 use App\Http\Controllers\Controller;
-use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Services\Reports\SalesReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -54,7 +54,8 @@ class SalesReportController extends Controller
             ? '* HPP ditandai estimasi (cost_price master saat ini) bila invoice belum memiliki snapshot HPP dari jurnal.'
             : null;
 
-        $customers = Customer::orderBy('name')->get(['id', 'code', 'name']);
+        // Master customer tidak dimuat: hanya customer yang sedang difilter; sisanya dicari lewat AJAX.
+        $customers = CustomerPicker::prefill([$customerId]);
         $modeOptions = SalesReportService::modeOptions();
         $statusOptions = SalesReportService::statusOptions($mode);
         $statusLabel = SalesReportService::statusFilterLabel($mode);

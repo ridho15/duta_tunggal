@@ -87,12 +87,8 @@
                         name="customer_id"
                         id="customer_id"
                         label="Pelanggan (Customer)"
-                        :options="$customers->map(fn($c) => [
-                            'id' => $c->id,
-                            'label' => $c->name . ($c->perusahaan ? ' — ' . $c->perusahaan : ''),
-                            'subtext' => ($c->address ? \Illuminate\Support\Str::limit($c->address, 35) : '') . ($c->phone ?? $c->telephone ? ' | Telp: ' . ($c->phone ?? $c->telephone) : '') . ' | Tempo: ' . ($c->tempo_kredit ?? 30) . ' hari',
-                            'badge' => $c->tipe_pembayaran ?? 'Customer'
-                        ])"
+                        :options="$customers"
+                        :remote-url="route('penjualan.customers.search')"
                         :value="old('customer_id', $quotation->customer_id)"
                         placeholder="-- Cari atau Pilih Pelanggan --"
                         :required="true"
@@ -663,14 +659,8 @@
         document.getElementById('txtGrandTotal').innerText = 'Rp ' + formatNumber(grandTotal);
     }
 
-    const customersData = {
-        @foreach($customers as $c)
-            "{{ $c->id }}": {
-                address: "{{ addslashes($c->address ?? '') }}",
-                tempo: {{ (int)($c->tempo_kredit ?? 30) }}
-            },
-        @endforeach
-    };
+    // Cache data customer: hanya yang terpilih dari server; sisanya diisi saat dipilih dari hasil pencarian AJAX.
+    const customersData = @json(\App\Support\CustomerPicker::dataMap($customers));
 
     const currenciesData = {
         @foreach($currencies as $curr)
@@ -704,6 +694,10 @@
             }
         }
     }
+
+    document.getElementById('customer_id')?.closest('[x-data]')?.addEventListener('option-selected', function (e) {
+        customersData[e.detail.id] = e.detail.data;
+    });
 
     document.getElementById('customer_id')?.addEventListener('change', function() {
         handleCustomerChange(this.value);

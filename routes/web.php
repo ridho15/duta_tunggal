@@ -168,6 +168,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'index'])->name('so.index');
         Route::get('/so/create', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'create'])->name('so.create');
         Route::get('/so/products/search', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'searchProducts'])->name('so.products.search');
+        Route::get('/customers/search', \App\Http\Controllers\Penjualan\CustomerSearchController::class)->name('customers.search');
         Route::post('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'store'])->name('so.store');
         Route::get('/so/{saleOrder}', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'show'])->name('so.show');
         Route::post('/so/{saleOrder}/approve', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'approve'])->name('so.approve');

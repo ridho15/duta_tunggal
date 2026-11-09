@@ -8,6 +8,7 @@ use App\Models\Cabang;
 use App\Models\CreditNote;
 use App\Models\CreditNoteItem;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\CustomerReturn;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -181,7 +182,8 @@ class CreditNoteController extends Controller
             }
         }
 
-        $customers = Customer::orderBy('name')->get(['id', 'name', 'code']);
+        // Master customer tidak dimuat: hanya customer terpilih; sisanya dicari lewat AJAX.
+        $customers = CustomerPicker::prefill([$selectedCustomer?->id]);
 
         return view('penjualan.credit-notes.create', [
             'customers' => $customers,

@@ -159,7 +159,9 @@ class BladeQuotationWorkflowTest extends TestCase
         $response->assertOk();
         $response->assertViewIs('penjualan.penawaran.create');
         $response->assertSee('Buat Penawaran Harga (Quotation)');
-        $response->assertSee($this->customer->name);
+        $response->assertDontSee($this->customer->name);
+        // Master customer tidak dikirim di payload halaman; dicari lewat AJAX.
+        $response->assertSee('penjualan\/customers\/search', false);
     }
 
     public function test_user_can_store_quotation_as_draft(): void

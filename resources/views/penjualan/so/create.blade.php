@@ -67,12 +67,8 @@
                             name="customer_id"
                             id="customerSelect"
                             label="Customer"
-                            :options="$customers->map(fn($c) => [
-                                'id' => $c->id,
-                                'label' => $c->name . ($c->code ? ' (' . $c->code . ')' : ''),
-                                'subtext' => ($c->address ? \Illuminate\Support\Str::limit($c->address, 35) : '') . ' | Limit: Rp ' . number_format($c->kredit_limit, 0, ',', '.') . ' | Tipe: ' . $c->tipe_pembayaran,
-                                'badge' => $c->tipe_pembayaran ?? 'Customer'
-                            ])"
+                            :options="$customers"
+                            :remote-url="route('penjualan.customers.search')"
                             :value="old('customer_id', $selectedQuotation->customer_id ?? null)"
                             placeholder="-- Pilih Customer --"
                             :required="true"
@@ -787,20 +783,8 @@
         }
     }
 
-    const customersData = {
-        @foreach($customers as $c)
-            "{{ $c->id }}": {
-                id: "{{ $c->id }}",
-                name: "{{ addslashes($c->name) }}",
-                tipe: "{{ $c->tipe_pembayaran ?? 'Tunai' }}",
-                limit: {{ (float)$c->kredit_limit }},
-                tempo: {{ (int)$c->tempo_kredit }},
-                address: "{{ addslashes($c->address ?? '') }}",
-                phone: "{{ addslashes($c->phone ?? ($c->telephone ?? '')) }}",
-                deposit: {{ (float)($c->deposit?->remaining_amount ?? 0) }}
-            },
-        @endforeach
-    };
+    // Cache data customer: hanya customer terpilih dari server; sisanya diisi saat dipilih dari hasil pencarian AJAX.
+    const customersData = @json(\App\Support\CustomerPicker::dataMap($customers));
 
     function handleCustomerSelectChange(custId) {
         const cust = customersData[custId];
@@ -844,6 +828,11 @@
             if (recipientName) recipientName.value = cust.name || '';
             if (recipientPhone) recipientPhone.value = cust.phone || '';
         }
+    });
+
+    // Hasil pencarian AJAX membawa data customer; simpan sebelum event 'change' membacanya.
+    document.getElementById('customerSelect')?.closest('[x-data]')?.addEventListener('option-selected', function (e) {
+        customersData[e.detail.id] = e.detail.data;
     });
 
     document.getElementById('customerSelect')?.addEventListener('change', function () {
