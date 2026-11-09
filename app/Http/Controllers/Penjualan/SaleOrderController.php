@@ -25,6 +25,7 @@ use App\Support\ProductPriceLimitation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -181,16 +182,16 @@ class SaleOrderController extends Controller
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
             ?? Currency::query()->orderBy('id')->value('id');
 
-        $customers = Customer::query()
-            ->with(['deposit'])
-            ->orderBy('name')
-            ->get([
-                'id', 'code', 'name', 'perusahaan', 'address', 'telephone',
-                'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe'
-            ]);
-
-        // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
+        // Payload halaman hanya berisi customer & produk yang sudah terpilih (quotation / input lama);
+        // sisanya dicari lewat AJAX (searchCustomers, searchProducts). ±18 ribu customer tidak lagi ikut dikirim.
         $selectedQuotationId = $request->query('quotation_id');
+        $prefillCustomerId = old('customer_id')
+            ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : null);
+        $customers = $this->customerPayload(
+            $prefillCustomerId ? $this->customerQuery()->whereKey($prefillCustomerId)->get() : collect()
+        );
+
+
         $prefillIds = collect(old('items', []))->pluck('product_id')
             ->merge($selectedQuotationId ? QuotationItem::where('quotation_id', $selectedQuotationId)->pluck('product_id') : [])
             ->filter()->unique()->values();
@@ -244,6 +245,57 @@ class SaleOrderController extends Controller
         $products = $query->orderByRaw('sku = ? desc', [$q])->orderBy('name')->limit(25)->get();
 
         return response()->json(['success' => true, 'products' => $this->productPayload($products)]);
+    }
+
+    /**
+     * Pencarian customer untuk form Buat SO (AJAX). Menggantikan pengiriman seluruh master customer di payload halaman.
+     * Setiap kata harus cocok di nama, kode, atau perusahaan; kode yang persis sama diurutkan lebih dulu.
+     */
+    public function searchCustomers(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+        abort_if($q === '', 422, 'Kata pencarian wajib diisi.');
+
+        $query = $this->customerQuery();
+        foreach (preg_split('/\s+/', $q, -1, PREG_SPLIT_NO_EMPTY) as $term) {
+            $like = '%'.addcslashes($term, '\\%_').'%';
+            $query->where(fn ($w) => $w->where('name', 'like', $like)
+                ->orWhere('code', 'like', $like)
+                ->orWhere('perusahaan', 'like', $like));
+        }
+
+        $customers = $query->orderByRaw('code = ? desc', [$q])->orderBy('name')->limit(25)->get();
+
+        return response()->json(['success' => true, 'options' => $this->customerPayload($customers)]);
+    }
+
+    private function customerQuery()
+    {
+        return Customer::query()->with('deposit')->select([
+            'id', 'code', 'name', 'perusahaan', 'address', 'phone', 'telephone',
+            'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe',
+        ]);
+    }
+
+    /** Bentuk opsi customer untuk searchable-select; `meta` dibaca JS form SO (limit kredit, deposit, alamat kirim). */
+    private function customerPayload($customers)
+    {
+        return $customers->map(fn ($c) => [
+            'id' => (string) $c->id,
+            'label' => $c->name.($c->code ? ' ('.$c->code.')' : ''),
+            'subtext' => ($c->address ? Str::limit($c->address, 35) : '').' | Limit: Rp '.number_format((float) $c->kredit_limit, 0, ',', '.').' | Tipe: '.$c->tipe_pembayaran,
+            'badge' => $c->tipe_pembayaran ?? 'Customer',
+            'meta' => [
+                'id' => (string) $c->id,
+                'name' => $c->name,
+                'tipe' => $c->tipe_pembayaran ?? 'Tunai',
+                'limit' => (float) $c->kredit_limit,
+                'tempo' => (int) $c->tempo_kredit,
+                'address' => $c->address ?? '',
+                'phone' => $c->phone ?: ($c->telephone ?? ''),
+                'deposit' => (float) ($c->deposit?->remaining_amount ?? 0),
+            ],
+        ])->values();
     }
 
     private function activeProducts()

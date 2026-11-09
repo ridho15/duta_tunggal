@@ -67,12 +67,8 @@
                             name="customer_id"
                             id="customerSelect"
                             label="Customer"
-                            :options="$customers->map(fn($c) => [
-                                'id' => $c->id,
-                                'label' => $c->name . ($c->code ? ' (' . $c->code . ')' : ''),
-                                'subtext' => ($c->address ? \Illuminate\Support\Str::limit($c->address, 35) : '') . ' | Limit: Rp ' . number_format($c->kredit_limit, 0, ',', '.') . ' | Tipe: ' . $c->tipe_pembayaran,
-                                'badge' => $c->tipe_pembayaran ?? 'Customer'
-                            ])"
+                            :options="$customers"
+                            :search-url="route('penjualan.so.customers.search')"
                             :value="old('customer_id', $selectedQuotation->customer_id ?? null)"
                             placeholder="-- Pilih Customer --"
                             :required="true"
@@ -787,20 +783,14 @@
         }
     }
 
-    const customersData = {
-        @foreach($customers as $c)
-            "{{ $c->id }}": {
-                id: "{{ $c->id }}",
-                name: "{{ addslashes($c->name) }}",
-                tipe: "{{ $c->tipe_pembayaran ?? 'Tunai' }}",
-                limit: {{ (float)$c->kredit_limit }},
-                tempo: {{ (int)$c->tempo_kredit }},
-                address: "{{ addslashes($c->address ?? '') }}",
-                phone: "{{ addslashes($c->phone ?? ($c->telephone ?? '')) }}",
-                deposit: {{ (float)($c->deposit?->remaining_amount ?? 0) }}
-            },
-        @endforeach
-    };
+    // Hanya customer yang sudah terpilih (prefill); customer lain masuk ke sini saat dipilih dari hasil pencarian AJAX.
+    const customersData = Object.fromEntries(@json($customers).map(o => [String(o.id), o.meta]));
+    document.addEventListener('option-selected', (e) => {
+        // $dispatch Alpine memancarkan dari elemen yang diklik (<li>), jadi cek lewat root komponen searchable-select.
+        if (e.target?.closest?.('[x-data]')?.querySelector('#customerSelect') && e.detail?.meta) {
+            customersData[String(e.detail.id)] = e.detail.meta;
+        }
+    });
 
     function handleCustomerSelectChange(custId) {
         const cust = customersData[custId];
