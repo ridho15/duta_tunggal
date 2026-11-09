@@ -45,12 +45,12 @@ it('E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, reserva
     app(SalesOrderService::class)->approve($so);
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 20.0, 'free' => 10.0]);
 
-    // 2. DO 12 dibuat/Siap Kirim → Tahap 3: stok fisik langsung terpotong (30 → 18); SO hanya menahan sisa 8; tidak ada reservasi DO
+    // 2. DO 12 dibuat/Siap Kirim → DO mengunci 12 (fisik tetap 30); SO hanya menahan sisa 8; stok bebas tetap 10
     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 8.0, 'free' => 10.0])
-        ->and(stkReserved($so, $do))->toBe(0.0);
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 20.0, 'free' => 10.0])
+        ->and(stkReserved($so, $do))->toBe(12.0);
 
-    // 3. Jadwal: Selesai dari Menunggu ditolak; Mulai → DO Dikirim (stok TIDAK terpotong lagi)
+    // 3. Jadwal: Selesai dari Menunggu ditolak; Mulai → DO Dikirim (stok fisik baru terpotong 12, kunci DO dikonsumsi)
     $schedule = stkSchedule($ctx, $do);
     expect(fn () => $schedule->update(['status' => 'delivered']))->toThrow(\App\Exceptions\DeliveryOrderTransitionException::class);
 
@@ -110,8 +110,9 @@ it('E2E: SO stok kurang ditolak; backorder beralasan menahan sebagian; DO Siap K
         ->and((float) StockReservation::where('sale_order_id', $so->id)->sum('quantity'))->toBe(15.0);
 
     $do = stkDeliveryOrder($ctx, $so->fresh(), $item, 10, 'approved');
-    // Tahap 3: DO 10 langsung memotong stok fisik (15 → 5); SO (butuh 20 − 10 di DO = 10) hanya bisa menahan 5 yang tersisa
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 5.0, 'reserved' => 5.0, 'free' => 0.0]);
+    // DO 10 mengunci stoknya (fisik tetap 15); SO (butuh 20 − 10 di DO = 10) hanya bisa menahan 5 yang tersisa
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 15.0, 'reserved' => 15.0, 'free' => 0.0])
+        ->and(stkReserved($so, $do))->toBe(10.0);
 
     app(DeliveryOrderTransitions::class)->to($do, 'closed', ['reason' => 'Customer menunda']);
     expect(stkReserved($so, $do))->toBe(0.0)

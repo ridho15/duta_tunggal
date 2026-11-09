@@ -232,7 +232,8 @@ class StockAvailability
     }
 
     /**
-     * Stok bebas untuk SO/DO: bebas + reservasi yang dimiliki SO tersebut pada produk×gudang itu.
+     * Stok bebas untuk SO/DO: bebas + reservasi level-SO (bukan milik DO) yang dimiliki SO tersebut pada produk×gudang itu.
+     * Kunci stok DO lain dari SO yang sama TIDAK dihitung bebas: barang itu sudah dijanjikan ke DO tersebut.
      *
      * @param  array<int, int>  $saleOrderIds
      */
@@ -246,6 +247,7 @@ class StockAvailability
 
         $own = (float) DB::table('stock_reservations')
             ->whereNull('material_issue_id')
+            ->whereNull('delivery_order_id')
             ->whereIn('sale_order_id', $saleOrderIds)
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
@@ -265,9 +267,9 @@ class StockAvailability
     }
 
     /**
-     * Seperti freeForSaleOrderItem, ditambah stok yang SUDAH dipotong oleh item DO ini pada produk×gudang (opsional per rak).
-     * Sejak Tahap 3 stok terpotong saat DO dibuat, jadi saat DO diedit (mis. checker mengurangi qty) kuantitas lamanya sudah tidak
-     * ada di stok bebas; tanpa penambahan ini validasi menolak pengurangan qty dengan "stok tidak mencukupi".
+     * Seperti freeForSaleOrderItem, ditambah stok yang SUDAH dimiliki DO item ini pada produk×gudang (opsional per rak): kunci
+     * stok DO-nya (DO belum berangkat) dan stok yang sudah keluar olehnya. Saat DO diedit (mis. checker mengurangi qty) kuantitas
+     * lamanya tidak ada di stok bebas; tanpa penambahan ini validasi menolak pengurangan qty dengan "stok tidak mencukupi".
      */
     public function freeForDeliveryOrderSource(int $productId, int $warehouseId, ?int $saleOrderItemId, ?int $rakId, ?int $deliveryOrderItemId): float
     {
@@ -286,7 +288,16 @@ class StockAvailability
         $shipped = (float) (clone $base)->where('type', 'sales')->sum('quantity');
         $returned = (float) (clone $base)->where('type', 'adjustment_in')->sum('quantity');
 
-        return $free + max(0.0, $shipped - $returned);
+        $deliveryOrderId = DB::table('delivery_order_items')->where('id', $deliveryOrderItemId)->value('delivery_order_id');
+        $locked = $deliveryOrderId ? (float) DB::table('stock_reservations')
+            ->where('delivery_order_id', $deliveryOrderId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->when($saleOrderItemId, fn ($q) => $q->where(fn ($w) => $w->where('sale_order_item_id', $saleOrderItemId)->orWhereNull('sale_order_item_id')))
+            ->when($rakId, fn ($q) => $q->where('rak_id', $rakId))
+            ->sum('quantity') : 0.0;
+
+        return $free + $locked + max(0.0, $shipped - $returned);
     }
 
     /** Stok bebas satu produk untuk keputusan otomatis suatu cabang (Σ gudang yang boleh dipakai) — dipakai daftar produk API/React. */

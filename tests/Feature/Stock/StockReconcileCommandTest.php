@@ -46,7 +46,7 @@ function reconFingerprint(): array
     ];
 }
 
-/** Tambahkan baris reservasi level-DO langsung (data warisan sebelum Tahap 3; alur DO sekarang tidak lagi menahan reservasi DO). */
+/** Tambahkan baris reservasi level-DO langsung (meniru data warisan yang tidak pernah dilepas). */
 function reconDoReservation(array $ctx, $so, $item, $do, float $qty): StockReservation
 {
     return StockReservation::create([
@@ -56,11 +56,10 @@ function reconDoReservation(array $ctx, $so, $item, $do, float $qty): StockReser
 }
 
 /**
- * Data uji: stok 60; SO 40 berjalan; DO A (Siap Kirim, reservasi 5 — SAH); DO B sudah Dikirim tetapi reservasi 12 tak pernah dilepas (YATIM, data warisan);
- * SO lain dibatalkan dengan sisa reservasi 3 (YATIM); reservasi Material Issue 7 (tak boleh disentuh).
+ * Data uji: stok 60; SO 40 berjalan; DO A (Siap Kirim, kunci stok 5 dari alur DO — SAH); DO B sudah Dikirim tetapi reservasi 12 tak pernah
+ * dilepas (YATIM, dibuat LANGSUNG meniru data warisan); SO lain dibatalkan dengan sisa reservasi 3 (YATIM); reservasi Material Issue 7 (tak boleh disentuh).
  *
- * Sejak Tahap 3 alur DO tidak lagi menghasilkan reservasi DO, sehingga baris reservasi warisan dibuat LANGSUNG (bukan lewat alur DO).
- * DO A (5) dan DO B (12) sudah memotong stok fisik saat dibuat: 60 − 17 = 43.
+ * Hanya DO B yang sudah berangkat dan memotong stok fisik: 60 − 12 = 48. DO A baru mengunci.
  */
 function reconScenario(): array
 {
@@ -70,8 +69,7 @@ function reconScenario(): array
 
     $valid = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
     $leaky = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
-    $leaky->update(['status' => 'sent']);            // sudah dikirim
-    reconDoReservation($ctx, $so, $item, $valid, 5);  // reservasi SAH (DO belum berakhir)
+    $leaky->update(['status' => 'sent']);            // sudah dikirim (stok fisik −12, kuncinya dikonsumsi)
     reconDoReservation($ctx, $so, $item, $leaky, 12); // reservasi tak pernah dilepas setelah Dikirim (YATIM)
 
     [$canceledSo] = stkSaleOrder($ctx, 3, ['status' => 'canceled']);
@@ -111,8 +109,8 @@ it('--apply menghapus HANYA yatim, menurunkan qty_reserved tepat sebesar itu, me
 
     expect(Artisan::output())->toContain('[APPLY]')->toContain('Dihapus: 2 reservasi yatim');
 
-    // 27 − 15 = 12: reservasi DO A (5) + Material Issue (7); fisik 43 (60 − DO A 5 − DO B 12)
-    expect(stkStock($s['ctx']['product'], $s['ctx']['warehouse']))->toBe(['available' => 43.0, 'reserved' => 12.0, 'free' => 31.0])
+    // 27 − 15 = 12: kunci DO A (5) + Material Issue (7); fisik 48 (60 − DO B 12 yang sudah dikirim)
+    expect(stkStock($s['ctx']['product'], $s['ctx']['warehouse']))->toBe(['available' => 48.0, 'reserved' => 12.0, 'free' => 36.0])
         ->and(StockReservation::where('delivery_order_id', $s['valid']->id)->count())->toBe(1)
         ->and(StockReservation::where('material_issue_id', $s['materialIssue']->id)->count())->toBe(1)
         ->and(StockReservation::where('delivery_order_id', $s['leaky']->id)->count())->toBe(0)
@@ -121,7 +119,7 @@ it('--apply menghapus HANYA yatim, menurunkan qty_reserved tepat sebesar itu, me
 
     $backup = reconCsv($dir, 'stock-reservation-backup');
     expect($backup)->toHaveCount(2)
-        ->and((float) $backup[0]['stok_fisik_sebelum'])->toBe(43.0)
+        ->and((float) $backup[0]['stok_fisik_sebelum'])->toBe(48.0)
         ->and((float) $backup[0]['qty_reserved_sebelum'])->toBe(27.0);
 
     File::deleteDirectory($dir);

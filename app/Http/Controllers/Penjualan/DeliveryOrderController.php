@@ -262,7 +262,7 @@ class DeliveryOrderController extends Controller
                 ->with('error', 'Kuantitas kirim harus lebih besar dari 0 pada minimal satu gudang.');
         }
 
-        // Tunda pemotongan stok otomatis di observer selama pembuatan & splitting
+        // Tunda efek stok otomatis (kunci stok) di observer selama pembuatan & splitting
         DeliveryOrderObserver::$deferStockDeduction = true;
 
         try {
@@ -331,7 +331,7 @@ class DeliveryOrderController extends Controller
                 // Jalankan pemecahan DO otomatis per gudang
                 $orders = $this->deliveryOrderSplitter->splitByWarehouse($deliveryOrder);
 
-                // Finalisasi tiap DO (potong stok, buat Warehouse Confirmation, dan majukan status)
+                // Finalisasi tiap DO (kunci stok bebas, buat Warehouse Confirmation, dan majukan status)
                 foreach ($orders as $order) {
                     app(DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($order, force: true);
                     $this->deliveryOrderService->createWarehouseConfirmationsForDeliveryOrder($order);

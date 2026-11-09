@@ -60,6 +60,11 @@ class DeliveryOrderItemWarehouseSource extends Model
                         meta: ['delivery_reversal' => true, 'source' => 'warehouse_source_deleted']
                     );
                 }
+
+                // DO belum berangkat: kunci stok di gudang ini ikut dilepas / disusun ulang.
+                if (! \App\Observers\DeliveryOrderObserver::isDispatched($do)) {
+                    app(\App\Observers\DeliveryOrderObserver::class)->reconcileStockMovementsForDeliveryOrder($do);
+                }
             }
         });
     }

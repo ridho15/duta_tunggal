@@ -93,14 +93,14 @@ class DeliveryOrderItem extends Model
             if ($deliveryOrderItem->isDirty('quantity')) {
                 $deliveryOrder = $deliveryOrderItem->deliveryOrder;
 
-                // Tahap 3: stok fisik sudah terpotong sejak DO dibuat, jadi edit kuantitas (mis. checker) TIDAK boleh membuat
-                // reservasi level-DO lagi (penahanan ganda). Reservasi level-SO disusun ulang di bawah (setelah stok disesuaikan).
+                // DO belum berangkat: kunci stok DO disusun ulang mengikuti kuantitas baru (mis. checker menurunkan qty);
+                // sudah berangkat: stok fisik disesuaikan selisihnya. Reservasi level-SO disusun ulang di bawah.
 
                 if ($deliveryOrder && ! in_array($deliveryOrder->status, ['closed', 'reject'], true)) {
                     // Sync journal entries if they exist
                     self::syncJournalEntries($deliveryOrder);
                     
-                    // Sesuaikan stok fisik dengan kuantitas/sumber gudang terbaru (selisih saja, tanpa menghapus gerakan lama)
+                    // Sesuaikan kunci stok / stok fisik dengan kuantitas & sumber gudang terbaru
                     app(\App\Observers\DeliveryOrderObserver::class)->reconcileStockMovementsForDeliveryOrder($deliveryOrder);
                     
                     // Update delivered_quantity for sale order items
@@ -114,7 +114,7 @@ class DeliveryOrderItem extends Model
 
         static::created(function ($deliveryOrderItem) {
             $deliveryOrder = $deliveryOrderItem->deliveryOrder;
-            // Tahap 3: Potong stok langsung untuk DO single warehouse
+            // DO single warehouse: kunci stok (atau potong bila DO sudah berangkat) untuk item baru
             if ($deliveryOrder && ! in_array($deliveryOrder->status, ['closed', 'reject'], true) && ($deliveryOrder->warehouse_id || $deliveryOrderItem->warehouse_id)) {
                 app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($deliveryOrder);
             }

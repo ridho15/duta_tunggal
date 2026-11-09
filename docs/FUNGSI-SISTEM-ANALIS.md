@@ -123,12 +123,13 @@ Status di aplikasi per 2026-11-08, ditambah hasil cek kode 2026-11-09.
 | # | Item | Status app | Temuan di kode |
 |---|---|---|---|
 | 1 | DO macet, tak ada aksi konfirmasi | **FIXED** | `POST /penjualan/do/{id}/confirm-stock` ada. |
-| 2 | **Stok dipotong saat DO dibuat, bukan dikunci** | **OPEN** | Disengaja ("Tahap 3"): `app/Observers/DeliveryOrderObserver.php` (`createStockMovementsForDeliveryOrder`), `app/Services/SaleOrderReservationSynchronizer.php`, `app/Services/StockAvailability.php`. Label di `resources/views/penjualan/do/create.blade.php` berbunyi "dikunci" padahal memotong. Perbaikan = perubahan desain (reservasi via `qty_reserved`, potong saat kirim) **plus migrasi data** untuk DO lama. |
-| 3 | Berat halaman Buat SO | **HALF** | Produk sudah AJAX. Customer masih dimuat semua (dengan relasi `deposit`) di `SaleOrderController::create` dan ditanam dua kali di `so/create.blade.php` (`:options` dan `customersData`). Terukur 11,4 MB / 4.712 ms vs Buat PO 0,6 MB / 577 ms. Solusi: tiru pola pencarian produk untuk customer. |
-| 4 | Gudang GRN tidak mewarisi PO | **HALF** di app | Kode (commit 4 Nov) sudah: pre-fill dari PO, `warehouse_override_reason`, tampilan "Gudang Tujuan PO" / "Gudang Terima" di detail & PDF. **Belum ada** tombol "Pindah ke Gudang Tujuan PO". Kemungkinan app belum di-deploy ulang — verifikasi ulang. |
+| 2 | Stok dipotong saat DO dibuat, bukan dikunci | **FIXED di kode (09 Nov)** | DO yang belum berangkat kini hanya **mengunci** stok (reservasi DO → kolom Terpesan); stok fisik berkurang saat DO **Dikirim** (termasuk lewat terbitnya Surat Jalan). Titik keputusan: `DeliveryOrderObserver::createStockMovementsForDeliveryOrder` → `lockStockForDeliveryOrder` / `deductShippedStock`. Retur by DO sebelum berangkat mencatat "keluar lalu kembali" agar stok tidak menggelembung. **Data lama wajib dikonversi sekali**: `php artisan stock:convert-open-do-deductions` (dry-run) lalu `--apply`. |
+| 3 | Berat halaman Buat SO | **FIXED di kode (09 Nov)** | Customer dicari lewat AJAX (`/penjualan/so/customers/search`), master customer tidak lagi ikut di payload. Ukur lokal 18.000 customer: 10.821 KB → 125 KB. |
+| 4 | Gudang GRN tidak mewarisi PO | **FIXED di kode** | Pre-fill dari tujuan PO, peringatan + alasan wajib (sudah ada sejak 4 Nov, terverifikasi di browser lokal untuk dua jalur masuk). Tombol **"Pindah ke Gudang Tujuan PO"** di detail GRN (status selesai) mengisi awal Pindah Stok. Bila di app masih kosong: cek PO-nya punya gudang tujuan, dan app sudah di-deploy ulang. |
 
-**Item 2 adalah defect paling bernilai**: stok fisik di sistem lebih kecil sebesar qty
-setiap DO yang belum dikirim, sehingga opname akan menunjukkan selisih palsu.
+Sebelum perbaikan item 2, stok fisik di sistem lebih kecil sebesar qty setiap DO yang belum
+dikirim, sehingga opname menunjukkan selisih palsu. Setelah deploy, **jalankan konversi data**
+sebelum opname berikutnya.
 
 ### Aturan bisnis yang belum (sepenuhnya) dibangun
 

@@ -12,9 +12,9 @@ use Illuminate\Support\Facades\DB;
  *
  * Per item SO:
  *   kebutuhan = qty − terkirim (Σ DO sent/received/completed)               ← SaleOrderDeliveryProgress::remaining
- *   di luar gudang oleh DO terbuka = max(Σ kuantitas DO terbuka (in_process), Σ reservasi baris DO)
- *       — sejak Tahap 3 stok fisik terpotong begitu DO dibuat, jadi kuantitas DO terbuka SUDAH keluar dari gudang dan tidak
- *       boleh ditahan lagi lewat reservasi SO (jika tidak, stok ditahan dua kali dan stok bebas semu nol)
+ *   ditahan oleh DO terbuka = max(Σ kuantitas DO terbuka (in_process), Σ reservasi baris DO)
+ *       — DO terbuka sudah MENGUNCI stoknya sendiri (reservasi level-DO) begitu dibuat, jadi kuantitas itu tidak boleh ditahan
+ *       lagi lewat reservasi SO (jika tidak, stok ditahan dua kali dan stok bebas semu nol)
  *   target SO  = kebutuhan − di luar gudang oleh DO terbuka                 ← total tertahan per item ≤ kebutuhan
  * Reservasi SO ditempatkan: alokasi gudang item → gudang item → (D22) gudang cabang dengan stok bebas terbesar, dan DIBATASI stok bebas
  * yang ada (D21: parsial bila stok kurang; kekurangan = backorder, diisi ulang FIFO saat stok masuk — `sales:top-up-reservations`).

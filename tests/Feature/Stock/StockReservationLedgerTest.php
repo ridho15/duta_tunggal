@@ -187,10 +187,10 @@ it('[ledger] DO ditutup, ditolak, atau dihapus mengembalikan stok fisiknya; SO d
     // SO menahan 40 (fisik 60, bebas 20)
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
 
-    // Tahap 3: DO memotong stok fisik saat dibuat dan tidak menahan reservasi DO; tutup/tolak/hapus MENGEMBALIKAN stok fisik
+    // DO mengunci stoknya saat dibuat (stok fisik tetap); tutup/tolak/hapus MELEPAS kuncinya
     $closed = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
-    expect(stkReserved(null, $closed))->toBe(0.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 55.0, 'reserved' => 35.0, 'free' => 20.0]);   // SO menahan sisa 35
+    expect(stkReserved(null, $closed))->toBe(5.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);   // DO 5 + SO sisa 35
 
     $closed->update(['status' => 'closed']);
 
@@ -201,7 +201,7 @@ it('[ledger] DO ditutup, ditolak, atau dihapus mengembalikan stok fisiknya; SO d
     $rejected = stkDeliveryOrder($ctx, $so, $item, 5, 'approved');
     $rejected->update(['status' => 'reject']);
 
-    // Ditolak: stok fisik kembali, tidak ada reservasi DO, dan SO tetap menahan stoknya (DO ditolak memegang kuantitas SO
+    // Ditolak: kunci DO dilepas, dan SO tetap menahan stoknya (DO ditolak memegang kuantitas SO
     // karena dapat diajukan ulang, tetapi barangnya tidak di luar gudang) → SO menahan 40, bukan 35.
     expect(stkReserved(null, $rejected))->toBe(0.0)
         ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
@@ -217,19 +217,20 @@ it('[ledger] DO ditutup, ditolak, atau dihapus mengembalikan stok fisiknya; SO d
         ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0]);
 
     $kept = stkDeliveryOrder($ctx, $so, $item, 7, 'approved');
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 53.0, 'reserved' => 33.0, 'free' => 20.0]);
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 60.0, 'reserved' => 40.0, 'free' => 20.0])   // DO 7 + SO 33
+        ->and(stkReserved(null, $kept))->toBe(7.0);
 
-    // SO dibatalkan: reservasi SO dilepas seluruhnya (DO yang sudah memotong stok tetap di luar gudang) dan tercatat di event
+    // SO dibatalkan: reservasi level-SO dilepas seluruhnya dan tercatat di event; kunci DO yang masih terbuka mengikuti DO-nya
     $so->update(['status' => 'canceled']);
 
-    expect(stkReserved($so))->toBe(0.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 53.0, 'reserved' => 0.0, 'free' => 53.0])
+    expect(stkReserved($so) - stkReserved(null, $kept))->toBe(0.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(60.0)
         ->and(StockReservationEvent::where('reason', 'like', '%dibatalkan%')->count())->toBeGreaterThanOrEqual(1);
 
     $kept->refresh();
 });
 
-it('[ledger] mengubah kuantitas item DO saat Siap Kirim (edit checker) menyesuaikan stok fisik, bukan membuat reservasi DO', function () {
+it('[ledger] mengubah kuantitas item DO saat Siap Kirim (edit checker) menyesuaikan kunci DO, bukan stok fisik', function () {
     ledgerOn();
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -237,20 +238,21 @@ it('[ledger] mengubah kuantitas item DO saat Siap Kirim (edit checker) menyesuai
     $do = stkDeliveryOrder($ctx, $so, $item, 12, 'approved');
     $doItem = $do->deliveryOrderItem->first();
 
-    // Tahap 3: stok fisik terpotong sejak DO dibuat, jadi reservasi DO tidak pernah tertahan (menahan lagi = penahanan ganda)
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0]);
+    // DO belum berangkat: 12 dikunci, stok fisik utuh
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 12.0, 'free' => 18.0]);
 
     $doItem->update(['quantity' => 8]);
-    expect(stkReserved(null, $do))->toBe(0.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 22.0, 'reserved' => 0.0, 'free' => 22.0]);   // 4 pcs kembali
+    expect(stkReserved(null, $do))->toBe(8.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 8.0, 'free' => 22.0])   // 4 pcs kembali bebas
+        ->and(\App\Models\StockMovement::count())->toBe(0);
 
     $doItem->update(['quantity' => 12]);
-    expect(stkReserved(null, $do))->toBe(0.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0]);   // terpotong lagi
+    expect(stkReserved(null, $do))->toBe(12.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 12.0, 'free' => 18.0]);   // dikunci lagi
 });
 
 
-it('DO dengan dua gudang sumber memotong stok per gudang; kuantitas item yang turun mengembalikan sumber TERAKHIR lebih dulu', function () {
+it('DO dengan dua gudang sumber mengunci stok per gudang; kuantitas item yang turun melepas sumber TERAKHIR lebih dulu', function () {
     $ctx = stkContext();
     $second = stkWarehouse($ctx);
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -263,15 +265,20 @@ it('DO dengan dua gudang sumber memotong stok per gudang; kuantitas item yang tu
     $doItem->warehouseSources->first()->update(['quantity' => 10]);
     \App\Models\DeliveryOrderItemWarehouseSource::create(['delivery_order_item_id' => $doItem->id, 'warehouse_id' => $second->id, 'quantity' => 6]);
 
-    // Tahap 3: 10 dari gudang utama + 6 dari gudang kedua terpotong; tidak ada reservasi DO
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(20.0)
-        ->and(stkStock($ctx['product'], $second)['available'])->toBe(24.0)
-        ->and(stkReserved(null, $do))->toBe(0.0);
+    // 10 di gudang utama + 6 di gudang kedua dikunci; stok fisik kedua gudang utuh
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 10.0, 'free' => 20.0])
+        ->and(stkStock($ctx['product'], $second))->toBe(['available' => 30.0, 'reserved' => 6.0, 'free' => 24.0])
+        ->and(stkReserved(null, $do))->toBe(16.0);
 
     // Qty item turun 16 → 12: sumber TERAKHIR (gudang kedua) berkurang lebih dulu (6 → 2), gudang utama tetap 10
     $doItem->fresh()->update(['quantity' => 12]);
 
-    expect(stkStock($ctx['product'], $ctx['warehouse'])['available'])->toBe(20.0)
-        ->and(stkStock($ctx['product'], $second)['available'])->toBe(28.0)
-        ->and(stkReserved(null, $do))->toBe(0.0);
+    expect(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(10.0)
+        ->and(stkStock($ctx['product'], $second)['reserved'])->toBe(2.0)
+        ->and(stkReserved(null, $do))->toBe(12.0);
+
+    // Berangkat: stok fisik dipotong per gudang sumber, kunci dikonsumsi
+    $do->fresh()->update(['status' => 'sent']);
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 20.0, 'reserved' => 0.0, 'free' => 20.0])
+        ->and(stkStock($ctx['product'], $second))->toBe(['available' => 28.0, 'reserved' => 0.0, 'free' => 28.0]);
 });

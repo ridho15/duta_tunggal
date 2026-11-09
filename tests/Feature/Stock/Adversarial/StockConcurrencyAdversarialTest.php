@@ -62,17 +62,24 @@ it('CC-02: eksekusi persetujuan berulang (idempotensi) tidak menggandakan pemoto
 
     $do = stkDeliveryOrder($ctx, $so, $soItem, 8, 'approved');
 
-    // Tahap 3: stok fisik terpotong sekali saat DO dibuat (20 → 12); tidak ada reservasi DO
-    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 12.0, 'reserved' => 0.0, 'free' => 12.0])
-        ->and(stkReserved(null, $do))->toBe(0.0)
-        ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(1);
+    // Stok dikunci sekali saat DO dibuat (8); stok fisik tetap 20, belum ada gerakan keluar
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 20.0, 'reserved' => 8.0, 'free' => 12.0])
+        ->and(stkReserved(null, $do))->toBe(8.0)
+        ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(0);
 
     // Panggil update status 'approved' sekali lagi (simulasi klik ganda)
     $do->update(['status' => 'approved']);
+    app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($do->fresh());
 
-    // Potongan tetap tepat 8 (stok 12, satu gerakan), tidak menjadi 16 dan tidak ada reservasi
+    // Kunci tetap tepat 8, tidak menjadi 16
+    expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 20.0, 'reserved' => 8.0, 'free' => 12.0])
+        ->and(stkReserved(null, $do->fresh()))->toBe(8.0)
+        ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(0);
+
+    // Dikirim dua kali (klik ganda) tetap memotong tepat 8
+    $do->fresh()->update(['status' => 'sent']);
+    app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($do->fresh());
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 12.0, 'reserved' => 0.0, 'free' => 12.0])
-        ->and(stkReserved(null, $do->fresh()))->toBe(0.0)
         ->and(\App\Models\StockMovement::where('type', 'sales')->count())->toBe(1);
 });
 
