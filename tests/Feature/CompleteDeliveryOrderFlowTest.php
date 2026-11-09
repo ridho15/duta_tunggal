@@ -205,18 +205,18 @@ class CompleteDeliveryOrderFlowTest extends TestCase
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'approved');
         $this->assertEquals('approved', $deliveryOrder->fresh()->status);
 
-        // Tahap 3 (Brief Ko Handy): stok fisik sudah terpotong sejak DO dibuat, jadi tidak ada reservasi DO yang tertahan.
-        $this->assertCount(0, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get(), 'Tidak ada reservasi DO: stok fisik sudah terpotong saat DO dibuat');
+        // Stok bebas terkunci sejak DO dibuat (reservasi DO); stok fisik baru dipotong saat DO dikirim.
+        $this->assertCount(1, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get(), 'DO mengunci stoknya (reservasi DO)');
 
         $movementsBeforeSent = StockMovement::where('type', 'sales')
             ->where('from_model_type', DeliveryOrderItem::class)
             ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
             ->get();
-        $this->assertCount(1, $movementsBeforeSent, 'StockMovement dibuat saat DO dibuat');
-        $this->assertEquals(10, $movementsBeforeSent->first()->quantity);
+        $this->assertCount(0, $movementsBeforeSent, 'Belum ada mutasi keluar sebelum DO dikirim');
+        $this->assertEquals(20, (float) InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouse->id)->sum('qty_available'), 'stok fisik utuh sebelum dikirim');
 
         // ==========================================
-        // STEP 7: SEND DELIVERY ORDER (idempoten: tidak memotong stok lagi)
+        // STEP 7: SEND DELIVERY ORDER (stok fisik dipotong di sini, sekali)
         // ==========================================
 
         $this->deliveryOrderService->updateStatus($deliveryOrder, 'sent');
@@ -226,7 +226,9 @@ class CompleteDeliveryOrderFlowTest extends TestCase
             ->where('from_model_type', DeliveryOrderItem::class)
             ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
             ->get();
-        $this->assertCount(1, $stockMovementsAtSent, 'Dikirim tidak memotong stok dua kali');
+        $this->assertCount(1, $stockMovementsAtSent, 'Dikirim memotong stok tepat sekali');
+        $this->assertEquals(10, $stockMovementsAtSent->first()->quantity);
+        $this->assertCount(0, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get(), 'Kunci DO dikonsumsi saat dikirim');
         $this->assertEquals(10, (float) InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->warehouse->id)->sum('qty_available'), 'stok akhir 10 (20 - 10)');
 
         // ==========================================

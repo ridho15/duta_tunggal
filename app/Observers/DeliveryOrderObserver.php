@@ -154,8 +154,8 @@ class DeliveryOrderObserver
             'do_number' => $deliveryOrder->do_number,
         ]);
 
-        // Barang berangkat: potong stok fisik (idempoten)
-        $this->deductShippedStock($deliveryOrder);
+        // Barang berangkat: potong stok fisik (idempoten; status sudah 'sent' sehingga jalur ini memotong, bukan mengunci)
+        $this->createStockMovementsForDeliveryOrder($deliveryOrder);
 
         // Catat jurnal pengiriman (Dr Barang Terkirim / Cr Persediaan) saat barang berangkat
         $this->createJournalEntriesForDelivery($deliveryOrder);
@@ -505,7 +505,7 @@ class DeliveryOrderObserver
         ]);
 
         // approved → completed langsung (tanpa sent): barang berangkat di sini. Idempoten bila sudah dipotong saat sent.
-        $this->deductShippedStock($deliveryOrder);
+        $this->createStockMovementsForDeliveryOrder($deliveryOrder);
 
         $this->createJournalEntriesForDelivery($deliveryOrder);
 

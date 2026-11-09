@@ -141,15 +141,24 @@ class DeliveryScheduleInventoryFixTest extends TestCase
             ->get();
     }
 
-    public function test_stock_movement_created_when_do_item_created()
+    public function test_stock_locked_when_do_item_created_and_deducted_when_sent()
     {
         [$do, $item, $stock] = $this->makeDeliveryOrderWithItem('TEST001', 300, 300);
 
+        // Item DO dibuat: stok dikunci, belum ada mutasi keluar
+        $this->assertCount(0, $this->salesMovements($item), 'Belum ada mutasi keluar sebelum DO dikirim');
+        $this->assertEquals(300, (float) $stock->fresh()->qty_available);
+        $this->assertEquals(300, (float) $stock->fresh()->qty_reserved);
+
+        $this->deliveryOrderService->updateStatus($do, 'approved');
+        $this->deliveryOrderService->updateStatus($do, 'sent');
+
         $movements = $this->salesMovements($item);
-        $this->assertCount(1, $movements, 'Satu mutasi keluar dibuat saat item DO dibuat');
+        $this->assertCount(1, $movements, 'Satu mutasi keluar dibuat saat DO dikirim');
         $this->assertEquals(300, $movements->first()->quantity);
         $this->assertEquals($this->warehouse->id, $movements->first()->warehouse_id);
         $this->assertEquals(0, (float) $stock->fresh()->qty_available);
+        $this->assertEquals(0, (float) $stock->fresh()->qty_reserved);
     }
 
     public function test_status_transitions_do_not_duplicate_stock_movement_or_reservation()
@@ -158,7 +167,8 @@ class DeliveryScheduleInventoryFixTest extends TestCase
 
         $this->deliveryOrderService->updateStatus($do, 'request_approve');
         $this->deliveryOrderService->updateStatus($do, 'approved');
-        $this->assertCount(0, StockReservation::where('delivery_order_id', $do->id)->get(), 'DO tidak menahan reservasi (stok sudah dipotong)');
+        $this->assertEquals(100, (float) StockReservation::where('delivery_order_id', $do->id)->sum('quantity'), 'DO mengunci stoknya satu kali, tidak ganda');
+        $this->assertCount(0, $this->salesMovements($item), 'Belum ada mutasi keluar sebelum dikirim');
 
         $this->deliveryOrderService->updateStatus($do, 'sent');
 
