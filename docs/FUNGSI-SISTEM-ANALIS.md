@@ -1,0 +1,233 @@
+# Fungsi Sistem — Catatan System Analyst
+
+> Disarikan dari handoff system analyst / UAT (terakhir diverifikasi di aplikasi 2026-11-08),
+> lalu dicocokkan dengan kode di repo ini (2026-11-09). Fokus dokumen ini adalah **fungsi
+> sistem**: alur bisnis, aturan, rute, status celah fungsional, dan cara menguji.
+>
+> Istilah domain, label UI, dan status sengaja ditulis dalam bahasa Indonesia apa adanya
+> agar sama dengan yang tampil di layar.
+
+Dokumen terkait: `docs/baru/Alur_Bisnis_Ko_Handy.md` (aturan bisnis lengkap),
+`docs/baru/List_Pengerjaan_Developer.md` (register bug & celah),
+`docs/UAT-LAPORAN-04NOV2026.md` (hasil UAT terakhir).
+
+---
+
+## 1. Gambaran Singkat
+
+- Laravel 12 · Blade + Alpine.js. Awalnya Filament v3, **dibangun ulang ±2026-10-26**
+  mengikuti spesifikasi UI/UX; rute pindah dari `/admin/*` ke root. Panduan lama yang
+  spesifik Filament (termasuk sebagian `docs/CONTEXT.md` dan `docs/baru/UIUX_Spec_*`)
+  sudah usang.
+- Skala data produksi yang memengaruhi performa: **±30 ribu SKU** dan **±18 ribu customer**.
+  Halaman yang menanam seluruh master data di HTML akan berat.
+- Master produk banyak duplikat (`CAB-<sku>`, `<sku>-DUP2-R#####`) dengan kategori tidak
+  konsisten. Stok satu barang fisik bisa terpecah di beberapa record produk — jangan
+  menyimpulkan "stok benar" dari satu SKU saja.
+
+---
+
+## 2. Peta Rute
+
+```
+/dashboard · /kasir
+Penjualan : /penjualan/{penawaran,so,do,surat-jalan,jadwal-kirim,invoice,
+                        terima-pembayaran,retur,nota-kredit}
+Gudang    : /gudang/{kiriman,penerimaan,stok,transfer,opname}
+Pembelian : /pembelian/{permintaan,po,invoice,pembayaran,retur}
+Keuangan  : /keuangan/{kas-bank,jurnal,aset}
+Manufaktur: /manufaktur/{bom,spk,material-issue,production,qc}
+Master    : /master/{produk,customer,supplier,cabang,gudang,kategori,satuan,
+                     kendaraan,mata-uang,pajak,coa}
+Laporan   : /laporan/keuangan  ·  /reports/*/preview (neraca, laba rugi, arus kas, HPP, ageing, …)
+Kartu stok: /gudang/stok/kartu-persediaan        (konsolidasi; ?start_date&end_date&warehouse_id)
+            /gudang/stok/{productId}/kartu        (per produk — WAJIB ?start_date=&end_date=)
+```
+
+Catatan perilaku rute:
+
+- `/penjualan/do/create` memberi 404 tanpa `?so_id=` — DO memang selalu dibuat dari SO.
+- Aksi DO: `POST /penjualan/do/{id}/confirm-stock`, `/send`, `/cancel`.
+- Pencarian produk AJAX: `/penjualan/so/products/search` (pola yang benar untuk master besar).
+- Kartu stok per produk tampil kosong bila tanggal tidak diisi — terlihat seperti bug padahal bukan.
+
+---
+
+## 3. Prinsip Utama
+
+**Sangat mudah dipakai. Produk tidak pernah diketik ulang.** Setiap dokumen mewarisi
+barisnya dari dokumen sebelumnya. Bila kode dan aturan di bawah ini berbeda, **kodenya
+yang salah**.
+
+---
+
+## 4. Alur Penjualan (customer kredit)
+
+```
+SO → Approve SO → DO (per gudang) → Konfirmasi Stok → Checker/Kirim
+   → [Retur by DO bila ada selisih] → Surat Jalan → Invoice → Terima Pembayaran
+```
+
+| Tahap | Aturan |
+|---|---|
+| **SO** | Customer, produk, qty, harga, diskon, **ongkos kirim**. Gudang **tidak** dipilih di sini. |
+| **Approve SO** | Oleh **kasir atau setara**, bukan Super Admin. Lolos hanya bila setiap baris **≥ harga batas bawah di master produk** (termasuk setelah diskon cabang) **dan** customer masih **dalam limit kredit**. Gagal salah satu → eskalasi ke atasan. COD: kasir memverifikasi deposit benar-benar masuk sebelum DO boleh terbit. |
+| **DO** | Hanya dari SO yang sudah disetujui. **Gudang dipilih di sini.** Per produk tampilkan semua gudang dengan stok bebas > 0, user mengisi qty per gudang. Qty ≤ sisa SO; qty per gudang ≤ stok bebas gudang itu. DO terpecah otomatis per gudang (`-01`, `-02`). **Stok bebas dikunci (bukan dipotong) saat DO dibuat.** |
+| **Retur by DO** (sebelum SJ) | Dicatat toko/checker: qty diterima / kurang / reject. Penomoran `DO.000x` → retur `DO.000xR` → pengganti `DO.000xC`. DO asal ditandai "sudah diretur"; **hanya `DO.000xC` yang boleh jadi SJ**. Saat disetujui: posting ke **Penyesuaian Stok** (ref `DO.000xR`) dan **stok kembali** ke gudang asal. Reject masuk karantina, bukan stok jual. Jenis mutasi sendiri "Retur DO", beda dengan Retur Penjualan setelah invoice. |
+| **Surat Jalan** | Pilih **Customer > SO > centang DO**. Tanpa input produk. Satu SJ boleh menggabungkan beberapa DO **dari SO yang sama**, termasuk lintas gudang. DO yang sudah dipakai disembunyikan. Membuat SJ **otomatis menandai DO diterima** (tanpa langkah Konfirmasi Diterima terpisah). Cetakan menampilkan gudang asal per baris. |
+| **Invoice** | Pilih **Customer > SO > centang SJ** (SO yang sama). Tanpa input produk. Boleh menambah ongkos kirim / biaya lain. **Tidak pernah terbit otomatis dari DO.** Terkunci setelah diposting; koreksi lewat batal/revisi yang tercatat. |
+
+---
+
+## 5. Alur Pembelian
+
+```
+PR → PO (disetujui) → Terima Barang + QC (satu layar) → Invoice Pembelian → Bayar
+```
+
+- QC **bukan** langkah terpisah. Qty baik masuk stok; qty reject **tidak** masuk stok,
+  **tidak** dijurnal, dan otomatis membuat **tepat satu** Retur Pembelian.
+- Rekening bank supplier disimpan di master dan ditampilkan saat pembayaran.
+
+### Terima di gudang selain tujuan PO
+
+Sah dan harus tetap bisa. Gudang GRN adalah **tempat barang benar-benar mendarat**, dan
+itulah yang menggerakkan stok.
+
+1. Gudang GRN **terisi otomatis dari tujuan PO**, tetapi bisa diubah.
+2. Bila diubah: tampilkan peringatan dan **wajib alasan**, disimpan di GRN.
+3. Detail + PDF menampilkan **"Gudang Tujuan PO"** dan **"Gudang Terima"**, ditandai bila beda.
+4. Sediakan tombol **"Pindah ke Gudang Tujuan PO"** yang mengisi awal form Pindah Stok.
+5. **PO tidak pernah diedit.** PO adalah komitmen ke vendor; penyimpangan adalah bukti
+   vendor salah kirim. PO yang sudah disetujui tidak punya tombol Ubah (hanya Draf).
+
+---
+
+## 6. Inventori
+
+- **Stok bebas = fisik − terkunci oleh DO.**
+- Opname harus **blind count** (qty sistem disembunyikan saat menghitung), selisih
+  direview, lalu diposting sebagai Penyesuaian Stok.
+- Gudang lama "Gudang Pusat" masih muncul di DO sebelum Oktober tetapi tidak ada di
+  dropdown mana pun — dokumen tersebut tidak terjangkau dari layar gudang (data legacy yatim).
+
+---
+
+## 7. Status Celah Fungsional
+
+Status di aplikasi per 2026-11-08, ditambah hasil cek kode 2026-11-09.
+**FIXED** sudah berfungsi · **HALF** sebagian · **OPEN** belum ditangani.
+
+### Dampak tinggi
+
+| # | Item | Status app | Temuan di kode |
+|---|---|---|---|
+| 1 | DO macet, tak ada aksi konfirmasi | **FIXED** | `POST /penjualan/do/{id}/confirm-stock` ada. |
+| 2 | **Stok dipotong saat DO dibuat, bukan dikunci** | **OPEN** | Disengaja ("Tahap 3"): `app/Observers/DeliveryOrderObserver.php` (`createStockMovementsForDeliveryOrder`), `app/Services/SaleOrderReservationSynchronizer.php`, `app/Services/StockAvailability.php`. Label di `resources/views/penjualan/do/create.blade.php` berbunyi "dikunci" padahal memotong. Perbaikan = perubahan desain (reservasi via `qty_reserved`, potong saat kirim) **plus migrasi data** untuk DO lama. |
+| 3 | Berat halaman Buat SO | **HALF** | Produk sudah AJAX. Customer masih dimuat semua (dengan relasi `deposit`) di `SaleOrderController::create` dan ditanam dua kali di `so/create.blade.php` (`:options` dan `customersData`). Terukur 11,4 MB / 4.712 ms vs Buat PO 0,6 MB / 577 ms. Solusi: tiru pola pencarian produk untuk customer. |
+| 4 | Gudang GRN tidak mewarisi PO | **HALF** di app | Kode (commit 4 Nov) sudah: pre-fill dari PO, `warehouse_override_reason`, tampilan "Gudang Tujuan PO" / "Gudang Terima" di detail & PDF. **Belum ada** tombol "Pindah ke Gudang Tujuan PO". Kemungkinan app belum di-deploy ulang — verifikasi ulang. |
+
+**Item 2 adalah defect paling bernilai**: stok fisik di sistem lebih kecil sebesar qty
+setiap DO yang belum dikirim, sehingga opname akan menunjukkan selisih palsu.
+
+### Aturan bisnis yang belum (sepenuhnya) dibangun
+
+Verifikasi di app sebelum melapor ulang — sebagian mungkin sudah masuk:
+
+- Ongkos kirim di SO *(kolom `shipping_cost` sudah ada di kode)* · approve oleh kasir
+  dengan gerbang harga batas bawah & limit kredit · batas harga dihitung setelah diskon
+  cabang · COD terikat deposit nyata.
+- Retur by DO: penomoran `R`/`C` *(sufiks `C` ada di `DeliveryOrderReturnProcessor`)*, DO
+  asal ditandai, Penyesuaian Stok + stok kembali saat disetujui, lokasi karantina, jenis
+  mutasi tersendiri.
+- SJ: Customer > SO > centang DO; batasan SO yang sama; SJ otomatis menandai DO diterima;
+  gudang asal di cetakan; SJ wajib sebelum kirim.
+- Invoice: Customer > SO > centang SJ; tidak terbit otomatis dari DO; terkunci setelah posting.
+
+### Temuan lain
+
+- **Valuasi GL vs laporan stok berbeda**: GL membukukan persediaan pada harga PO, laporan
+  stok pada HPP. Perlu keputusan akuntansi, bukan sekadar perbaikan kode.
+- Penyesuaian stok bertambah mengkredit **PENDAPATAN LAINNYA (7000.04)** — perlu konfirmasi akuntan.
+- Data Retur Pembelian duplikat historis masih ada (bug pembuatnya sudah diperbaiki, data lama belum dibersihkan).
+- PO menampilkan `100% (15/15)` tetapi status "Diterima Sebagian".
+- Kolom "Sudah DO" di detail SO bernilai 0 walau DO ada (kolom Sisa benar).
+- Pesan persetujuan retur mengklaim stok dipotong & GL diposting, padahal tidak (perilaku benar, **teks salah**).
+- Daftar opname menampilkan "Tidak Ada Hasil Ditemukan" bersamaan dengan baris data.
+- Opname menampilkan qty sistem ke penghitung (tidak blind) dan memakai snapshot basi.
+- Siapkan & Kirim tidak bisa menampilkan DO yang gudangnya tidak ada di dropdown.
+- Pindah Stok menawarkan stok **fisik**, bukan stok bebas — barang yang sudah dikunci DO bisa dipindah.
+- Duplikasi master data (lihat §1).
+
+### Sudah diperbaiki selama UAT
+
+DO gagal dibuat tanpa pesan · Transfer Stok `Unknown column 'stock'` · SJ 500
+`Unknown column 'order_number'` · item Stock Opname tidak tampil · stack trace / `APP_DEBUG`
+terbuka · retur ganda dari QC reject · escaping JSON di `x-data` form GRN.
+
+### Perilaku yang sudah benar — jadikan uji regresi
+
+- Terima barang: qty diterima masuk stok, qty reject tidak; kartu stok mencatat
+  `Penerimaan Pembelian`; GL Dr Persediaan / Cr Penerimaan Barang Belum Tertagih.
+- Menyetujui retur dari QC reject **tidak** memotong stok dua kali.
+- Membatalkan DO mengembalikan stok dan mencatat alasan di kartu stok.
+- Aritmetika stok konsisten (`fisik − terpesan = bebas`, total cocok, tanpa negatif).
+
+---
+
+## 8. Keputusan yang Menunggu Klien
+
+1. **Harga di bawah batas** — (A) tolak saat simpan, atau (B) simpan lalu eskalasi approval. Mockup memakai B.
+2. **Visibilitas PO per peran** — usulan: user gudang hanya melihat PO tujuan gudangnya.
+   Ini **memblokir kasus salah kirim**: user gudang B tak bisa menerima barang yang mendarat
+   di B. Opsi: (a) "Ajukan terima di gudang saya" dengan approval, atau (b) salah kirim
+   hanya ditangani user senior.
+3. Apakah reject QC mengurangi hutang (AP)?
+4. Penyesuaian stok bertambah ke pendapatan lain — konfirmasi akuntan.
+5. "Permintaan Pembayaran" vs "Pengajuan Voucher" — fungsinya sama? Bila ya, digabung.
+
+---
+
+## 9. Cara Menguji
+
+**Aturan praktis**
+
+- Uji lewat interaksi UI sungguhan. Mengubah properti Alpine `x-data` dari console membuat
+  komponen tidak sinkron dan memunculkan "bug" palsu.
+- Elemen tersembunyi `x-show` tetap muncul di `innerText`; cek `offsetParent !== null`.
+- Laporan kosong belum tentu bug laporan — cek dulu datanya (mis. barang dibukukan ke gudang lain).
+- Ukur, jangan menduga: ukuran payload & waktu muat membuat keluhan "lemot" bisa ditindaklanjuti.
+- Setiap transaksi diverifikasi **tiga cara**: status dokumen, angka stok, dan kartu stok.
+- Data uji ditandai `TEST-<inisial>-<yyyymmdd>`; batal/void boleh, hapus permanen tidak.
+
+**Probe dari console (sesi login)**
+
+```js
+// Sapu rute untuk error server
+for (const r of ROUTES) {
+  const res = await fetch(r), t = await res.text();
+  const err = /SQLSTATE|Unknown column|Exception|Stack trace|Whoops/.test(t);
+  console.log(res.status, r, err ? '‼ERROR' : '');
+}
+
+// Deteksi x-data rusak (JSON tak ter-escape di atribut)
+[...document.querySelectorAll('[x-data]')].filter(e => {
+  try { new Function('return (' + e.getAttribute('x-data') + ')'); return false }
+  catch { return true }
+});
+
+// Berat halaman & latensi
+const t0 = performance.now(); const txt = await fetch(u).then(r => r.text());
+({ ms: Math.round(performance.now() - t0), kb: Math.round(txt.length / 1024) });
+
+// Enumerasi form sebelum mengisi — action form membuktikan aksi ada / tidak
+[...document.querySelectorAll('input,select,textarea')].map(e => `${e.tagName} ${e.name}=${e.value}`);
+[...document.querySelectorAll('form')].map(f => f.getAttribute('action'));
+```
+
+**Titik cek data**
+
+- Baseline stok: `/gudang/stok?status=in_stock` — catat Fisik / Terpesan / Bebas per produk
+  dan per gudang **sebelum** transaksi uji.
+- Kartu stok (sumber kebenaran mutasi):
+  `/gudang/stok/{productId}/kartu?start_date=2026-01-01&end_date=2026-12-31`.
