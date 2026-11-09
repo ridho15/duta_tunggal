@@ -19,7 +19,7 @@ function legacyDeducted(DeliveryOrder $do, array $ctx, float $qty): void
     StockReservation::where('delivery_order_id', $do->id)->get()->each->delete();
     app(\App\Services\ProductService::class)->createStockMovement(
         product_id: $ctx['product']->id, warehouse_id: $ctx['warehouse']->id, quantity: $qty, type: 'sales', date: now()->toDateString(),
-        notes: "Pemotongan stok saat DO {$do->do_number} dibuat", fromModel: $do->deliveryOrderItem->first(), value: 0,
+        notes: "Pemotongan stok saat DO {$do->do_number} dibuat", rak_id: null, fromModel: $do->deliveryOrderItem->first(), value: 0,
         meta: ['do_created_deduction' => true]
     );
 }
