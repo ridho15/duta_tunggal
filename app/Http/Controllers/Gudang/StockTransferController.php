@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Gudang;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\PurchaseReceipt;
 use App\Models\Rak;
 use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
@@ -115,14 +116,58 @@ class StockTransferController extends Controller
     /**
      * Form pembuatan Transfer Stok Baru.
      */
-    public function create()
+    public function create(Request $request)
     {
         $this->authorizeAccess('create stock transfer');
 
-        $warehouses = Warehouse::where('status', 1)->orderBy('name')->get();
+        // "Pindah ke Gudang Tujuan PO" dari detail GRN: isi awal gudang asal (gudang terima), tujuan (gudang PO) dan barangnya.
+        $prefill = $this->prefillFromPurchaseReceipt($request->query('from_purchase_receipt'));
+
+        $warehouses = Warehouse::where('status', 1)
+            ->when($prefill, fn ($q) => $q->orWhereIn('id', [$prefill['from_warehouse_id'], $prefill['to_warehouse_id']]))
+            ->orderBy('name')->get();
         $suggestedNumber = $this->stockTransferService->generateTransferNumber();
 
-        return view('gudang.transfer.create', compact('warehouses', 'suggestedNumber'));
+        return view('gudang.transfer.create', compact('warehouses', 'suggestedNumber', 'prefill'));
+    }
+
+    /**
+     * Barang GRN yang diterima di gudang selain tujuan PO (qty diterima baik, per produk). Bila barang mendarat di beberapa
+     * gudang, yang diambil gudang pertama; sisanya dipindah dengan transfer berikutnya. Null bila GRN tidak menyimpang.
+     */
+    private function prefillFromPurchaseReceipt($receiptId): ?array
+    {
+        if (! $receiptId) {
+            return null;
+        }
+
+        $receipt = PurchaseReceipt::with(['purchaseOrder', 'purchaseReceiptItem'])->find($receiptId);
+        $poWarehouseId = (int) ($receipt?->purchaseOrder?->warehouse_id ?? 0);
+        if (! $receipt || ! $poWarehouseId || $receipt->status !== 'completed') {
+            return null;
+        }
+
+        $misplaced = $receipt->purchaseReceiptItem
+            ->filter(fn ($i) => $i->warehouse_id && (int) $i->warehouse_id !== $poWarehouseId && (float) $i->qty_accepted > 0);
+        if ($misplaced->isEmpty()) {
+            return null;
+        }
+
+        $fromWarehouseId = (int) $misplaced->first()->warehouse_id;
+
+        return [
+            'receipt_number' => $receipt->receipt_number,
+            'from_warehouse_id' => $fromWarehouseId,
+            'to_warehouse_id' => $poWarehouseId,
+            'items' => $misplaced->where('warehouse_id', $fromWarehouseId)
+                ->groupBy('product_id')
+                ->map(fn ($rows, $productId) => [
+                    'product_id' => (int) $productId,
+                    'quantity' => (float) $rows->sum('qty_accepted'),
+                    'from_rak_id' => $rows->first()->rak_id,
+                    'to_rak_id' => null,
+                ])->values()->all(),
+        ];
     }
 
     /**
@@ -472,14 +517,16 @@ class StockTransferController extends Controller
             abort(401);
         }
 
-        if (MenuAccess::isSuper($user) || in_array('GDG', MenuAccess::codesFor($user))) {
-            return;
-        }
-
-        if ($user->can($permission)) {
+        if (self::userMay($user, $permission)) {
             return;
         }
 
         abort(403, 'Anda tidak memiliki hak akses untuk fitur ini.');
+    }
+
+    /** Aturan akses Pindah Stok; dipakai juga untuk menampilkan tombol yang menuju ke sini (mis. dari detail GRN). */
+    public static function userMay($user, string $permission): bool
+    {
+        return $user && (MenuAccess::isSuper($user) || in_array('GDG', MenuAccess::codesFor($user)) || $user->can($permission));
     }
 }

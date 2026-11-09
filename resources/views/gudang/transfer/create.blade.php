@@ -41,6 +41,14 @@
     <form action="{{ route('gudang.transfer.store') }}" method="POST" id="transferForm" class="space-y-6">
         @csrf
 
+        @if (!empty($prefill) && !old('items'))
+            <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
+                <span class="font-bold">Pindah ke Gudang Tujuan PO.</span>
+                Gudang asal, gudang tujuan, dan barang diisi dari penerimaan {{ $prefill['receipt_number'] }}
+                (barang diterima di gudang selain tujuan PO). Periksa kuantitas sebelum menyimpan.
+            </div>
+        @endif
+
         {{-- Section 1: Informasi Dokumen & Lokasi --}}
         <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
             <h2 class="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-3">
@@ -79,7 +87,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Gudang Asal (Sumber Stok) <span class="text-rose-500">*</span>
                     </label>
-                    <x-searchable-select name="from_warehouse_id" id="fromWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="old('from_warehouse_id')" placeholder="-- Pilih Gudang Asal --" :required="true" size="sm" />
+                    <x-searchable-select name="from_warehouse_id" id="fromWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="old('from_warehouse_id', $prefill['from_warehouse_id'] ?? null)" placeholder="-- Pilih Gudang Asal --" :required="true" size="sm" />
                 </div>
 
                 {{-- Gudang Tujuan --}}
@@ -87,7 +95,7 @@
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
                         Gudang Tujuan <span class="text-rose-500">*</span>
                     </label>
-                    <x-searchable-select name="to_warehouse_id" id="toWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="old('to_warehouse_id')" placeholder="-- Pilih Gudang Tujuan --" :required="true" size="sm" />
+                    <x-searchable-select name="to_warehouse_id" id="toWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="old('to_warehouse_id', $prefill['to_warehouse_id'] ?? null)" placeholder="-- Pilih Gudang Tujuan --" :required="true" size="sm" />
                 </div>
             </div>
         </div>
@@ -667,11 +675,18 @@
     document.getElementById('fromWarehouseSelect').addEventListener('change', onWarehouseChange);
     document.getElementById('toWarehouseSelect').addEventListener('change', onDestinationWarehouseChange);
 
+    // Barang dari GRN yang menyimpang gudang ("Pindah ke Gudang Tujuan PO"); kosong bila form dibuka biasa atau sudah ada input lama.
+    const prefillItems = {{ Js::from(old('items') ? [] : ($prefill['items'] ?? [])) }};
+
     // Init on page load if old warehouse exists
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         const fromWh = document.getElementById('fromWarehouseSelect').value;
         if (fromWh) {
-            onWarehouseChange();
+            await onWarehouseChange();
+            if (prefillItems.length) {
+                document.getElementById('itemsContainer').innerHTML = '';   // ganti baris kosong otomatis
+                prefillItems.forEach(item => addItemRow(item, false));
+            }
         }
         const toWh = document.getElementById('toWarehouseSelect').value;
         if (toWh) {

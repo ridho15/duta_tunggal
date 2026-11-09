@@ -248,6 +248,16 @@
                             <div class="sm:col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
                                 <span class="font-bold">Gudang terima berbeda dari tujuan PO.</span>
                                 Alasan: {{ $receipt->warehouse_override_reason ?: '(tidak dicatat)' }}
+                                @if (! \App\Http\Controllers\Gudang\StockTransferController::userMay(auth()->user(), 'create stock transfer'))
+                                    {{-- tanpa hak Pindah Stok: tidak ada tombol --}}
+                                @elseif ($receipt->status === 'completed')
+                                    <a href="{{ route('gudang.transfer.create', ['from_purchase_receipt' => $receipt->id]) }}"
+                                       class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">
+                                        Pindah ke Gudang Tujuan PO
+                                    </a>
+                                @else
+                                    <span class="mt-1 block text-amber-800">Tombol "Pindah ke Gudang Tujuan PO" tersedia setelah penerimaan dikonfirmasi (stok sudah masuk).</span>
+                                @endif
                             </div>
                         @endif
                     </div>

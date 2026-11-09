@@ -147,3 +147,52 @@ it('gudang tujuan PO yang sudah nonaktif tetap muncul di pilihan form GRN', func
     $this->actingAs($ctx['user'])->get(route('gudang.penerimaan.create', ['po_id' => $po->id]))
         ->assertOk()->assertSee('Gudang Lama')->assertSee('nonaktif');
 });
+
+it('"Pindah ke Gudang Tujuan PO": tombol muncul setelah GRN dikonfirmasi dan form Pindah Stok terisi dari GRN', function () {
+    $ctx = stkContext();
+    $target = stkWarehouse($ctx, 'Gudang Tujuan');
+    $other = stkWarehouse($ctx, 'Gudang Titipan');
+    $po = grnPo($ctx, $target);
+
+    $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $other->id, ['warehouse_override_reason' => 'Vendor salah kirim']))
+        ->assertSessionHasNoErrors();
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();
+    $transferUrl = route('gudang.transfer.create', ['from_purchase_receipt' => $grn->id]);
+
+    // Tanpa hak Pindah Stok: tidak ada tombol sama sekali.
+    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertDontSee('Pindah ke Gudang Tujuan PO');
+    \Spatie\Permission\Models\Permission::findOrCreate('create stock transfer', 'web');
+    $ctx['user']->givePermissionTo('create stock transfer');
+    $ctx['user']->refresh();
+
+    // Draf: stok belum masuk, tombol belum aktif dan prefill diabaikan.
+    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()
+        ->assertSee('tersedia setelah penerimaan dikonfirmasi')->assertDontSee($transferUrl, false);
+    $this->get($transferUrl)->assertOk()->assertDontSee('Pindah ke Gudang Tujuan PO.');
+
+    $grn->update(['status' => 'completed']);
+
+    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertSee($transferUrl, false);
+
+    $html = $this->get($transferUrl)->assertOk()->assertSee('Pindah ke Gudang Tujuan PO.')->assertSee($grn->receipt_number)->getContent();
+    expect($html)->toContain('value="'.$other->id.'"')                 // gudang asal = gudang terima
+        ->and($html)->toContain('value="'.$target->id.'"')            // gudang tujuan = tujuan PO
+        ->and($html)->toContain((string) \Illuminate\Support\Js::from([
+            ['product_id' => $ctx['product']->id, 'quantity' => 10.0, 'from_rak_id' => null, 'to_rak_id' => null],
+        ]));
+});
+
+it('"Pindah ke Gudang Tujuan PO": GRN yang tidak menyimpang tidak mengisi form', function () {
+    $ctx = stkContext();
+    $target = stkWarehouse($ctx, 'Gudang Tujuan');
+    $po = grnPo($ctx, $target);
+    $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id))->assertSessionHasNoErrors();
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();
+    $grn->update(['status' => 'completed']);
+    \Spatie\Permission\Models\Permission::findOrCreate('create stock transfer', 'web');
+    $ctx['user']->givePermissionTo('create stock transfer');
+
+    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertDontSee('Pindah ke Gudang Tujuan PO');
+    $this->get(route('gudang.transfer.create', ['from_purchase_receipt' => $grn->id]))->assertOk()
+        ->assertDontSee('Pindah ke Gudang Tujuan PO.');
+});
