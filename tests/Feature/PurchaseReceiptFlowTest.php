@@ -52,7 +52,8 @@ class PurchaseReceiptFlowTest extends TestCase
         ]);
         $this->supplier = Supplier::factory()->create();
         $this->warehouse = Warehouse::factory()->create();
-        $this->product = Product::factory()->create();
+        // HPP 0 → persediaan dinilai harga PO (cadangan InventoryValuation); penilaian berbasis HPP diuji di InventoryValuationHppTest.
+        $this->product = Product::factory()->create(['cost_price' => 0]);
         $this->currency = Currency::factory()->create();
 
         // Set up product COA relationships for testing
