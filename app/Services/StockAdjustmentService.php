@@ -216,6 +216,7 @@ class StockAdjustmentService
         );
 
         $entriesByInventoryCoa = [];
+        $entriesByCogsCoa = [];
         $totalValue = 0.0;
 
         foreach ($stockAdjustment->items as $item) {
@@ -247,8 +248,19 @@ class StockAdjustmentService
                 ]);
             }
 
+            // Ko Handy 10 Nov 2026 (#4B): selisih opname/penyesuaian berlawanan dengan akun HPP produk (bukan pendapatan/biaya lain-lain).
+            $cogsCoa = $item->product?->resolveCogsCoaOrDefault()
+                ?? $this->findFirstExistingCoa(['5100.10', '5100', '5000']);
+            if (! $cogsCoa) {
+                $prodName = $item->product?->name ?? 'Produk ID ' . $item->product_id;
+                throw ValidationException::withMessages([
+                    'accounting' => "Akun HPP (COA) untuk produk '{$prodName}' tidak ditemukan. Penyesuaian stok tidak dapat disetujui tanpa akun akuntansi yang valid.",
+                ]);
+            }
+
             $coaId = $inventoryCoa->id;
             $entriesByInventoryCoa[$coaId] = ($entriesByInventoryCoa[$coaId] ?? 0.0) + $itemVal;
+            $entriesByCogsCoa[$cogsCoa->id] = ($entriesByCogsCoa[$cogsCoa->id] ?? 0.0) + $itemVal;
             $totalValue += $itemVal;
         }
 
@@ -256,96 +268,30 @@ class StockAdjustmentService
             return;
         }
 
-        if ($stockAdjustment->adjustment_type === 'increase') {
-            // Inventory Increase:
-            // Debit: Inventory COA
-            // Credit: Adjustment Income COA (Selisih Persediaan - Pendapatan Luar Usaha)
-            $incomeCoa = $this->findFirstExistingCoa([
-                config('coa.inventory_variance_gain', '7000.04'),
-                '7000.04',
-                '7000.01',
-                '7000',
-            ]);
-
-            if (! $incomeCoa) {
-                throw ValidationException::withMessages([
-                    'accounting' => 'Akun pendapatan penyesuaian persediaan tidak ditemukan.',
-                ]);
-            }
-
-            foreach ($entriesByInventoryCoa as $invCoaId => $amount) {
-                JournalEntry::create([
-                    'coa_id' => $invCoaId,
-                    'date' => $date,
-                    'reference' => $reference,
-                    'description' => $description,
-                    'debit' => $amount,
-                    'credit' => 0,
-                    'journal_type' => 'stock_adjustment',
-                    'cabang_id' => $cabangId,
-                    'source_type' => StockAdjustment::class,
-                    'source_id' => $stockAdjustment->id,
-                ]);
-            }
-
+        // Ko Handy 10 Nov 2026 (#4B): hasil opname/penyesuaian berdampak ke COA Persediaan dan COA HPP.
+        //   Lebih  : Dr Persediaan (+) / Cr HPP (−)
+        //   Kurang : Dr HPP (+)        / Cr Persediaan (−)
+        $isIncrease = $stockAdjustment->adjustment_type === 'increase';
+        $line = function (int $coaId, float $amount, bool $debit) use ($date, $reference, $description, $cabangId, $stockAdjustment) {
             JournalEntry::create([
-                'coa_id' => $incomeCoa->id,
+                'coa_id' => $coaId,
                 'date' => $date,
                 'reference' => $reference,
                 'description' => $description,
-                'debit' => 0,
-                'credit' => $totalValue,
+                'debit' => $debit ? round($amount, 2) : 0,
+                'credit' => $debit ? 0 : round($amount, 2),
                 'journal_type' => 'stock_adjustment',
                 'cabang_id' => $cabangId,
                 'source_type' => StockAdjustment::class,
                 'source_id' => $stockAdjustment->id,
             ]);
-        } else {
-            // Inventory Decrease:
-            // Debit: Adjustment Expense COA (Selisih Persediaan - Beban Luar Usaha/Umum)
-            // Credit: Inventory COA
-            $expenseCoa = $this->findFirstExistingCoa([
-                config('coa.inventory_variance_loss', '8000.05'),
-                '8000.05',
-                '6280.05',
-                '8000',
-                '6280',
-                '6100',
-            ]);
+        };
 
-            if (! $expenseCoa) {
-                throw ValidationException::withMessages([
-                    'accounting' => 'Akun beban penyesuaian persediaan tidak ditemukan.',
-                ]);
-            }
-
-            JournalEntry::create([
-                'coa_id' => $expenseCoa->id,
-                'date' => $date,
-                'reference' => $reference,
-                'description' => $description,
-                'debit' => $totalValue,
-                'credit' => 0,
-                'journal_type' => 'stock_adjustment',
-                'cabang_id' => $cabangId,
-                'source_type' => StockAdjustment::class,
-                'source_id' => $stockAdjustment->id,
-            ]);
-
-            foreach ($entriesByInventoryCoa as $invCoaId => $amount) {
-                JournalEntry::create([
-                    'coa_id' => $invCoaId,
-                    'date' => $date,
-                    'reference' => $reference,
-                    'description' => $description,
-                    'debit' => 0,
-                    'credit' => $amount,
-                    'journal_type' => 'stock_adjustment',
-                    'cabang_id' => $cabangId,
-                    'source_type' => StockAdjustment::class,
-                    'source_id' => $stockAdjustment->id,
-                ]);
-            }
+        foreach ($entriesByInventoryCoa as $invCoaId => $amount) {
+            $line((int) $invCoaId, $amount, $isIncrease);
+        }
+        foreach ($entriesByCogsCoa as $cogsCoaId => $amount) {
+            $line((int) $cogsCoaId, $amount, ! $isIncrease);
         }
     }
 

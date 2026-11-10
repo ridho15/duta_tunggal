@@ -16,8 +16,8 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->service = app(StockAdjustmentService::class);
-    // Persetujuan membuat jurnal: butuh akun persediaan dan akun selisih (kode default service).
-    foreach ([['1140.10', 'Asset'], ['7000.04', 'Revenue'], ['8000.05', 'Expense']] as [$code, $type]) {
+    // Persetujuan membuat jurnal: butuh akun persediaan dan akun HPP (Ko Handy #4B: selisih opname/penyesuaian ke HPP).
+    foreach ([['1140.10', 'Asset'], ['5100.10', 'Expense'], ['7000.04', 'Revenue'], ['8000.05', 'Expense']] as [$code, $type]) {
         \App\Models\ChartOfAccount::firstOrCreate(['code' => $code], ['name' => 'Akun uji '.$code, 'type' => $type]);
     }
 });
@@ -325,4 +325,47 @@ test('stock adjustment rak selection stays within the adjustment warehouse', fun
     expect($eligibleRakIds)
         ->toContain($rakInAdjustmentWarehouse->id)
         ->not->toContain($rakInOtherWarehouse->id);
+});
+/**
+ * Ko Handy 10 Nov 2026 (#4B): hasil opname/penyesuaian berdampak ke COA Persediaan dan COA HPP.
+ *   Lebih : Dr Persediaan / Cr HPP   ·   Kurang : Dr HPP / Cr Persediaan
+ */
+function adjJournal(StockAdjustment $adjustment): \Illuminate\Support\Collection
+{
+    return \App\Models\JournalEntry::where('source_type', StockAdjustment::class)->where('source_id', $adjustment->id)->with('coa')->get();
+}
+
+test('#4B penyesuaian lebih: Persediaan didebit, HPP dikredit (bukan pendapatan lain-lain)', function () {
+    $adjustment = StockAdjustment::factory()->draft()->increase()->create();
+    $product = Product::factory()->create(['cogs_coa_id' => null]);
+    $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
+    StockAdjustmentItem::create([
+        'stock_adjustment_id' => $adjustment->id, 'product_id' => $product->id, 'rak_id' => $rak->id,
+        'current_qty' => 10, 'adjusted_qty' => 15, 'difference_qty' => 5, 'unit_cost' => 1000, 'difference_value' => 5000,
+    ]);
+
+    $this->service->approveStockAdjustment($adjustment, User::factory()->create()->id);
+    $lines = adjJournal($adjustment);
+
+    expect((float) $lines->filter(fn ($l) => str_starts_with($l->coa->code, '1140'))->sum('debit'))->toBe(5000.0)
+        ->and((float) $lines->filter(fn ($l) => $l->coa->code === '5100.10')->sum('credit'))->toBe(5000.0)
+        ->and($lines->filter(fn ($l) => in_array($l->coa->code, ['7000.04', '8000.05'], true)))->toHaveCount(0);
+});
+
+test('#4B penyesuaian kurang: HPP didebit, Persediaan dikredit (bukan biaya lain-lain)', function () {
+    $adjustment = StockAdjustment::factory()->draft()->create(['adjustment_type' => 'decrease']);
+    $product = Product::factory()->create(['cogs_coa_id' => null]);
+    $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
+    \App\Models\InventoryStock::create(['product_id' => $product->id, 'warehouse_id' => $adjustment->warehouse_id, 'rak_id' => $rak->id, 'qty_available' => 10, 'qty_reserved' => 0, 'qty_min' => 0]);
+    StockAdjustmentItem::create([
+        'stock_adjustment_id' => $adjustment->id, 'product_id' => $product->id, 'rak_id' => $rak->id,
+        'current_qty' => 10, 'adjusted_qty' => 7, 'difference_qty' => -3, 'unit_cost' => 2000, 'difference_value' => -6000,
+    ]);
+
+    $this->service->approveStockAdjustment($adjustment, User::factory()->create()->id);
+    $lines = adjJournal($adjustment);
+
+    expect((float) $lines->filter(fn ($l) => $l->coa->code === '5100.10')->sum('debit'))->toBe(6000.0)
+        ->and((float) $lines->filter(fn ($l) => str_starts_with($l->coa->code, '1140'))->sum('credit'))->toBe(6000.0)
+        ->and($lines->filter(fn ($l) => in_array($l->coa->code, ['7000.04', '8000.05'], true)))->toHaveCount(0);
 });
