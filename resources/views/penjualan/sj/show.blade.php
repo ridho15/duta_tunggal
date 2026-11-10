@@ -28,8 +28,13 @@
                 @endif
             </div>
             <p class="text-xs text-gray-500 mt-1">
-                {{ $doc['delivery']['destination_name'] ?? 'Customer' }} · Diterbitkan {{ $suratJalan->issued_at ? $suratJalan->issued_at->format('d F Y') : '-' }} · Cabang {{ $suratJalan->cabang->nama ?? 'Pusat' }}
+                {{ $doc['delivery']['destination_name'] ?? 'Customer' }} · Diterbitkan {{ $suratJalan->issued_at ? $suratJalan->issued_at->format('d F Y') : '-' }} · Tanggal Kirim {{ $suratJalan->effectiveDeliveryDate()->format('d F Y') }} · Cabang {{ $suratJalan->cabang->nama ?? 'Pusat' }}
             </p>
+            @if ($suratJalan->status === \App\Models\SuratJalan::STATUS_ISSUED && ! $suratJalan->isDeliveryDue())
+                <p class="mt-2 inline-block rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                    Dijadwalkan kirim {{ $suratJalan->effectiveDeliveryDate()->format('d F Y') }} — stok masih terkunci, belum berkurang. Faktur dapat dibuat setelah tanggal kirim.
+                </p>
+            @endif
         </div>
 
         {{-- Top Action Buttons --}}

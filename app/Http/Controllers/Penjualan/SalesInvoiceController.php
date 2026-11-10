@@ -118,7 +118,9 @@ class SalesInvoiceController extends Controller
         ->where('status', SuratJalan::STATUS_ISSUED)
         ->orderBy('id', 'desc')
         ->get()
-        ->reject(fn ($sj) => $sj->isInvoiced());
+        ->reject(fn ($sj) => $sj->isInvoiced())
+        // Ko Handy 10 Nov: piutang timbul saat barang keluar (tanggal kirim SJ) → hanya SJ yang tanggal kirimnya s/d hari ini.
+        ->filter(fn ($sj) => $sj->isDeliveryDue());
 
         // Kelompokkan Surat Jalan berdasarkan SO
         $groupedSJs = [];
@@ -192,6 +194,12 @@ class SalesInvoiceController extends Controller
             if ($sj->isInvoiced()) {
                 throw ValidationException::withMessages([
                     'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} sudah pernah difakturkan pada invoice aktif lain.",
+                ]);
+            }
+            if (! $sj->isDeliveryDue()) {
+                throw ValidationException::withMessages([
+                    'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} dijadwalkan kirim {$sj->effectiveDeliveryDate()->format('d/m/Y')}. "
+                        .'Faktur baru dapat dibuat setelah barang berangkat pada tanggal kirim.',
                 ]);
             }
         }

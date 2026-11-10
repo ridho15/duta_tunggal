@@ -42,6 +42,14 @@ Schedule::command('sales:top-up-reservations')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Ko Handy 10 Nov 2026: stok terpotong pada tanggal kirim Surat Jalan. SJ bertanggal kirim di masa depan diberangkatkan di sini saat
+// tanggalnya tiba (dini hari, sebelum jam operasional). Idempoten.
+Schedule::command('sales:dispatch-scheduled-surat-jalan')
+    ->dailyAt('00:15')
+    ->name('sales-dispatch-scheduled-surat-jalan')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Purchase return automation removed - now handled manually or through UI triggers
 // Schedule::command('purchase:automate-return')
 //     ->dailyAt('08:00')

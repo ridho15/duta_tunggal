@@ -47,6 +47,7 @@ class SuratJalan extends Model
     protected $fillable = [
         'sj_number',
         'issued_at',
+        'delivery_date',
         'signed_by',
         'status',
         'created_by',
@@ -59,9 +60,25 @@ class SuratJalan extends Model
 
     protected $casts = [
         'issued_at' => 'datetime',
+        'delivery_date' => 'date',
         'cancelled_at' => 'datetime',
         'status' => 'integer',
     ];
+
+    /**
+     * Tanggal kirim efektif (Ko Handy 10 Nov 2026): tanggal jadwal pengiriman; bila tidak diisi = tanggal SJ dibuat.
+     * Stok baru terpotong (DO berangkat) pada tanggal ini.
+     */
+    public function effectiveDeliveryDate(): \Carbon\CarbonInterface
+    {
+        return ($this->delivery_date ?? $this->issued_at ?? now())->copy()->startOfDay();
+    }
+
+    /** Barang SJ ini sudah boleh/sudah berangkat (tanggal kirim ≤ hari ini). */
+    public function isDeliveryDue(?\Carbon\CarbonInterface $today = null): bool
+    {
+        return $this->effectiveDeliveryDate()->lte(($today ?? now())->copy()->startOfDay());
+    }
 
     public static function statusLabel(int|string|null $status): string
     {
