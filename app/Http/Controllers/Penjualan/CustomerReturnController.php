@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Penjualan;
 use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\CustomerReturn;
 use App\Models\CustomerReturnItem;
 use App\Models\Invoice;
@@ -174,10 +175,8 @@ class CustomerReturnController extends Controller
             }
         }
 
-        // Pelanggan yang memiliki invoice aktif
-        $customers = Customer::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'phone']);
+        // Master customer tidak dimuat: hanya customer terpilih; sisanya dicari lewat AJAX.
+        $customers = CustomerPicker::prefill([$preselectedCustomerId]);
 
         // Gudang penerima (sesuai cabang pengguna)
         $warehouseQuery = Warehouse::where('status', 1);

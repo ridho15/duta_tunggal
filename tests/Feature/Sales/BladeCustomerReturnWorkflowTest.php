@@ -202,7 +202,9 @@ class BladeCustomerReturnWorkflowTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Ajukan Retur Penjualan');
-        $response->assertSee($this->customer->name);
+        $response->assertDontSee($this->customer->name);
+        // Master customer tidak dikirim di payload halaman; dicari lewat AJAX.
+        $response->assertSee('penjualan\/customers\/search', false);
         $response->assertSee('Pilih Produk yang Dikembalikan');
     }
 

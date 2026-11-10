@@ -8,6 +8,7 @@ use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -182,8 +183,7 @@ class SaleOrderController extends Controller
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
             ?? Currency::query()->orderBy('id')->value('id');
 
-        // Payload halaman hanya berisi customer & produk yang sudah terpilih (quotation / input lama);
-        // sisanya dicari lewat AJAX (searchCustomers, searchProducts). ±18 ribu customer tidak lagi ikut dikirim.
+        // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
         $selectedQuotationId = $request->query('quotation_id');
         $prefillCustomerId = old('customer_id')
             ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : null);
@@ -210,6 +210,9 @@ class SaleOrderController extends Controller
                 ->with(['customer', 'quotationItem.product.uom'])
                 ->find($selectedQuotationId);
         }
+
+        // Master customer TIDAK dikirim di halaman ini: hanya customer terpilih (input lama / penawaran); sisanya dicari lewat AJAX (searchCustomers).
+        $customers = CustomerPicker::prefill([old('customer_id'), $selectedQuotation?->customer_id]);
 
         $nextSoNumber = $this->salesOrderService->generateSoNumber($canAccessAll ? null : $user?->cabang_id);
 

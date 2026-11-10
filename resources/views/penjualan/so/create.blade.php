@@ -68,7 +68,7 @@
                             id="customerSelect"
                             label="Customer"
                             :options="$customers"
-                            :search-url="route('penjualan.so.customers.search')"
+                            :remote-url="route('penjualan.customers.search')"
                             :value="old('customer_id', $selectedQuotation->customer_id ?? null)"
                             placeholder="-- Pilih Customer --"
                             :required="true"
@@ -783,14 +783,8 @@
         }
     }
 
-    // Hanya customer yang sudah terpilih (prefill); customer lain masuk ke sini saat dipilih dari hasil pencarian AJAX.
-    const customersData = Object.fromEntries(@json($customers).map(o => [String(o.id), o.meta]));
-    document.addEventListener('option-selected', (e) => {
-        // $dispatch Alpine memancarkan dari elemen yang diklik (<li>), jadi cek lewat root komponen searchable-select.
-        if (e.target?.closest?.('[x-data]')?.querySelector('#customerSelect') && e.detail?.meta) {
-            customersData[String(e.detail.id)] = e.detail.meta;
-        }
-    });
+    // Cache data customer: hanya customer terpilih dari server; sisanya diisi saat dipilih dari hasil pencarian AJAX.
+    const customersData = @json(\App\Support\CustomerPicker::dataMap($customers));
 
     function handleCustomerSelectChange(custId) {
         const cust = customersData[custId];
@@ -834,6 +828,11 @@
             if (recipientName) recipientName.value = cust.name || '';
             if (recipientPhone) recipientPhone.value = cust.phone || '';
         }
+    });
+
+    // Hasil pencarian AJAX membawa data customer; simpan sebelum event 'change' membacanya.
+    document.getElementById('customerSelect')?.closest('[x-data]')?.addEventListener('option-selected', function (e) {
+        customersData[e.detail.id] = e.detail.data;
     });
 
     document.getElementById('customerSelect')?.addEventListener('change', function () {

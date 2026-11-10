@@ -11,9 +11,8 @@
     'hint' => null,
     'autoSubmit' => false,
     'size' => 'md',
-    // Mode remote: opsi dicari lewat AJAX ke URL ini (?q=...), bukan disaring dari $options.
-    // $options cukup berisi opsi yang sudah terpilih. Respons JSON: { options: [{id,label,subtext,badge,meta}] }.
-    'searchUrl' => null,
+    'remoteUrl' => null,   // bila diisi: opsi dicari lewat AJAX (GET ?q=) dan hasilnya {results:[{id,label,subtext,badge,data}]}
+    'remoteMin' => 2,
 ])
 
 @php
@@ -66,7 +65,8 @@
         placeholder: '{{ $placeholder }}',
         disabled: {{ $disabled ? 'true' : 'false' }},
         autoSubmit: {{ $autoSubmit ? 'true' : 'false' }},
-        searchUrl: {{ Js::from($searchUrl) }},
+        remoteUrl: {{ Js::from($remoteUrl) }},
+        remoteMin: {{ (int) $remoteMin }},
     })"
     x-id="['searchable-select']"
     @click.outside="open = false"
@@ -177,6 +177,7 @@
                         type="text"
                         x-ref="searchInput"
                         x-model="searchQuery"
+                        @input.debounce.300ms="fetchRemote()"
                         @keydown.arrow-down.prevent="highlightNext()"
                         @keydown.arrow-up.prevent="highlightPrev()"
                         @keydown.enter.prevent="selectHighlighted()"
@@ -253,8 +254,8 @@
                     <svg class="w-6 h-6 mx-auto text-gray-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
-                    <div class="font-semibold text-gray-600 text-xs">Tidak Ada Hasil Ditemukan</div>
-                    <div class="text-[11px] text-gray-400 mt-0.5">Coba kata kunci pencarian yang lain.</div>
+                    <div class="font-semibold text-gray-600 text-xs" x-text="emptyTitle()"></div>
+                    <div class="text-[11px] text-gray-400 mt-0.5" x-text="emptyHint()"></div>
                 </li>
             </ul>
         </div>
@@ -279,6 +280,12 @@ function searchableSelect(config) {
         placeholder: config.placeholder || '-- Pilih Opsi --',
         disabled: config.disabled || false,
         autoSubmit: config.autoSubmit || false,
+        remoteUrl: config.remoteUrl || null,
+        remoteMin: config.remoteMin || 2,
+        remote: [],
+        loading: false,
+        remoteError: false,
+        remoteSeq: 0,
         open: false,
         searchQuery: '',
         highlightIndex: 0,
@@ -325,8 +332,8 @@ function searchableSelect(config) {
         },
 
         get filteredOptions() {
-            if (this.searchUrl) {
-                return this.searchQuery.trim() ? this.remoteOptions : this.options;
+            if (this.remoteUrl && this.searchQuery.trim().length >= this.remoteMin) {
+                return this.remote;
             }
             if (!this.searchQuery.trim()) {
                 return this.options;
@@ -337,6 +344,45 @@ function searchableSelect(config) {
                 const subMatch = (opt.subtext || '').toLowerCase().includes(q);
                 return labelMatch || subMatch;
             });
+        },
+
+        async fetchRemote() {
+            const q = this.searchQuery.trim();
+            if (!this.remoteUrl || q.length < this.remoteMin) {
+                this.remote = [];
+                this.remoteError = false;
+                return;
+            }
+            const seq = ++this.remoteSeq;
+            this.loading = true;
+            this.remoteError = false;
+            try {
+                const res = await fetch(this.remoteUrl + (this.remoteUrl.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                if (seq !== this.remoteSeq) return; // hasil usang: pengguna sudah mengetik lagi
+                this.remote = (data.results || []).map(o => ({ ...o, id: String(o.id) }));
+                this.highlightIndex = 0;
+            } catch (e) {
+                if (seq !== this.remoteSeq) return;
+                this.remote = [];
+                this.remoteError = true;
+            } finally {
+                if (seq === this.remoteSeq) this.loading = false;
+            }
+        },
+
+        emptyTitle() {
+            if (this.remoteUrl && this.searchQuery.trim().length < this.remoteMin) return 'Ketik untuk mencari';
+            if (this.loading) return 'Mencari...';
+            if (this.remoteError) return 'Gagal memuat hasil pencarian';
+            return 'Tidak Ada Hasil Ditemukan';
+        },
+
+        emptyHint() {
+            if (this.remoteUrl && this.searchQuery.trim().length < this.remoteMin) return 'Ketik minimal ' + this.remoteMin + ' huruf (nama, kode, atau perusahaan).';
+            if (this.remoteError) return 'Periksa koneksi lalu coba ketik ulang.';
+            return 'Coba kata kunci pencarian yang lain.';
         },
 
         toggleDropdown() {
@@ -354,12 +400,9 @@ function searchableSelect(config) {
         },
 
         selectOption(opt) {
-            // Mode remote: simpan opsi terpilih agar label tetap tampil setelah hasil pencarian dibersihkan.
-            if (this.searchUrl && !this.options.some(o => String(o.id) === String(opt.id))) {
-                this.options = [opt];
-            }
-            this.$dispatch('option-selected', opt);
+            if (!this.options.some(o => String(o.id) === String(opt.id))) this.options.push(opt);
             this.selected = String(opt.id);
+            this.$dispatch('option-selected', opt);
             this.open = false;
             this.searchQuery = '';
             this.$dispatch('change', this.selected);

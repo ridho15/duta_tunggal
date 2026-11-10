@@ -67,20 +67,17 @@
                     <label class="block text-xs font-bold text-gray-700">
                         Pelanggan (Customer) <span class="text-red-500">*</span>
                     </label>
-                    <select data-searchable
-                        name="customer_id"
-                        x-model="customerId"
-                        @change="onCustomerChange"
-                        required
-                        class="w-full text-xs font-semibold py-2.5 px-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
-                    >
-                        <option value="">-- Pilih Pelanggan --</option>
-                        @foreach($customers as $c)
-                            <option value="{{ $c->id }}">
-                                {{ $c->name }} {{ $c->phone ? "({$c->phone})" : '' }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <div @change="if ($event.detail !== undefined) { customerId = $event.detail; onCustomerChange(); }">
+                        <x-searchable-select
+                            name="customer_id"
+                            :options="$customers"
+                            :remote-url="route('penjualan.customers.search')"
+                            :value="$preselectedCustomerId"
+                            placeholder="-- Pilih Pelanggan --"
+                            :required="true"
+                            size="sm"
+                        />
+                    </div>
                 </div>
 
                 {{-- Pilih Faktur Penjualan (Invoice) --}}

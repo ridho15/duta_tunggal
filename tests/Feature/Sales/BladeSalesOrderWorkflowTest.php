@@ -228,4 +228,65 @@ class BladeSalesOrderWorkflowTest extends TestCase
         $response->assertSee('Buat Perintah Kirim');
         $response->assertSee($so->so_number);
     }
+
+    public function test_create_form_does_not_ship_customer_master_in_page_payload()
+    {
+        Customer::factory()->create(['name' => 'PT Tidak Boleh Muncul Di Payload', 'cabang_id' => $this->cabang->id]);
+
+        $response = $this->actingAs($this->user)->get(route('penjualan.so.create'));
+
+        $response->assertOk();
+        $response->assertDontSee('PT Tidak Boleh Muncul Di Payload');
+        $response->assertSee('penjualan\/customers\/search', false); // URL ada di config komponen (JSON meng-escape garis miring)
+    }
+
+    public function test_create_form_prefills_only_the_old_customer()
+    {
+        $other = Customer::factory()->create(['name' => 'PT Customer Lama Terpilih', 'cabang_id' => $this->cabang->id]);
+
+        $response = $this->actingAs($this->user)->withSession(['_old_input' => ['customer_id' => $other->id]])
+            ->get(route('penjualan.so.create'));
+
+        $response->assertSee('PT Customer Lama Terpilih');
+        $response->assertDontSee('DAYA TEKNIK MEDIKA');
+    }
+
+    public function test_customer_search_returns_option_and_credit_data()
+    {
+        $this->customer->update(['kredit_limit' => 12345678, 'tempo_kredit' => 30]);
+
+        $json = $this->actingAs($this->user)->getJson(route('penjualan.customers.search', ['q' => 'daya teknik']))
+            ->assertOk()->json();
+
+        $row = collect($json['results'])->firstWhere('id', $this->customer->id);
+        $this->assertNotNull($row);
+        $this->assertSame('DAYA TEKNIK MEDIKA (CUST-DTM)', $row['label']);
+        $this->assertEquals(12345678.0, $row['data']['limit']);
+        $this->assertSame(30, $row['data']['tempo']);
+        $this->assertArrayHasKey('deposit', $row['data']);
+
+        $byCode = $this->actingAs($this->user)->getJson(route('penjualan.customers.search', ['q' => 'CUST-DTM']))->json('results');
+        $this->assertContains($this->customer->id, collect($byCode)->pluck('id')->all());
+    }
+
+    public function test_customer_search_rejects_short_query_and_hides_merged_customers()
+    {
+        $this->actingAs($this->user)->getJson(route('penjualan.customers.search', ['q' => 'a']))->assertStatus(422);
+
+        $merged = Customer::factory()->create(['name' => 'PT Sudah Digabung Xyz', 'cabang_id' => $this->cabang->id, 'merged_into' => $this->customer->id]);
+
+        $ids = collect($this->actingAs($this->user)->getJson(route('penjualan.customers.search', ['q' => 'Sudah Digabung']))->json('results'))->pluck('id');
+        $this->assertNotContains($merged->id, $ids->all());
+    }
+
+    public function test_sales_report_does_not_ship_customer_master_but_keeps_filtered_customer(): void
+    {
+        $other = Customer::factory()->create(['name' => 'PT Filter Laporan Penjualan', 'cabang_id' => $this->cabang->id]);
+
+        $plain = $this->actingAs($this->user)->get(route('penjualan.laporan.index'));
+        $plain->assertOk()->assertDontSee('PT Filter Laporan Penjualan')->assertSee('penjualan\/customers\/search', false);
+
+        $this->actingAs($this->user)->get(route('penjualan.laporan.index', ['customer_id' => $other->id]))
+            ->assertOk()->assertSee('PT Filter Laporan Penjualan');
+    }
 }

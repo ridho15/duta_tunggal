@@ -71,31 +71,17 @@
                     <label class="block text-xs font-bold text-gray-700">
                         Customer (Pelanggan) <span class="text-red-500">*</span>
                     </label>
-                    <select data-searchable
-                        name="customer_id"
-                        x-model="customerId"
-                        @change="onCustomerChange"
-                        required
-                        class="w-full text-xs font-semibold py-2.5 px-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d] bg-white"
-                    >
-                        <option value="">-- Pilih Customer yang memiliki Piutang --</option>
-                        @if($customersWithDebt->isNotEmpty())
-                            <optgroup label="Pelanggan dengan Tagihan Belum Lunas">
-                                @foreach($customersWithDebt as $c)
-                                    <option value="{{ $c->id }}" {{ (string)old('customer_id', $preselectedCustomerId) === (string)$c->id ? 'selected' : '' }}>
-                                        {{ $c->name }} (Telp: {{ $c->phone ?? '-' }})
-                                    </option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                        <optgroup label="Semua Pelanggan">
-                            @foreach($allCustomers as $c)
-                                <option value="{{ $c->id }}" {{ (string)old('customer_id', $preselectedCustomerId) === (string)$c->id ? 'selected' : '' }}>
-                                    {{ $c->name }}
-                                </option>
-                            @endforeach
-                        </optgroup>
-                    </select>
+                    <div @change="if ($event.detail !== undefined) { customerId = $event.detail; onCustomerChange(); }">
+                        <x-searchable-select
+                            name="customer_id"
+                            :options="$customers"
+                            :remote-url="route('penjualan.customers.search', ['debtors_first' => 1])"
+                            :value="$preselectedCustomerId"
+                            placeholder="-- Pilih Customer yang memiliki Piutang --"
+                            :required="true"
+                            size="sm"
+                        />
+                    </div>
                 </div>
 
                 {{-- Tanggal Pembayaran --}}
