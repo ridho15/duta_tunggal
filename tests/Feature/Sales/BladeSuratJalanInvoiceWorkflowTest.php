@@ -489,4 +489,49 @@ class BladeSuratJalanInvoiceWorkflowTest extends TestCase
         $resPdf->assertStatus(200);
         $this->assertStringContainsString('application/pdf', $resPdf->headers->get('Content-Type'));
     }
+
+    /** Buat SJ terbit (belum difaktur) untuk satu customer; kembalikan [SO, SJ]. */
+    private function issuedSjForCustomer(Customer $customer): array
+    {
+        $so = SaleOrder::create([
+            'so_number' => 'SO-FLT-' . uniqid(), 'customer_id' => $customer->id, 'cabang_id' => $this->cabang->id,
+            'order_date' => now(), 'status' => 'approved', 'created_by' => $this->user->id, 'total_amount' => 100000,
+        ]);
+        $soItem = SaleOrderItem::create(['sale_order_id' => $so->id, 'product_id' => $this->product->id, 'quantity' => 2, 'delivered_quantity' => 0, 'unit_price' => 50000]);
+        $do = DeliveryOrder::create([
+            'do_number' => 'DO-FLT-' . uniqid(), 'delivery_date' => now(), 'warehouse_id' => $this->warehouse->id,
+            'cabang_id' => $this->cabang->id, 'status' => 'received', 'created_by' => $this->user->id,
+        ]);
+        $do->salesOrders()->sync([$so->id]);
+        DeliveryOrderItem::create(['delivery_order_id' => $do->id, 'product_id' => $this->product->id, 'quantity' => 2, 'sale_order_item_id' => $soItem->id]);
+        $sj = SuratJalan::create([
+            'sj_number' => 'SJ-FLT-' . uniqid(), 'issued_at' => now(), 'status' => SuratJalan::STATUS_ISSUED,
+            'signed_by' => $this->user->id, 'created_by' => $this->user->id, 'cabang_id' => $this->cabang->id,
+        ]);
+        $sj->deliveryOrder()->sync([$do->id]);
+
+        return [$so, $sj];
+    }
+
+    /** Ko Handy 10 Nov: Sales Invoicing dapat difilter Nama Konsumen; saat dipilih, hanya SJ konsumen itu yang tampil. */
+    public function test_sales_invoice_create_filter_by_customer(): void
+    {
+        $customerB = Customer::create([
+            'name' => 'PT Konsumen Kedua Filter', 'perusahaan' => 'PT Konsumen Kedua Filter', 'code' => 'CUST-FLT-02',
+            'email' => 'filter2@example.com', 'phone' => '081200000002', 'telephone' => '021-00000002', 'fax' => '-', 'address' => 'Jl. Filter No. 2', 'nik_npwp' => '02', 'keterangan' => '-', 'isSpecial' => 0,
+            'tipe' => 'PKP', 'tipe_pembayaran' => 'Kredit', 'cabang_id' => $this->cabang->id,
+        ]);
+
+        [$soA, $sjA] = $this->issuedSjForCustomer($this->customer);
+        [$soB, $sjB] = $this->issuedSjForCustomer($customerB);
+
+        // Tanpa filter: kedua SJ tampil, dan kedua nama konsumen ada di dropdown filter.
+        $all = $this->actingAs($this->user)->get(route('penjualan.invoices.create'))->assertStatus(200);
+        $all->assertSee($sjA->sj_number)->assertSee($sjB->sj_number)
+            ->assertSee($this->customer->name)->assertSee($customerB->name);
+
+        // Filter konsumen B: hanya SJ milik B yang tampil.
+        $filtered = $this->actingAs($this->user)->get(route('penjualan.invoices.create', ['customer_id' => $customerB->id]))->assertStatus(200);
+        $filtered->assertSee($sjB->sj_number)->assertDontSee($sjA->sj_number);
+    }
 }

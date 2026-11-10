@@ -132,6 +132,7 @@ class SalesInvoiceController extends Controller
                         'so_id' => $primarySO->id,
                         'so_number' => $primarySO->so_number,
                         'customer' => $customer,
+                        'customer_id' => $customer?->id,
                         'cabang' => $primarySO->cabang,
                         'tipe_pajak' => $primarySO->tipe_pajak ?? 'None',
                         'ppn_rate' => $primarySO->ppn_rate ?? 0,
@@ -143,7 +144,20 @@ class SalesInvoiceController extends Controller
             }
         }
 
-        return view('penjualan.invoices.create', compact('groupedSJs', 'availableSJs', 'activeCabang', 'soId', 'sjId'));
+        // Daftar customer yang punya SJ belum difaktur (untuk filter Nama Konsumen — kontrol Manager/Direktur, Ko Handy 10 Nov).
+        $customerFilterOptions = collect($groupedSJs)
+            ->filter(fn ($g) => $g['customer'])
+            ->keyBy('customer_id')
+            ->map(fn ($g) => ['id' => $g['customer_id'], 'name' => $g['customer']->name])
+            ->sortBy('name')->values();
+
+        // Bila Nama Konsumen dipilih, hanya SJ milik konsumen tsb yang tampil.
+        $customerId = $request->query('customer_id');
+        if ($customerId) {
+            $groupedSJs = array_filter($groupedSJs, fn ($g) => (string) $g['customer_id'] === (string) $customerId);
+        }
+
+        return view('penjualan.invoices.create', compact('groupedSJs', 'availableSJs', 'activeCabang', 'soId', 'sjId', 'customerFilterOptions', 'customerId'));
     }
 
     /**

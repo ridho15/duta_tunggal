@@ -16,6 +16,25 @@
         </p>
     </div>
 
+    {{-- Filter Nama Konsumen: kontrol Manager/Direktur atas SJ terkirim yang belum jadi Invoice (Ko Handy 10 Nov) --}}
+    @if(!empty($customerFilterOptions) && count($customerFilterOptions))
+        <form method="GET" action="{{ route('penjualan.invoices.create') }}" class="bg-white border border-gray-200 rounded-2xl p-4 mb-4 flex flex-wrap items-end gap-3">
+            <div class="flex-1 min-w-[220px]">
+                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Filter Nama Konsumen</label>
+                <select name="customer_id" data-searchable onchange="this.form.submit()"
+                    class="w-full py-2 px-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white">
+                    <option value="">— Semua konsumen (SJ belum difaktur s/d hari ini) —</option>
+                    @foreach($customerFilterOptions as $opt)
+                        <option value="{{ $opt['id'] }}" {{ (string)($customerId ?? '') === (string)$opt['id'] ? 'selected' : '' }}>{{ $opt['name'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @if($customerId)
+                <a href="{{ route('penjualan.invoices.create') }}" class="text-xs font-semibold text-gray-500 hover:text-gray-800 py-2">Reset</a>
+            @endif
+        </form>
+    @endif
+
     @if(empty($groupedSJs))
         <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center space-y-3">
             <div class="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto">
