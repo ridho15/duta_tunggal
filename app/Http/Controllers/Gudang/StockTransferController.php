@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Gudang;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryStock;
 use App\Models\Product;
+use App\Models\PurchaseReceipt;
 use App\Models\Rak;
 use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
@@ -115,14 +116,61 @@ class StockTransferController extends Controller
     /**
      * Form pembuatan Transfer Stok Baru.
      */
-    public function create()
+    public function create(Request $request)
     {
         $this->authorizeAccess('create stock transfer');
 
-        $warehouses = Warehouse::where('status', 1)->orderBy('name')->get();
+        // "Buat Mutasi Stok" dari detail GRN: isi awal gudang asal (gudang GRN/tujuan PO), barang, dan keterangan; gudang tujuan dipilih user.
+        $prefill = $this->prefillFromPurchaseReceipt($request->query('from_purchase_receipt'));
+
+        $warehouses = Warehouse::where('status', 1)
+            ->when($prefill, fn ($q) => $q->orWhere('id', $prefill['from_warehouse_id']))
+            ->orderBy('name')->get();
         $suggestedNumber = $this->stockTransferService->generateTransferNumber();
 
-        return view('gudang.transfer.create', compact('warehouses', 'suggestedNumber'));
+        return view('gudang.transfer.create', compact('warehouses', 'suggestedNumber', 'prefill'));
+    }
+
+    /**
+     * "Buat Mutasi Stok" dari sebuah GRN (keputusan Ko Handy 10 Nov 2026): barang diterima di gudang tujuan PO, lalu
+     * bila fisik barang sebenarnya di gudang lain (mis. supplier salah kirim), dibuat mutasi dari gudang GRN → gudang lain.
+     * Gudang asal = gudang GRN (tujuan PO); gudang tujuan dipilih user. Barang = seluruh qty diterima baik.
+     */
+    private function prefillFromPurchaseReceipt($receiptId): ?array
+    {
+        if (! $receiptId) {
+            return null;
+        }
+
+        $receipt = PurchaseReceipt::with(['purchaseReceiptItem'])->find($receiptId);
+        if (! $receipt || $receipt->status !== 'completed') {
+            return null;
+        }
+
+        $accepted = $receipt->purchaseReceiptItem
+            ->filter(fn ($i) => $i->warehouse_id && (float) $i->qty_accepted > 0);
+        if ($accepted->isEmpty()) {
+            return null;
+        }
+
+        // Gudang asal mutasi = gudang penerimaan (tujuan PO). Bila GRN tercatat di >1 gudang, ambil gudang dengan qty terbanyak.
+        $fromWarehouseId = (int) $accepted->groupBy('warehouse_id')
+            ->map(fn ($rows) => (float) $rows->sum('qty_accepted'))->sortDesc()->keys()->first();
+
+        return [
+            'receipt_number' => $receipt->receipt_number,
+            'from_warehouse_id' => $fromWarehouseId,
+            'to_warehouse_id' => null,   // dipilih user (gudang tempat barang sebenarnya berada)
+            'notes' => 'Mutasi karena supplier salah kirim lokasi gudang (dari penerimaan '.$receipt->receipt_number.')',
+            'items' => $accepted->where('warehouse_id', $fromWarehouseId)
+                ->groupBy('product_id')
+                ->map(fn ($rows, $productId) => [
+                    'product_id' => (int) $productId,
+                    'quantity' => (float) $rows->sum('qty_accepted'),
+                    'from_rak_id' => $rows->first()->rak_id,
+                    'to_rak_id' => null,
+                ])->values()->all(),
+        ];
     }
 
     /**
@@ -137,6 +185,7 @@ class StockTransferController extends Controller
             'transfer_date' => 'required|date',
             'from_warehouse_id' => 'required|exists:warehouses,id',
             'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
+            'notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -180,7 +229,7 @@ class StockTransferController extends Controller
                 }
             }
 
-            $transferNumber = $validated['transfer_number'] ?: $this->stockTransferService->generateTransferNumber();
+            $transferNumber = ($validated['transfer_number'] ?? '') ?: $this->stockTransferService->generateTransferNumber();
 
             $transfer = StockTransfer::create([
                 'transfer_number' => $transferNumber,
@@ -188,6 +237,7 @@ class StockTransferController extends Controller
                 'to_warehouse_id' => $toWarehouseId,
                 'transfer_date' => $validated['transfer_date'],
                 'status' => 'Draft',
+                'notes' => $validated['notes'] ?? null,
             ]);
 
             foreach ($validated['items'] as $itemData) {
@@ -266,6 +316,7 @@ class StockTransferController extends Controller
             'transfer_date' => 'required|date',
             'from_warehouse_id' => 'required|exists:warehouses,id',
             'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
+            'notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -299,6 +350,7 @@ class StockTransferController extends Controller
                 'transfer_date' => $validated['transfer_date'],
                 'from_warehouse_id' => $fromWarehouseId,
                 'to_warehouse_id' => $toWarehouseId,
+                'notes' => $validated['notes'] ?? null,
             ]);
 
             // Hapus item lama dan buat ulang
@@ -472,14 +524,16 @@ class StockTransferController extends Controller
             abort(401);
         }
 
-        if (MenuAccess::isSuper($user) || in_array('GDG', MenuAccess::codesFor($user))) {
-            return;
-        }
-
-        if ($user->can($permission)) {
+        if (self::userMay($user, $permission)) {
             return;
         }
 
         abort(403, 'Anda tidak memiliki hak akses untuk fitur ini.');
+    }
+
+    /** Aturan akses Pindah Stok; dipakai juga untuk menampilkan tombol yang menuju ke sini (mis. dari detail GRN). */
+    public static function userMay($user, string $permission): bool
+    {
+        return $user && (MenuAccess::isSuper($user) || in_array('GDG', MenuAccess::codesFor($user)) || $user->can($permission));
     }
 }

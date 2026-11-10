@@ -144,6 +144,8 @@ class DeliveryOrderReturnProcessor
                     'notes' => ($line['quarantine'] ? 'Karantina: ' : 'Kembali ke gudang sumber: ').($line['item']->note ?: $line['item']->condition),
                 ]);
 
+                $this->dispatchReturnedPortion($line, $deliveryOrder, $returnProduct);
+
                 StockMovement::create([
                     'product_id' => $line['item']->product_id,
                     'warehouse_id' => $warehouseId,
@@ -172,6 +174,52 @@ class DeliveryOrderReturnProcessor
                 ]);
             }
         }
+
+        // Kuantitas & sumber gudang DO asal sudah berkurang sebesar retur: kunci stoknya (bila belum berangkat) ikut turun.
+        if ($deliveryOrder && ! \App\Observers\DeliveryOrderObserver::isDispatched($deliveryOrder->refresh())
+            && ! in_array($deliveryOrder->status, ['closed', 'reject'], true)) {
+            app(\App\Observers\DeliveryOrderObserver::class)->lockStockForDeliveryOrder($deliveryOrder);
+        }
+    }
+
+    /**
+     * DO yang belum berangkat hanya MENGUNCI stok (stok fisik belum berkurang). Barang yang diretur toko/checker sudah keluar dari
+     * gudang lalu kembali, jadi bagian yang belum tercatat keluar dicatat keluar lebih dulu dari lokasi asalnya — gerakan `do_return`
+     * sesudahnya mengembalikannya (ke gudang asal: netto nol; ke karantina: pindah dari stok jual ke karantina). Tanpa ini retur
+     * menambah stok yang tidak pernah berkurang.
+     *
+     * @param  array{item: ReturnProductItem, quantity: float, origin_warehouse_id: int, origin_rak_id: int|null}  $line
+     */
+    private function dispatchReturnedPortion(array $line, ?DeliveryOrder $deliveryOrder, ReturnProduct $returnProduct): void
+    {
+        $item = $line['item'];
+        if ($item->from_item_model_type !== DeliveryOrderItem::class) {
+            return;
+        }
+
+        $doItem = DeliveryOrderItem::withoutGlobalScopes()->withTrashed()->with('product')->find($item->from_item_model_id);
+        if (! $doItem || ! $doItem->product) {
+            return;
+        }
+
+        $outside = DeliveryShipments::netShipped($doItem, (int) $line['origin_warehouse_id'], $line['origin_rak_id']);
+        $deficit = (float) $line['quantity'] - $outside;
+        if ($deficit <= 0.00001) {
+            return;
+        }
+
+        app(ProductService::class)->createStockMovement(
+            product_id: $doItem->product_id,
+            warehouse_id: (int) $line['origin_warehouse_id'],
+            quantity: $deficit,
+            type: 'sales',
+            date: now()->toDateString(),
+            notes: 'Barang keluar lalu diretur: DO '.($deliveryOrder?->do_number ?? '-').' ('.$returnProduct->return_number.')',
+            rak_id: $line['origin_rak_id'],
+            fromModel: $doItem,
+            value: (float) $doItem->product->cost_price * $deficit,
+            meta: ['dispatch_deduction' => true, 'source' => 'do_return_dispatch', 'return_product_id' => $returnProduct->id, 'allow_negative_stock' => true]
+        );
     }
 
     /**

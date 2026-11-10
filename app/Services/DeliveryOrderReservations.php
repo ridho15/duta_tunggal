@@ -17,9 +17,12 @@ class DeliveryOrderReservations
     public function __construct(private readonly StockReservationLedger $ledger) {}
 
     /**
-     * @throws \Exception bila konfigurasi gudang sumber tidak valid (perilaku sama dengan sebelumnya)
+     * @param  bool  $strict  true: sumber gudang tidak valid → exception (perilaku lama). false: baris tanpa gudang dilewati
+     *                        (DO draf yang belum punya gudang tidak mengunci apa pun).
+     *
+     * @throws \Exception bila $strict dan konfigurasi gudang sumber tidak valid
      */
-    public function sync(DeliveryOrder $deliveryOrder, string $reason = 'DO disetujui (Siap Kirim)'): void
+    public function sync(DeliveryOrder $deliveryOrder, string $reason = 'DO disetujui (Siap Kirim)', bool $strict = true): void
     {
         $deliveryOrder->load('deliveryOrderItem.warehouseSources', 'deliveryOrderItem.saleOrderItem');   // selalu segar: relasi ter-cache bisa basi
 
@@ -35,6 +38,9 @@ class DeliveryOrderReservations
             foreach ($item->warehouseSources as $source) {
                 $sourceQty = max(0.0, (float) ($source->quantity ?? 0));
                 if ($sourceQty <= 0 || ! $source->warehouse_id) {
+                    if (! $strict) {
+                        continue;
+                    }
                     throw new \Exception('Warehouse source configuration is required for stock reservation');
                 }
 
@@ -48,6 +54,9 @@ class DeliveryOrderReservations
             if ($item->warehouseSources->isEmpty()) {
                 $warehouseId = $deliveryOrder->warehouse_id ?? $item->warehouse_id;
                 if (! $warehouseId) {
+                    if (! $strict) {
+                        continue;
+                    }
                     throw new \Exception('Warehouse ID is required for stock reservation');
                 }
                 $desired[] = $this->row($item, $saleOrderItem, (int) $warehouseId, $item->rak_id, $remaining, $deliveryOrder);

@@ -6,7 +6,7 @@ use App\Models\StockOpname;
 use App\Services\StockOpnameService;
 use Illuminate\Validation\ValidationException;
 
-test('OPN-GL-01: surplus fisik menerbitkan jurnal Dr Persediaan dan Cr Penyesuaian Persediaan secara seimbang', function () {
+test('OPN-GL-01: surplus fisik menerbitkan jurnal Dr Persediaan dan Cr HPP secara seimbang', function () {
     $ctx = opnContext();
     $service = app(StockOpnameService::class);
 
@@ -39,7 +39,7 @@ test('OPN-GL-01: surplus fisik menerbitkan jurnal Dr Persediaan dan Cr Penyesuai
     expect((float) $journals->sum('debit'))->toBe((float) $journals->sum('credit'));
 });
 
-test('OPN-GL-02: defisit fisik (shrinkage) menerbitkan jurnal Dr Penyesuaian Persediaan dan Cr Persediaan secara seimbang', function () {
+test('OPN-GL-02: defisit fisik (shrinkage) menerbitkan jurnal Dr HPP dan Cr Persediaan secara seimbang', function () {
     $ctx = opnContext();
     $service = app(StockOpnameService::class);
 

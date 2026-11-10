@@ -474,8 +474,12 @@ class QualityControlService
         $date = now();
         $reference = $qualityControl->qc_number;
 
+        // Ko Handy 10 Nov 2026: persediaan dinilai pada HPP master produk; pengadaan sementara tetap pada harga PO; selisih → Selisih Pembelian.
+        $valuation = \App\Support\InventoryValuation::forPurchase($product, (float) $passedQuantity, (float) $unitPrice);
+
         DB::transaction(function () use (
             $amount,
+            $valuation,
             $date,
             $fromModel,
             $inventoryCoa,
@@ -500,13 +504,27 @@ class QualityControlService
                 'coa_id' => $inventoryCoa->id,
                 'date' => $date,
                 'reference' => $reference,
-                'description' => 'QC Inventory - Debit inventory for QC passed items: ' . $qualityControl->qc_number,
-                'debit' => $amount,
+                'description' => 'QC Inventory - Debit inventory (HPP) for QC passed items: ' . $qualityControl->qc_number,
+                'debit' => $valuation['inventory_amount'],
                 'credit' => 0,
                 'journal_type' => 'inventory',
                 'source_type' => QualityControl::class,
                 'source_id' => $qualityControl->id,
             ]);
+
+            if ($valuation['variance'] != 0.0 && $valuation['variance_coa']) {
+                JournalEntry::create([
+                    'coa_id' => $valuation['variance_coa']->id,
+                    'date' => $date,
+                    'reference' => $reference,
+                    'description' => 'QC Inventory - Selisih harga PO vs HPP: ' . $qualityControl->qc_number,
+                    'debit' => $valuation['variance'] > 0 ? round($valuation['variance'], 2) : 0,
+                    'credit' => $valuation['variance'] < 0 ? round(abs($valuation['variance']), 2) : 0,
+                    'journal_type' => 'inventory',
+                    'source_type' => QualityControl::class,
+                    'source_id' => $qualityControl->id,
+                ]);
+            }
 
             JournalEntry::create([
                 'coa_id' => $temporaryProcurementCoa->id,
@@ -533,7 +551,8 @@ class QualityControlService
                 'source' => 'quality_control',
                 'qc_id' => $qualityControl->id,
                 'qc_number' => $qualityControl->qc_number,
-                'unit_cost' => $unitPrice,
+                'unit_cost' => $valuation['unit_cost'],
+                'po_unit_price_idr' => $unitPrice,
                 'currency' => $qualityControl->from_model_type === 'App\Models\PurchaseOrderItem'
                     ? optional($fromModel->purchaseOrder->purchaseOrderCurrency->first())->currency_code
                     : optional($fromModel->purchaseReceipt->currency)->code,
@@ -548,7 +567,7 @@ class QualityControlService
                 'product_id' => $product->id,
                 'warehouse_id' => $qualityControl->warehouse_id,
                 'quantity' => $passedQuantity,
-                'value' => $amount,
+                'value' => $valuation['inventory_amount'],
                 'type' => 'purchase_in',
                 'date' => $date,
                 'notes' => 'Stock inbound from QC completion: ' . $qualityControl->qc_number,

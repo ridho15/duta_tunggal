@@ -345,8 +345,10 @@ class DeliveryOrderSourceHardeningTest extends TestCase
         $this->stock($this->warehouse2->id, 10);
         [$do, $doItem] = $this->deliveredDo('B16', [[$this->warehouse1->id, 6], [$this->warehouse2->id, 4]]);
 
-        $this->assertEquals(4, InventoryStock::where('warehouse_id', $this->warehouse1->id)->value('qty_available'));
-        $this->assertEquals(6, InventoryStock::where('warehouse_id', $this->warehouse2->id)->value('qty_available'));
+        // DO belum berangkat: stok dikunci per gudang sumber, stok fisik utuh
+        $this->assertEquals(10, InventoryStock::where('warehouse_id', $this->warehouse1->id)->value('qty_available'));
+        $this->assertEquals(6, InventoryStock::where('warehouse_id', $this->warehouse1->id)->value('qty_reserved'));
+        $this->assertEquals(4, InventoryStock::where('warehouse_id', $this->warehouse2->id)->value('qty_reserved'));
 
         $return = $this->returnFor($do, $doItem, 'RN-B16', 8);
         app(ReturnProductService::class)->updateQuantityFromModel($return->fresh());
@@ -356,6 +358,10 @@ class DeliveryOrderSourceHardeningTest extends TestCase
         $returned = StockMovement::where('type', 'do_return')->get()->groupBy('warehouse_id')->map(fn ($rows) => (float) $rows->sum('quantity'));
         $this->assertEquals([$this->warehouse1->id => 6.0, $this->warehouse2->id => 2.0], $returned->all());   // jenis mutasi sendiri (B17), bukan customer_return
         $this->assertSame(0, StockMovement::where('type', 'customer_return')->count());
+
+        // Barang kondisi baik yang diretur sebelum DO berangkat: tercatat keluar lalu kembali, stok fisik netto TIDAK bertambah
+        $this->assertEquals(10, InventoryStock::where('warehouse_id', $this->warehouse1->id)->value('qty_available'));
+        $this->assertEquals(10, InventoryStock::where('warehouse_id', $this->warehouse2->id)->value('qty_available'));
     }
 
     public function test_return_product_approval_is_idempotent_for_stock_movements(): void

@@ -74,11 +74,11 @@ it('RC-02: invarian cadangan stok menjamin nol reservasi phantom dan stok fisik 
         ->where('warehouse_id', $ctx['warehouse']->id)
         ->sum('quantity');
 
-    // Tahap 3: DO memotong stok fisik saat dibuat (40 → 20) dan tidak menahan reservasi apa pun
+    // DO mengunci stoknya (12 + 8 = 20) tanpa memotong stok fisik (tetap 40); qty_reserved = Σ reservasi aktif
     $physicalNow = fn () => (float) InventoryStock::withoutGlobalScopes()->where('product_id', $ctx['product']->id)->where('warehouse_id', $ctx['warehouse']->id)->sum('qty_available');
-    expect($reservedInStock)->toBe(0.0)
-        ->and($activeReservations)->toBe(0.0)
-        ->and($physicalNow())->toBe(20.0)
+    expect($reservedInStock)->toBe(20.0)
+        ->and($activeReservations)->toBe(20.0)
+        ->and($physicalNow())->toBe(40.0)
         ->and(abs($reservedInStock - $activeReservations))->toBe(0.0);
 
     // DO 1 dikirim -> reservasi DO 1 dilepas/dikonsumsi
@@ -94,10 +94,10 @@ it('RC-02: invarian cadangan stok menjamin nol reservasi phantom dan stok fisik 
         ->where('warehouse_id', $ctx['warehouse']->id)
         ->sum('quantity');
 
-    // Dikirim tidak memotong lagi (fisik tetap 20) dan tidak ada reservasi phantom
-    expect($reservedAfterSend)->toBe(0.0)
-        ->and($activeAfterSend)->toBe(0.0)
-        ->and($physicalNow())->toBe(20.0)
+    // DO 1 berangkat: fisik 40 → 28, kunci DO 1 dikonsumsi (sisa kunci DO 2 = 8), tidak ada reservasi phantom
+    expect($reservedAfterSend)->toBe(8.0)
+        ->and($activeAfterSend)->toBe(8.0)
+        ->and($physicalNow())->toBe(28.0)
         ->and(abs($reservedAfterSend - $activeAfterSend))->toBe(0.0);
 
     // DO 2 dibatalkan (closed) -> cadangan harus kembali menjadi 0
@@ -112,7 +112,7 @@ it('RC-02: invarian cadangan stok menjamin nol reservasi phantom dan stok fisik 
         ->where('warehouse_id', $ctx['warehouse']->id)
         ->sum('quantity');
 
-    // DO 2 (8 pcs) dibatalkan → 8 pcs kembali ke stok fisik (20 → 28); DO 1 (12) tetap di luar gudang
+    // DO 2 (8 pcs) dibatalkan → kuncinya dilepas; stok fisik tetap 28 (DO 1 yang 12 sudah di luar gudang)
     expect($finalReserved)->toBe(0.0)
         ->and($finalActive)->toBe(0.0)
         ->and($physicalNow())->toBe(28.0)

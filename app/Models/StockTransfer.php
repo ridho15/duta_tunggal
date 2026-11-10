@@ -18,7 +18,8 @@ class StockTransfer extends Model
         'from_warehouse_id',
         'to_warehouse_id',
         'transfer_date',
-        'status' //Pending, completed, cancelled, Draft, Approved, Request, Reject
+        'status', //Pending, completed, cancelled, Draft, Approved, Request, Reject
+        'notes', // keterangan mutasi (mis. supplier salah kirim gudang)
     ];
 
     public function fromWarehouse()

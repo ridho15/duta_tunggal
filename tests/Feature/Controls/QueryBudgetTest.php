@@ -49,7 +49,8 @@ it('anggaran: Jadwal Mulai/Selesai (rantai DO → stok → jurnal → invoice), 
 
     // Terukur (data dev): mulai 37 (22 Sep) → 49 (4 Nov: +5 insert activity_log untuk jejak audit, +cek periode akuntansi per jurnal; tanpa N+1) ·
     // selesai 100 (target audit ≤ 60, lanjutan) · approve 7 · terbit 37. Anggaran = terukur + ±15%.
-    expect($start)->toBeLessThanOrEqual(57, "Jadwal Mulai: {$start} kueri")
+    // 9 Nov: mulai 60 — saat berangkat kunci stok DO dikonsumsi (baca reservasi, hapus, turunkan qty_reserved, catat event); konstan per baris, bukan N+1.
+    expect($start)->toBeLessThanOrEqual(69, "Jadwal Mulai: {$start} kueri")
         ->and($complete)->toBeLessThanOrEqual(115, "Jadwal Selesai: {$complete} kueri")
         ->and($approve)->toBeLessThanOrEqual(10, "SO Approve: {$approve} kueri")
         ->and($issue)->toBeLessThanOrEqual(45, "Nota Kredit Terbit: {$issue} kueri");

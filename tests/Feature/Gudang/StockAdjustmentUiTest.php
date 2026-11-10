@@ -29,7 +29,7 @@ function adjSetup(float $qty = 10): array
     // Baris stok (produk, gudang, tanpa rak) bisa sudah ada dari pembuatan produk: ubah, jangan gandakan.
     $stock = InventoryStock::updateOrCreate(['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'rak_id' => null], ['qty_available' => $qty, 'qty_reserved' => 0, 'qty_min' => 0]);
     // Persetujuan membuat jurnal: butuh akun persediaan dan akun selisih (kode default service).
-    foreach ([['1140.10', 'Asset'], ['7000.04', 'Revenue'], ['8000.05', 'Expense']] as [$code, $type]) {
+    foreach ([['1140.10', 'Asset'], ['5100.10', 'Expense'], ['7000.04', 'Revenue'], ['8000.05', 'Expense']] as [$code, $type]) {
         ChartOfAccount::firstOrCreate(['code' => $code], ['name' => 'Akun uji '.$code, 'type' => $type]);
     }
 

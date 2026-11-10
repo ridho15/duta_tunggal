@@ -281,8 +281,8 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
         echo "\n\n=== DELIVERY ORDER APPROVED ===";
         echo "\nStatus: {$deliveryOrder->fresh()->status}";
 
-        // Tahap 3: stok fisik sudah dipotong saat DO dibuat, DO tidak menahan reservasi.
-        $this->assertCount(0, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get());
+        // Stok bebas terkunci sejak DO dibuat (reservasi DO); stok fisik dipotong saat dikirim.
+        $this->assertCount(1, StockReservation::where('delivery_order_id', $deliveryOrder->id)->get());
 
         // Check inventory stock after reservation
         // NOTE: qty_reserved may not update if product/warehouse/rak don't match exactly in test
@@ -301,11 +301,11 @@ class SalesOrderToDeliveryOrderCompleteTest extends TestCase
             ->where('from_model_type', DeliveryOrderItem::class)
             ->whereIn('from_model_id', $deliveryOrder->deliveryOrderItem->pluck('id'))
             ->get();
-        $this->assertCount(1, $stockMovements, 'Satu mutasi keluar (dibuat saat DO dibuat, tidak ganda di sent)');
+        $this->assertCount(1, $stockMovements, 'Satu mutasi keluar, dibuat saat DO dikirim');
 
         $stockMovement = $stockMovements->first();
         $meta = is_string($stockMovement->meta) ? json_decode($stockMovement->meta, true) : $stockMovement->meta;
-        $this->assertArrayHasKey('do_created_deduction', $meta, 'Mutasi berasal dari pemotongan saat DO dibuat');
+        $this->assertArrayHasKey('dispatch_deduction', $meta, 'Mutasi berasal dari pemotongan saat DO dikirim');
 
         // ==========================================
         // STEP 8: RECEIVE DELIVERY ORDER

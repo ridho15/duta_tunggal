@@ -27,6 +27,7 @@
                 'label' => (string)($item['label'] ?? $item['name'] ?? $item['title'] ?? ''),
                 'subtext' => (string)($item['subtext'] ?? $item['code'] ?? $item['sku'] ?? $item['description'] ?? ''),
                 'badge' => (string)($item['badge'] ?? ''),
+                'meta' => $item['meta'] ?? null,
             ];
         } elseif (is_object($item)) {
             return [
@@ -235,9 +236,19 @@
                     </li>
                 </template>
 
+                {{-- Mode remote: petunjuk & status memuat --}}
+                <li x-show="searchUrl && loading" class="py-4 px-3 text-center text-gray-400 select-none">Mencari...</li>
+                <li
+                    x-show="searchUrl && !loading && !searchQuery.trim() && filteredOptions.length === 0"
+                    class="py-6 px-3 text-center text-gray-400 select-none"
+                >
+                    <div class="font-semibold text-gray-600 text-xs">Ketik untuk mencari</div>
+                    <div class="text-[11px] text-gray-400 mt-0.5">Ketik nama, kode, atau perusahaan.</div>
+                </li>
+
                 {{-- Empty Search Results --}}
                 <li
-                    x-show="filteredOptions.length === 0"
+                    x-show="filteredOptions.length === 0 && !loading && (!searchUrl || searchQuery.trim())"
                     class="py-6 px-3 text-center text-gray-400 select-none"
                 >
                     <svg class="w-6 h-6 mx-auto text-gray-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,6 +289,43 @@ function searchableSelect(config) {
         open: false,
         searchQuery: '',
         highlightIndex: 0,
+        searchUrl: config.searchUrl || null,
+        remoteOptions: [],
+        loading: false,
+        searchSeq: 0,
+        searchTimer: null,
+
+        init() {
+            if (!this.searchUrl) return;
+            this.$watch('searchQuery', (q) => {
+                clearTimeout(this.searchTimer);
+                const term = (q || '').trim();
+                if (!term) {
+                    this.searchSeq++;   // abaikan respons yang masih di jalan
+                    this.remoteOptions = [];
+                    this.loading = false;
+                    return;
+                }
+                this.loading = true;
+                this.searchTimer = setTimeout(() => this.fetchRemote(term), 250);
+            });
+        },
+
+        async fetchRemote(term) {
+            const seq = ++this.searchSeq;
+            try {
+                const url = this.searchUrl + (this.searchUrl.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(term);
+                const res = await fetch(url, { headers: { Accept: 'application/json' } });
+                const data = res.ok ? await res.json() : { options: [] };
+                if (seq !== this.searchSeq) return;
+                this.remoteOptions = (data.options || []).map(o => ({ ...o, id: String(o.id) }));
+                this.highlightIndex = 0;
+            } catch (e) {
+                if (seq === this.searchSeq) this.remoteOptions = [];
+            } finally {
+                if (seq === this.searchSeq) this.loading = false;
+            }
+        },
 
         get selectedOption() {
             return this.options.find(opt => String(opt.id) === String(this.selected)) || null;

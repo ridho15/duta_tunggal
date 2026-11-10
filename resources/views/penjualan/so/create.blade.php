@@ -312,7 +312,7 @@
 
             <!-- Price Violation Warning Card -->
             <div id="priceViolationAlert" class="hidden bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-900">
-                <span class="font-bold">Harga di bawah batas.</span> SO tetap tersimpan, namun membutuhkan approve atasan (bukan kasir).
+                <span class="font-bold">Harga di bawah batas.</span> SO tidak dapat disimpan dengan harga ini. Harga di bawah batas hanya bisa lewat Penawaran yang sudah di-approve.
             </div>
 
             <!-- Credit Limit Status Card -->

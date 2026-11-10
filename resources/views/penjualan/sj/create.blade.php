@@ -163,10 +163,25 @@
                         <input
                             type="date"
                             name="issued_at"
-                            value="{{ date('Y-m-d') }}"
+                            value="{{ old('issued_at', date('Y-m-d')) }}"
                             required
                             class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:border-[#15803d]"
                         >
+                    </div>
+
+                    {{-- Tanggal Kirim (jadwal pengiriman) — stok terpotong pada tanggal ini --}}
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">
+                            Tanggal Kirim
+                        </label>
+                        <input
+                            type="date"
+                            name="delivery_date"
+                            value="{{ old('delivery_date', date('Y-m-d')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:border-[#15803d]"
+                        >
+                        <p class="text-[11px] text-gray-500 mt-1">Stok berkurang pada tanggal kirim. Bila di masa depan, barang tetap terkunci sampai tanggal itu. Kosong = tanggal Surat Jalan.</p>
+                        @error('delivery_date') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     {{-- Metode Pengiriman --}}

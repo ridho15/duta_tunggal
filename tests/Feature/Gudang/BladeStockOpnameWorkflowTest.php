@@ -75,6 +75,10 @@ class BladeStockOpnameWorkflowTest extends TestCase
             ['code' => '8000.05'],
             ['name' => 'Selisih Persediaan Test', 'type' => 'Expense', 'normal_balance' => 'Debit']
         );
+        ChartOfAccount::firstOrCreate(
+            ['code' => '5100.10'],
+            ['name' => 'HPP Test', 'type' => 'Expense', 'normal_balance' => 'Debit']
+        );
 
         $role = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
         $perms = [

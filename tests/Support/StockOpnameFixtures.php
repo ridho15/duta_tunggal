@@ -77,7 +77,8 @@ function opnContext(array $overrides = []): array
     $expenseVarianceCoa = ChartOfAccount::where('code', config('coa.inventory_variance_loss', '8000.05'))->first()
         ?? $coa('8000.05', 'Beban Selisih Penyesuaian Persediaan', 'Expense');
 
-    $adjustmentCoa = $expenseVarianceCoa;
+    // Ko Handy 10 Nov 2026 (#4B): akun lawan selisih opname = HPP (bukan pendapatan/biaya lain-lain).
+    $adjustmentCoa = ChartOfAccount::where('code', '5100.10')->first() ?? $coa('5100.10', 'Harga Pokok Penjualan', 'Expense');
 
     $kasCoa = $coa('1101', 'Kas Operasional', 'Asset');
 

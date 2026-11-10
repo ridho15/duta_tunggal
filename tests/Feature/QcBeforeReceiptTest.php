@@ -46,7 +46,9 @@ class QcBeforeReceiptTest extends TestCase
         $this->user = User::factory()->create();
         $this->supplier = Supplier::factory()->create();
         $this->warehouse = Warehouse::factory()->create();
-        $this->product = Product::factory()->create();
+        // HPP 0 → persediaan dinilai harga PO (cadangan InventoryValuation), sehingga tes ini tetap menguji konversi kurs harga PO
+        // tanpa terganggu HPP acak factory. Penilaian berbasis HPP diuji di Purchasing/InventoryValuationHppTest.
+        $this->product = Product::factory()->create(['cost_price' => 0]);
         $this->currency = Currency::factory()->create([
             'name' => 'Indonesian Rupiah',
             'symbol' => 'Rp',
@@ -121,7 +123,7 @@ class QcBeforeReceiptTest extends TestCase
             'source_type' => PurchaseReceiptItem::class,
             'source_id' => $receiptItem->id,
             'journal_type' => 'inventory',
-            'description' => 'Debit inventory for receipt item ' . $receiptItem->id,
+            'description' => 'Debit inventory (HPP) for receipt item ' . $receiptItem->id,
             'debit' => 50000,
         ]);
         $this->assertDatabaseHas('journal_entries', [

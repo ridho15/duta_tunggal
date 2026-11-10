@@ -26,6 +26,7 @@ use App\Support\ProductPriceLimitation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -184,6 +185,13 @@ class SaleOrderController extends Controller
 
         // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
         $selectedQuotationId = $request->query('quotation_id');
+        $prefillCustomerId = old('customer_id')
+            ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : null);
+        $customers = $this->customerPayload(
+            $prefillCustomerId ? $this->customerQuery()->whereKey($prefillCustomerId)->get() : collect()
+        );
+
+
         $prefillIds = collect(old('items', []))->pluck('product_id')
             ->merge($selectedQuotationId ? QuotationItem::where('quotation_id', $selectedQuotationId)->pluck('product_id') : [])
             ->filter()->unique()->values();
@@ -242,6 +250,82 @@ class SaleOrderController extends Controller
         return response()->json(['success' => true, 'products' => $this->productPayload($products)]);
     }
 
+    /**
+     * Pencarian customer untuk form Buat SO (AJAX). Menggantikan pengiriman seluruh master customer di payload halaman.
+     * Setiap kata harus cocok di nama, kode, atau perusahaan; kode yang persis sama diurutkan lebih dulu.
+     */
+    public function searchCustomers(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+        abort_if($q === '', 422, 'Kata pencarian wajib diisi.');
+
+        $query = $this->customerQuery();
+        foreach (preg_split('/\s+/', $q, -1, PREG_SPLIT_NO_EMPTY) as $term) {
+            $like = '%'.addcslashes($term, '\\%_').'%';
+            $query->where(fn ($w) => $w->where('name', 'like', $like)
+                ->orWhere('code', 'like', $like)
+                ->orWhere('perusahaan', 'like', $like));
+        }
+
+        $customers = $query->orderByRaw('code = ? desc', [$q])->orderBy('name')->limit(25)->get();
+
+        return response()->json(['success' => true, 'options' => $this->customerPayload($customers)]);
+    }
+
+    private function customerQuery()
+    {
+        return Customer::query()->with('deposit')->select([
+            'id', 'code', 'name', 'perusahaan', 'address', 'phone', 'telephone',
+            'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe',
+        ]);
+    }
+
+    /** Bentuk opsi customer untuk searchable-select; `meta` dibaca JS form SO (limit kredit, deposit, alamat kirim). */
+    private function customerPayload($customers)
+    {
+        return $customers->map(fn ($c) => [
+            'id' => (string) $c->id,
+            'label' => $c->name.($c->code ? ' ('.$c->code.')' : ''),
+            'subtext' => ($c->address ? Str::limit($c->address, 35) : '').' | Limit: Rp '.number_format((float) $c->kredit_limit, 0, ',', '.').' | Tipe: '.$c->tipe_pembayaran,
+            'badge' => $c->tipe_pembayaran ?? 'Customer',
+            'meta' => [
+                'id' => (string) $c->id,
+                'name' => $c->name,
+                'tipe' => $c->tipe_pembayaran ?? 'Tunai',
+                'limit' => (float) $c->kredit_limit,
+                'tempo' => (int) $c->tempo_kredit,
+                'address' => $c->address ?? '',
+                'phone' => $c->phone ?: ($c->telephone ?? ''),
+                'deposit' => (float) ($c->deposit?->remaining_amount ?? 0),
+            ],
+        ])->values();
+    }
+
+    /**
+     * Harga efektif (setelah diskon) per produk dari Penawaran yang SUDAH di-approve — jalur sah untuk harga di bawah batas.
+     *
+     * @return array<int, float> product_id => harga efektif terendah yang disetujui
+     */
+    private function approvedQuotationEffectivePrices($quotationId): array
+    {
+        if (! $quotationId) {
+            return [];
+        }
+
+        $quotation = Quotation::query()->with('quotationItem')->find($quotationId);
+        if (! $quotation || $quotation->status !== Quotation::STATUS_APPROVE) {
+            return [];
+        }
+
+        $prices = [];
+        foreach ($quotation->quotationItem as $qi) {
+            $effective = (float) $qi->unit_price * (1 - max(0.0, min(100.0, (float) ($qi->discount ?? 0))) / 100);
+            $prices[(int) $qi->product_id] = min($prices[(int) $qi->product_id] ?? INF, $effective);
+        }
+
+        return $prices;
+    }
+
     private function activeProducts()
     {
         return Product::query()->with('uom')->where(fn ($q) => $q->whereNull('is_active')->orWhere('is_active', true));
@@ -261,7 +345,7 @@ class SaleOrderController extends Controller
             'sku' => $p->sku,
             'name' => $p->name,
             'sell_price' => (float) $p->sell_price,
-            'bottom_price' => (float) ($p->bottom_price ?? 0),
+            'bottom_price' => ProductPriceLimitation::getMinimumAllowedPrice($p),
             'free_stock' => max(0.0, (float) ($freeStock[$p->id] ?? 0)),
             'uom' => $p->uom?->abbreviation ?? 'PCS',
         ])->values();
@@ -307,22 +391,31 @@ class SaleOrderController extends Controller
         $exchangeRate = (float) ($validated['exchange_rate'] ?? ($currency?->to_rupiah ?? 1.0));
         $shippingCost = (float) ($validated['shipping_cost'] ?? 0);
 
-        // Hitung estimasi total & periksa pelanggaran batas harga bawah
-        $hasPriceViolation = false;
+        // Batas harga (keputusan Ko Handy 09 Nov 2026): harga di bawah batas DITOLAK saat simpan. Harga di bawah batas hanya sah bila
+        // berasal dari Penawaran yang sudah di-approve (penawaran adalah jalur persetujuannya).
+        $approvedQuotePrices = $this->approvedQuotationEffectivePrices($validated['quotation_id'] ?? null);
+        $priceErrors = [];
         $totalItemsAmount = 0;
 
-        foreach ($validated['items'] as $item) {
+        foreach ($validated['items'] as $idx => $item) {
             $product = Product::find($item['product_id']);
             $unitPrice = (float) $item['unit_price'];
             $disc = (float) ($item['discount'] ?? 0);
             $qty = (float) $item['quantity'];
 
-            if ($product && ProductPriceLimitation::validatePrice($product, $unitPrice, $disc)) {
-                $hasPriceViolation = true;
+            $message = $product ? ProductPriceLimitation::validatePrice($product, $unitPrice, $disc) : null;
+            $effective = $unitPrice * (1 - max(0.0, min(100.0, $disc)) / 100);
+            $approvedFloor = $approvedQuotePrices[(int) $item['product_id']] ?? null;
+            if ($message && ($approvedFloor === null || $effective + 0.005 < $approvedFloor)) {
+                $priceErrors["items.{$idx}.unit_price"] = $message.' Harga di bawah batas hanya bisa lewat Penawaran yang sudah di-approve.';
             }
 
             $subtotal = HelperController::hitungSubtotal($qty, $unitPrice, $disc, 0, 'None');
             $totalItemsAmount += (float) $subtotal;
+        }
+
+        if ($priceErrors !== []) {
+            return redirect()->back()->withInput()->withErrors($priceErrors);
         }
 
         $grandTotalIdr = CurrencyConversionResolver::convertToIdr(

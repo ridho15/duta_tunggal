@@ -250,6 +250,21 @@
                                 Alasan: {{ $receipt->warehouse_override_reason ?: '(tidak dicatat)' }}
                             </div>
                         @endif
+                        {{-- Keputusan Ko Handy 10 Nov: barang diterima di gudang tujuan PO. Bila fisik sebenarnya di gudang lain
+                             (mis. supplier salah kirim), buat mutasi dari gudang GRN → gudang tersebut dengan keterangan. --}}
+                        @if (\App\Http\Controllers\Gudang\StockTransferController::userMay(auth()->user(), 'create stock transfer'))
+                            <div class="sm:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+                                Bila barang sebenarnya berada di gudang lain (mis. supplier salah kirim lokasi), buat mutasi ke gudang tersebut.
+                                @if ($receipt->status === 'completed')
+                                    <a href="{{ route('gudang.transfer.create', ['from_purchase_receipt' => $receipt->id]) }}"
+                                       class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#15803d] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#166534]">
+                                        Buat Mutasi Stok ke Gudang Lain
+                                    </a>
+                                @else
+                                    <span class="mt-1 block text-gray-500">Tombol "Buat Mutasi Stok" tersedia setelah penerimaan dikonfirmasi (stok sudah masuk).</span>
+                                @endif
+                            </div>
+                        @endif
                     </div>
 
                     <div>

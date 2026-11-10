@@ -102,7 +102,7 @@ it('spec: pengiriman parsial — DO1 12 dikirim menyisakan tertahan 8; DO2 8 dik
         ->and($so->fresh()->status)->toBe('completed');
 });
 
-it('spec: tidak ada double reservasi — DO mengeluarkan stok fisik dan SO hanya menahan sisa, total tertahan tidak berlipat', function () {
+it('spec: tidak ada double reservasi — DO mengunci stoknya dan SO hanya menahan sisa, total tertahan tidak berlipat', function () {
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
     [$soA, $itemA] = stkSaleOrder($ctx, 20);
@@ -112,11 +112,11 @@ it('spec: tidak ada double reservasi — DO mengeluarkan stok fisik dan SO hanya
 
     stkDeliveryOrder($ctx, $soA, $itemA, 12, 'approved');
 
-    // Tahap 3: fisik 30 → 18 (12 keluar lewat DO); SO A menahan sisa 8, SO B tetap 10 → tertahan 18 = fisik, tidak melebihi stok nyata
+    // Fisik tetap 30; DO A mengunci 12, SO A menahan sisa 8, SO B tetap 10 → tertahan 30 = fisik, tidak melebihi stok nyata
     $physical = (float) InventoryStock::where('product_id', $ctx['product']->id)->sum('qty_available');
     $reserved = (float) InventoryStock::where('product_id', $ctx['product']->id)->sum('qty_reserved');
-    expect($physical)->toEqual(18.0)
-        ->and($reserved)->toEqual(18.0)
+    expect($physical)->toEqual(30.0)
+        ->and($reserved)->toEqual(30.0)
         ->and($reserved)->toBeLessThanOrEqual($physical)
         ->and(SaleOrder::count())->toBe(2);
 });

@@ -32,7 +32,7 @@ it('DO dapat dibuat tanpa driver/kendaraan (nullable) dan WC dibuat per item dar
         ->and($do->fresh()->status)->toBe('request_stock');
 });
 
-it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) tanpa reservasi DO (stok sudah terpotong); WC ditolak → DO Ditolak', function () {
+it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved), stok tetap terkunci tanpa dipotong; WC ditolak → DO Ditolak, kunci dilepas', function () {
     config(['sales.stock.ledger' => true]);
     $ctx = stkContext();
     stkSetStock($ctx['product'], $ctx['warehouse'], 30);
@@ -43,10 +43,10 @@ it('semua WC dikonfirmasi → DO otomatis Siap Kirim (approved) tanpa reservasi 
     WarehouseConfirmation::where('confirmable_id', $do->id)->where('confirmable_type', DeliveryOrder::class)->get()
         ->each(fn ($wc) => $wc->update(['status' => 'confirmed']));
 
-    // Tahap 3: stok fisik terpotong sejak DO dibuat (30 → 26); konfirmasi gudang tidak menahan reservasi DO lagi
+    // Stok dikunci sejak DO dibuat (4); konfirmasi gudang tidak memotong stok fisik — itu terjadi saat Dikirim
     expect($do->fresh()->status)->toBe('approved')
-        ->and(stkReserved($so, $do))->toBe(0.0)
-        ->and(stkStock($ctx['product'], $ctx['warehouse'])['reserved'])->toBe(0.0);
+        ->and(stkReserved($so, $do))->toBe(4.0)
+        ->and(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 30.0, 'reserved' => 4.0, 'free' => 26.0]);
 
     // DO lain: WC ditolak gudang → DO Ditolak
     $rejected = stkDeliveryOrder($ctx, $so, $item, 2);

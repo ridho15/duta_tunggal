@@ -190,11 +190,13 @@ test('ADV-DO-02: Delivery Order Splitter automatically separates multi-warehouse
     expect((float) $doA->deliveryOrderItem->first()->quantity)->toBe(8.0);
     expect((float) $doB->deliveryOrderItem->first()->quantity)->toBe(5.0);
 
-    // Verifikasi stok fisik terpotong/terikat: Gudang A sisa 2, Gudang B sisa 5
+    // Verifikasi stok terkunci per gudang (stok fisik belum berkurang sampai DO dikirim): bebas Gudang A 2, Gudang B 5
     $this->stockA->refresh();
     $this->stockB->refresh();
-    expect((float) $this->stockA->qty_available)->toBe(2.0);
-    expect((float) $this->stockB->qty_available)->toBe(5.0);
+    expect((float) $this->stockA->qty_available - (float) $this->stockA->qty_reserved)->toBe(2.0);
+    expect((float) $this->stockB->qty_available - (float) $this->stockB->qty_reserved)->toBe(5.0);
+    expect((float) $this->stockA->qty_reserved)->toBe(8.0);
+    expect((float) $this->stockB->qty_reserved)->toBe(5.0);
 });
 
 test('ADV-DO-03: Illegal status jump directly from request_stock to completed is rejected', function () {
@@ -279,10 +281,11 @@ test('UAT-DO-01: Checker creates valid DO with 4-Layer Data Validation', functio
     expect($do->deliveryOrderItem->count())->toBe(1);
     expect((float) $do->deliveryOrderItem->first()->quantity)->toBe(6.0);
 
-    // LAYER 2: Hubungan ke SO tercatat & stok fisik terpotong (10 - 6 = 4)
+    // LAYER 2: Hubungan ke SO tercatat & stok terkunci (bebas 10 - 6 = 4; fisik tetap 10 sampai dikirim)
     expect($do->salesOrders()->where('sale_orders.id', $so->id)->exists())->toBeTrue();
     $this->stockA->refresh();
-    expect((float) $this->stockA->qty_available)->toBe(4.0);
+    expect((float) $this->stockA->qty_available)->toBe(10.0);
+    expect((float) $this->stockA->qty_available - (float) $this->stockA->qty_reserved)->toBe(4.0);
 
     // LAYER 3: Jurnal Akuntansi (Belum ada jurnal saat DO dibuat, jurnal baru saat SJ terbit / Delivered)
     expect(DB::table('journal_entries')->where('source_type', DeliveryOrder::class)->where('source_id', $do->id)->count())->toBe(0);

@@ -158,6 +158,8 @@ class SuratJalanController extends Controller
             'delivery_order_ids' => 'required|array|min:1',
             'delivery_order_ids.*' => 'exists:delivery_orders,id',
             'issued_at' => 'required|date',
+            // Tanggal kirim (jadwal pengiriman). Kosong = tanggal SJ dibuat. Stok terpotong pada tanggal ini (Ko Handy 10 Nov).
+            'delivery_date' => 'nullable|date|after_or_equal:issued_at',
             'cabang_id' => 'nullable|exists:cabangs,id',
             'delivery_method' => 'required|in:internal,ekspedisi',
             'driver_id' => 'nullable|exists:drivers,id',
@@ -165,6 +167,8 @@ class SuratJalanController extends Controller
             'expedition_name' => 'nullable|string|max:100',
             'tracking_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+        ], [
+            'delivery_date.after_or_equal' => 'Tanggal kirim tidak boleh sebelum tanggal Surat Jalan.',
         ]);
 
         $deliveryOrders = DeliveryOrder::whereIn('id', $validated['delivery_order_ids'])->get();
@@ -177,9 +181,12 @@ class SuratJalanController extends Controller
         $suratJalan = DB::transaction(function () use ($validated, $deliveryOrders, $cabangId) {
             $sjNumber = $this->suratJalanService->generateCode($cabangId);
 
+            $deliveryDate = Carbon::parse($validated['delivery_date'] ?? $validated['issued_at'])->startOfDay();
+
             $sj = SuratJalan::create([
                 'sj_number' => $sjNumber,
                 'issued_at' => Carbon::parse($validated['issued_at']),
+                'delivery_date' => $deliveryDate->toDateString(),
                 'status' => SuratJalan::STATUS_ISSUED,
                 'signed_by' => Auth::id(),
                 'created_by' => Auth::id(),
@@ -189,7 +196,8 @@ class SuratJalanController extends Controller
             // Hubungkan DO
             $sj->deliveryOrder()->attach($deliveryOrders->pluck('id'));
 
-            // Otomatis tandai DO terkirim & diterima
+            // Otomatis tandai DO terkirim & diterima — langsung bila tanggal kirim ≤ hari ini; bila di masa depan, DO tetap terkunci
+            // sampai tanggal kirim (diberangkatkan `sales:dispatch-scheduled-surat-jalan`).
             $this->suratJalanService->markDeliveryOrdersReceived($sj);
 
             // Buat record DeliverySchedule agar terhubung rapi ke logistik & cetakan PDF
@@ -202,14 +210,14 @@ class SuratJalanController extends Controller
 
                 $schedule = DeliverySchedule::create([
                     'schedule_number' => $scheduleNum,
-                    'scheduled_date' => Carbon::parse($validated['issued_at'])->format('Y-m-d'),
+                    'scheduled_date' => $deliveryDate->format('Y-m-d'),
                     'delivery_method' => $validated['delivery_method'],
                     'driver_id' => $driver?->id,
                     'vehicle_id' => $vehicle?->id,
                     'driver_name' => $driver ? $driver->name : ($validated['expedition_name'] ?? '-'),
                     'vehicle_info' => $vehicle ? $vehicle->plate : ($validated['tracking_number'] ?? '-'),
                     'tracking_number' => $validated['tracking_number'] ?? null,
-                    'status' => 'delivered',
+                    'status' => $sj->isDeliveryDue() ? 'delivered' : 'pending',
                     'notes' => $validated['notes'] ?? null,
                     'created_by' => Auth::id(),
                     'cabang_id' => $cabangId,
