@@ -148,19 +148,18 @@ it('gudang tujuan PO yang sudah nonaktif tetap muncul di pilihan form GRN', func
         ->assertOk()->assertSee('Gudang Lama')->assertSee('nonaktif');
 });
 
-it('"Pindah ke Gudang Tujuan PO": tombol muncul setelah GRN dikonfirmasi dan form Pindah Stok terisi dari GRN', function () {
+// Keputusan Ko Handy 10 Nov 2026: barang diterima di gudang tujuan PO; bila fisik di gudang lain, buat mutasi dari gudang GRN → gudang lain.
+it('"Buat Mutasi Stok": tombol muncul setelah GRN dikonfirmasi; form mutasi terisi dari gudang GRN (asal), tujuan dikosongkan', function () {
     $ctx = stkContext();
-    $target = stkWarehouse($ctx, 'Gudang Tujuan');
-    $other = stkWarehouse($ctx, 'Gudang Titipan');
+    $target = stkWarehouse($ctx, 'Gudang Tujuan');   // tujuan PO = gudang terima
     $po = grnPo($ctx, $target);
 
-    $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $other->id, ['warehouse_override_reason' => 'Vendor salah kirim']))
-        ->assertSessionHasNoErrors();
+    $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id))->assertSessionHasNoErrors();
     $grn = PurchaseReceipt::latest('id')->firstOrFail();
     $transferUrl = route('gudang.transfer.create', ['from_purchase_receipt' => $grn->id]);
 
     // Tanpa hak Pindah Stok: tidak ada tombol sama sekali.
-    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertDontSee('Pindah ke Gudang Tujuan PO');
+    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertDontSee('Buat Mutasi Stok');
     \Spatie\Permission\Models\Permission::findOrCreate('create stock transfer', 'web');
     $ctx['user']->givePermissionTo('create stock transfer');
     $ctx['user']->refresh();
@@ -168,31 +167,49 @@ it('"Pindah ke Gudang Tujuan PO": tombol muncul setelah GRN dikonfirmasi dan for
     // Draf: stok belum masuk, tombol belum aktif dan prefill diabaikan.
     $this->get(route('gudang.penerimaan.show', $grn))->assertOk()
         ->assertSee('tersedia setelah penerimaan dikonfirmasi')->assertDontSee($transferUrl, false);
-    $this->get($transferUrl)->assertOk()->assertDontSee('Pindah ke Gudang Tujuan PO.');
+    $this->get($transferUrl)->assertOk()->assertDontSee('Mutasi dari penerimaan');
 
     $grn->update(['status' => 'completed']);
 
-    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertSee($transferUrl, false);
+    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertSee($transferUrl, false)->assertSee('Buat Mutasi Stok ke Gudang Lain');
 
-    $html = $this->get($transferUrl)->assertOk()->assertSee('Pindah ke Gudang Tujuan PO.')->assertSee($grn->receipt_number)->getContent();
-    expect($html)->toContain('value="'.$other->id.'"')                 // gudang asal = gudang terima
-        ->and($html)->toContain('value="'.$target->id.'"')            // gudang tujuan = tujuan PO
+    $html = $this->get($transferUrl)->assertOk()->assertSee('Mutasi dari penerimaan')->assertSee($grn->receipt_number)->getContent();
+    expect($html)->toContain('value="'.$target->id.'"')                     // gudang asal = gudang GRN (tujuan PO)
+        ->and($html)->toContain('supplier salah kirim lokasi gudang')      // keterangan default
         ->and($html)->toContain((string) \Illuminate\Support\Js::from([
             ['product_id' => $ctx['product']->id, 'quantity' => 10.0, 'from_rak_id' => null, 'to_rak_id' => null],
         ]));
 });
 
-it('"Pindah ke Gudang Tujuan PO": GRN yang tidak menyimpang tidak mengisi form', function () {
+it('"Buat Mutasi Stok": GRN draf (stok belum masuk) tidak mengisi form', function () {
     $ctx = stkContext();
     $target = stkWarehouse($ctx, 'Gudang Tujuan');
     $po = grnPo($ctx, $target);
     $this->actingAs($ctx['user'])->post(route('gudang.penerimaan.store'), grnPayload($po, $target->id))->assertSessionHasNoErrors();
-    $grn = PurchaseReceipt::latest('id')->firstOrFail();
-    $grn->update(['status' => 'completed']);
+    $grn = PurchaseReceipt::latest('id')->firstOrFail();   // status draft
     \Spatie\Permission\Models\Permission::findOrCreate('create stock transfer', 'web');
     $ctx['user']->givePermissionTo('create stock transfer');
 
-    $this->get(route('gudang.penerimaan.show', $grn))->assertOk()->assertDontSee('Pindah ke Gudang Tujuan PO');
     $this->get(route('gudang.transfer.create', ['from_purchase_receipt' => $grn->id]))->assertOk()
-        ->assertDontSee('Pindah ke Gudang Tujuan PO.');
+        ->assertDontSee('Mutasi dari penerimaan');
+});
+
+it('mutasi menyimpan keterangan (butir salah kirim gudang)', function () {
+    $ctx = stkContext();
+    $from = stkWarehouse($ctx, 'Gudang Tujuan PO');
+    $to = stkWarehouse($ctx, 'Gudang Sebenarnya');
+    stkSetStock($ctx['product'], $from, 10);
+    \Spatie\Permission\Models\Permission::findOrCreate('create stock transfer', 'web');
+    $ctx['user']->givePermissionTo('create stock transfer');
+
+    $this->actingAs($ctx['user'])->post(route('gudang.transfer.store'), [
+        'transfer_number' => '',
+        'transfer_date' => now()->toDateString(),
+        'from_warehouse_id' => $from->id,
+        'to_warehouse_id' => $to->id,
+        'notes' => 'Mutasi karena supplier salah kirim lokasi gudang',
+        'items' => [['product_id' => $ctx['product']->id, 'quantity' => 4]],
+    ])->assertSessionHasNoErrors();
+
+    expect(\App\Models\StockTransfer::latest('id')->first()->notes)->toBe('Mutasi karena supplier salah kirim lokasi gudang');
 });

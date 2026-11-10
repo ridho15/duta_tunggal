@@ -178,7 +178,7 @@
                             <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->kode }}){{ $wh->status ? '' : ' · nonaktif' }}</option>
                         @endforeach
                     </select>
-                    <span class="text-[11px] text-gray-500 mt-1 block">Otomatis mengikuti gudang tujuan PO. Mengubahnya menerapkan gudang yang sama ke semua baris barang.</span>
+                    <span class="text-[11px] text-gray-500 mt-1 block">Otomatis mengikuti gudang tujuan PO. Bila barang fisik sebenarnya ada di gudang lain (mis. supplier salah kirim), tetap terima di gudang tujuan PO lalu buat <span class="font-semibold">Mutasi Stok</span> dari detail penerimaan.</span>
                 </div>
 
                 {{-- Peringatan: gudang terima berbeda dari tujuan PO (alasan wajib) --}}

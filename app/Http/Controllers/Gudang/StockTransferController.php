@@ -120,11 +120,11 @@ class StockTransferController extends Controller
     {
         $this->authorizeAccess('create stock transfer');
 
-        // "Pindah ke Gudang Tujuan PO" dari detail GRN: isi awal gudang asal (gudang terima), tujuan (gudang PO) dan barangnya.
+        // "Buat Mutasi Stok" dari detail GRN: isi awal gudang asal (gudang GRN/tujuan PO), barang, dan keterangan; gudang tujuan dipilih user.
         $prefill = $this->prefillFromPurchaseReceipt($request->query('from_purchase_receipt'));
 
         $warehouses = Warehouse::where('status', 1)
-            ->when($prefill, fn ($q) => $q->orWhereIn('id', [$prefill['from_warehouse_id'], $prefill['to_warehouse_id']]))
+            ->when($prefill, fn ($q) => $q->orWhere('id', $prefill['from_warehouse_id']))
             ->orderBy('name')->get();
         $suggestedNumber = $this->stockTransferService->generateTransferNumber();
 
@@ -132,8 +132,9 @@ class StockTransferController extends Controller
     }
 
     /**
-     * Barang GRN yang diterima di gudang selain tujuan PO (qty diterima baik, per produk). Bila barang mendarat di beberapa
-     * gudang, yang diambil gudang pertama; sisanya dipindah dengan transfer berikutnya. Null bila GRN tidak menyimpang.
+     * "Buat Mutasi Stok" dari sebuah GRN (keputusan Ko Handy 10 Nov 2026): barang diterima di gudang tujuan PO, lalu
+     * bila fisik barang sebenarnya di gudang lain (mis. supplier salah kirim), dibuat mutasi dari gudang GRN → gudang lain.
+     * Gudang asal = gudang GRN (tujuan PO); gudang tujuan dipilih user. Barang = seluruh qty diterima baik.
      */
     private function prefillFromPurchaseReceipt($receiptId): ?array
     {
@@ -141,25 +142,27 @@ class StockTransferController extends Controller
             return null;
         }
 
-        $receipt = PurchaseReceipt::with(['purchaseOrder', 'purchaseReceiptItem'])->find($receiptId);
-        $poWarehouseId = (int) ($receipt?->purchaseOrder?->warehouse_id ?? 0);
-        if (! $receipt || ! $poWarehouseId || $receipt->status !== 'completed') {
+        $receipt = PurchaseReceipt::with(['purchaseReceiptItem'])->find($receiptId);
+        if (! $receipt || $receipt->status !== 'completed') {
             return null;
         }
 
-        $misplaced = $receipt->purchaseReceiptItem
-            ->filter(fn ($i) => $i->warehouse_id && (int) $i->warehouse_id !== $poWarehouseId && (float) $i->qty_accepted > 0);
-        if ($misplaced->isEmpty()) {
+        $accepted = $receipt->purchaseReceiptItem
+            ->filter(fn ($i) => $i->warehouse_id && (float) $i->qty_accepted > 0);
+        if ($accepted->isEmpty()) {
             return null;
         }
 
-        $fromWarehouseId = (int) $misplaced->first()->warehouse_id;
+        // Gudang asal mutasi = gudang penerimaan (tujuan PO). Bila GRN tercatat di >1 gudang, ambil gudang dengan qty terbanyak.
+        $fromWarehouseId = (int) $accepted->groupBy('warehouse_id')
+            ->map(fn ($rows) => (float) $rows->sum('qty_accepted'))->sortDesc()->keys()->first();
 
         return [
             'receipt_number' => $receipt->receipt_number,
             'from_warehouse_id' => $fromWarehouseId,
-            'to_warehouse_id' => $poWarehouseId,
-            'items' => $misplaced->where('warehouse_id', $fromWarehouseId)
+            'to_warehouse_id' => null,   // dipilih user (gudang tempat barang sebenarnya berada)
+            'notes' => 'Mutasi karena supplier salah kirim lokasi gudang (dari penerimaan '.$receipt->receipt_number.')',
+            'items' => $accepted->where('warehouse_id', $fromWarehouseId)
                 ->groupBy('product_id')
                 ->map(fn ($rows, $productId) => [
                     'product_id' => (int) $productId,
@@ -182,6 +185,7 @@ class StockTransferController extends Controller
             'transfer_date' => 'required|date',
             'from_warehouse_id' => 'required|exists:warehouses,id',
             'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
+            'notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -225,7 +229,7 @@ class StockTransferController extends Controller
                 }
             }
 
-            $transferNumber = $validated['transfer_number'] ?: $this->stockTransferService->generateTransferNumber();
+            $transferNumber = ($validated['transfer_number'] ?? '') ?: $this->stockTransferService->generateTransferNumber();
 
             $transfer = StockTransfer::create([
                 'transfer_number' => $transferNumber,
@@ -233,6 +237,7 @@ class StockTransferController extends Controller
                 'to_warehouse_id' => $toWarehouseId,
                 'transfer_date' => $validated['transfer_date'],
                 'status' => 'Draft',
+                'notes' => $validated['notes'] ?? null,
             ]);
 
             foreach ($validated['items'] as $itemData) {
@@ -311,6 +316,7 @@ class StockTransferController extends Controller
             'transfer_date' => 'required|date',
             'from_warehouse_id' => 'required|exists:warehouses,id',
             'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
+            'notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -344,6 +350,7 @@ class StockTransferController extends Controller
                 'transfer_date' => $validated['transfer_date'],
                 'from_warehouse_id' => $fromWarehouseId,
                 'to_warehouse_id' => $toWarehouseId,
+                'notes' => $validated['notes'] ?? null,
             ]);
 
             // Hapus item lama dan buat ulang

@@ -43,9 +43,9 @@
 
         @if (!empty($prefill) && !old('items'))
             <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
-                <span class="font-bold">Pindah ke Gudang Tujuan PO.</span>
-                Gudang asal, gudang tujuan, dan barang diisi dari penerimaan {{ $prefill['receipt_number'] }}
-                (barang diterima di gudang selain tujuan PO). Periksa kuantitas sebelum menyimpan.
+                <span class="font-bold">Mutasi dari penerimaan {{ $prefill['receipt_number'] }}.</span>
+                Gudang asal dan barang diisi dari gudang penerimaan (tujuan PO). <span class="font-semibold">Pilih gudang tujuan</span>
+                (tempat barang sebenarnya berada), periksa kuantitas, lalu simpan.
             </div>
         @endif
 
@@ -97,6 +97,18 @@
                     </label>
                     <x-searchable-select name="to_warehouse_id" id="toWarehouseSelect" :options="collect($warehouses)->map(fn ($wh) => ['id' => $wh->id, 'label' => $wh->name . ' (' . ($wh->kode ?? 'WH') . ')'])->values()" :value="old('to_warehouse_id', $prefill['to_warehouse_id'] ?? null)" placeholder="-- Pilih Gudang Tujuan --" :required="true" size="sm" />
                 </div>
+            </div>
+
+            {{-- Keterangan mutasi (mis. supplier salah kirim gudang) --}}
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Keterangan</label>
+                <input type="text"
+                       name="notes"
+                       maxlength="500"
+                       value="{{ old('notes', $prefill['notes'] ?? '') }}"
+                       placeholder="Contoh: Mutasi karena supplier salah kirim lokasi gudang"
+                       class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-gray-800">
+                @error('notes') <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p> @enderror
             </div>
         </div>
 
