@@ -273,14 +273,20 @@ class PurchaseReceiptService
             ? round($amount / $unitCost['exchange_rate'], 4)
             : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
+        // Ko Handy 10 Nov 2026: persediaan dinilai pada HPP master produk (sama dengan Laporan Stok); akun belum-ditagih tetap
+        // pada harga PO; selisihnya ke Selisih Pembelian.
+        $valuation = \App\Support\InventoryValuation::forPurchase($product, (float) $qtyAccepted, (float) $unitPrice);
+        $inventoryAmount = $valuation['inventory_amount'];
+        $toOriginal = fn (float $idr) => $unitCost['exchange_rate'] > 0 ? round($idr / $unitCost['exchange_rate'], 4) : $amountOriginalCurrency;
+
         if (! $journalAlreadyPosted) {
-            // Debit inventory account
+            // Debit inventory account (HPP)
             $entries[] = JournalEntry::create([
                 'coa_id' => $inventoryCoa->id,
                 'date' => $date,
                 'reference' => $receiptRef,
-                'description' => 'Debit inventory for receipt item ' . $item->id,
-                'debit' => round($amount, 2),
+                'description' => 'Debit inventory (HPP) for receipt item ' . $item->id,
+                'debit' => round($inventoryAmount, 2),
                 'credit' => 0,
                 'journal_type' => 'inventory',
                 'cabang_id' => $branchId,
@@ -290,10 +296,32 @@ class PurchaseReceiptService
                 'source_id' => $item->id,
                 'currency_id' => $unitCost['currency_id'],
                 'exchange_rate' => $unitCost['exchange_rate'],
-                'amount_original_currency' => $amountOriginalCurrency,
+                'amount_original_currency' => $toOriginal($inventoryAmount),
             ]);
 
-            // Credit unbilled purchase position (goods receipt / GRNI)
+            // Selisih harga PO vs HPP → Selisih Pembelian (debit bila harga PO di atas HPP, kredit bila di bawah)
+            if ($valuation['variance'] != 0.0 && $valuation['variance_coa']) {
+                $variance = $valuation['variance'];
+                $entries[] = JournalEntry::create([
+                    'coa_id' => $valuation['variance_coa']->id,
+                    'date' => $date,
+                    'reference' => $receiptRef,
+                    'description' => 'Selisih harga PO vs HPP untuk receipt item ' . $item->id,
+                    'debit' => $variance > 0 ? round($variance, 2) : 0,
+                    'credit' => $variance < 0 ? round(abs($variance), 2) : 0,
+                    'journal_type' => 'inventory',
+                    'cabang_id' => $branchId,
+                    'department_id' => $departmentId,
+                    'project_id' => $projectId,
+                    'source_type' => PurchaseReceiptItem::class,
+                    'source_id' => $item->id,
+                    'currency_id' => $unitCost['currency_id'],
+                    'exchange_rate' => $unitCost['exchange_rate'],
+                    'amount_original_currency' => $toOriginal(abs($variance)),
+                ]);
+            }
+
+            // Credit unbilled purchase position (goods receipt / GRNI) — harga PO
             $entries[] = JournalEntry::create([
                 'coa_id' => $unbilledPurchaseCoa->id,
                 'date' => $date,
@@ -326,8 +354,9 @@ class PurchaseReceiptService
                 'source' => $qc ? 'quality_control' : 'purchase_receipt',
                 'purchase_receipt_id' => $item->purchase_receipt_id,
                 'purchase_receipt_item_id' => $item->id,
-                'unit_cost' => $unitPrice,
-                'unit_cost_idr' => $unitPrice,
+                'unit_cost' => $valuation['unit_cost'],          // HPP (nilai persediaan)
+                'unit_cost_idr' => $valuation['unit_cost'],
+                'po_unit_price_idr' => $unitPrice,                // harga PO (acuan selisih pembelian)
                 'raw_unit_price' => $unitCost['raw_unit_price'],
                 'currency_id' => $unitCost['currency_id'],
                 'currency' => $unitCost['currency_code'],
@@ -345,7 +374,7 @@ class PurchaseReceiptService
                 'product_id' => $product->id,
                 'warehouse_id' => $item->warehouse_id,
                 'quantity' => $qtyAccepted,
-                'value' => $amount,
+                'value' => $inventoryAmount,
                 'type' => 'purchase_in',
                 'date' => $date,
                 'notes' => $qc ? 'Stock inbound from QC completion: ' . $qc->qc_number : 'Stock inbound from QC-approved receipt: ' . $item->purchaseReceipt->receipt_number,
@@ -381,7 +410,8 @@ class PurchaseReceiptService
         if (! $existingMovement) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
             $unitPrice = (float) ($item->purchaseOrderItem?->unit_price ?? 0);
-            $amount = round($qtyAccepted * $unitPrice, 2);
+            // Nilai gerakan stok = HPP (sama dengan jurnal persediaan & Laporan Stok)
+            $amount = round($qtyAccepted * \App\Support\InventoryValuation::unitCost($item->product, $unitPrice), 2);
 
             if ($qtyAccepted <= 0 || $unitPrice <= 0 || $amount <= 0) {
                 return $this->skipWithWarning('Unable to reconcile stock for receipt item', [
