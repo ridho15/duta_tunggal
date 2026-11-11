@@ -28,6 +28,10 @@ class WarehouseConfirmation extends Model
         'confirmed_at',
     ];
 
+    protected $casts = [
+        'confirmed_at' => 'datetime',
+    ];
+
     // ─────────────────────────── Relationships ───────────────────────────
 
     /**

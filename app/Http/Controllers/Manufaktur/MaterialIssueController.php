@@ -297,7 +297,7 @@ class MaterialIssueController extends Controller
             'items.rak',
             'warehouseConfirmations.warehouseConfirmationItems.product',
             'warehouseConfirmations.user',
-            'journalEntries.chartOfAccount',
+            'journalEntries.coa',
         ]);
 
         // Cek ketersediaan stok fisik real-time per item
@@ -540,10 +540,10 @@ class MaterialIssueController extends Controller
                 ]);
             }
 
-            // Panggil sinkronisasi approve
+            // Panggil sinkronisasi approve jika belum berstatus selesai
             $lastWc = $confirmations->last();
-            if ($lastWc) {
-                $materialIssue->approveFromWarehouseConfirmation($lastWc);
+            if ($lastWc && ! $materialIssue->fresh()?->isCompleted()) {
+                $materialIssue->fresh()?->approveFromWarehouseConfirmation($lastWc);
             }
 
             DB::commit();

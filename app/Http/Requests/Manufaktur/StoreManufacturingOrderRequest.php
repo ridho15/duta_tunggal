@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Manufaktur;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreManufacturingOrderRequest extends FormRequest
 {
@@ -23,7 +24,7 @@ class StoreManufacturingOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'mo_number' => ['required', 'string', 'max:255', 'unique:manufacturing_orders,mo_number'],
+            'mo_number' => ['required', 'string', 'max:255', Rule::unique('manufacturing_orders', 'mo_number')->whereNull('deleted_at')],
             'production_plan_id' => ['nullable', 'exists:production_plans,id'],
             'bill_of_material_id' => ['required_without:production_plan_id', 'nullable', 'exists:bill_of_materials,id'],
             'quantity' => ['required', 'numeric', 'min:0.0001'],

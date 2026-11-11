@@ -5,6 +5,7 @@ namespace App\Http\Requests\Manufaktur;
 use App\Models\ManufacturingOrder;
 use App\Services\ManufacturingService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreMaterialIssueRequest extends FormRequest
 {
@@ -38,7 +39,7 @@ class StoreMaterialIssueRequest extends FormRequest
     {
         return [
             'type' => ['required', 'in:issue,return'],
-            'issue_number' => ['required', 'string', 'max:255', 'unique:material_issues,issue_number'],
+            'issue_number' => ['required', 'string', 'max:255', Rule::unique('material_issues', 'issue_number')->whereNull('deleted_at')],
             'manufacturing_order_id' => ['nullable', 'exists:manufacturing_orders,id'],
             'production_plan_id' => ['nullable', 'exists:production_plans,id'],
             'warehouse_id' => ['required', 'exists:warehouses,id'],

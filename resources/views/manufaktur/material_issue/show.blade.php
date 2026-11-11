@@ -440,7 +440,7 @@
                             <span class="text-gray-400 mx-1">•</span>
                             <span class="text-gray-600">{{ $wc->note ?: 'Konfirmasi Pengambilan Bahan' }}</span>
                             @if ($wc->confirmed_at)
-                                <p class="text-[11px] text-gray-400 mt-0.5">Dikonfirmasi oleh {{ $wc->user?->name ?? 'Petugas Gudang' }} pada {{ $wc->confirmed_at?->format('d/m/Y H:i') }}</p>
+                                <p class="text-[11px] text-gray-400 mt-0.5">Dikonfirmasi oleh {{ $wc->user?->name ?? 'Petugas Gudang' }} pada {{ $wc->confirmed_at instanceof \DateTimeInterface ? $wc->confirmed_at->format('d/m/Y H:i') : \Illuminate\Support\Carbon::parse($wc->confirmed_at)->format('d/m/Y H:i') }}</p>
                             @endif
                         </div>
                         <span class="px-2 py-0.5 rounded-full text-[11px] font-bold {{ $wc->status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' : ($wc->status === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800') }}">

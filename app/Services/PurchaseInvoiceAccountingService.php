@@ -385,8 +385,11 @@ class PurchaseInvoiceAccountingService
         $receipts = PurchaseReceipt::withoutGlobalScopes()
             ->with([
                 'purchaseOrder.purchaseOrderItem.currency',
+                'purchaseOrder.purchaseOrderItem.product.unit',
                 'purchaseOrder.purchaseOrderCurrency.currency',
                 'purchaseReceiptItem.purchaseOrderItem.currency',
+                'purchaseReceiptItem.purchaseOrderItem.product.unit',
+                'purchaseReceiptItem.product.unit',
                 'purchaseReceiptBiaya.currency',
             ])
             ->whereIn('id', $receiptIds)
@@ -989,8 +992,14 @@ class PurchaseInvoiceAccountingService
         $lineTotal = round($dppUnitPrice * $quantity, 2);
         $lineTaxAmount = round($lineTotal * ($taxRate / 100), 2);
 
+        $product = $receiptItem->product ?? $purchaseOrderItem->product ?? null;
+
         return [
             'product_id' => $receiptItem->product_id,
+            'product_name' => $product?->name ?? 'Produk #' . $receiptItem->product_id,
+            'sku' => $product?->sku ?? '-',
+            'uom' => $product?->unit?->name ?? $product?->uom?->name ?? 'Pcs',
+            'po_price' => $unitPrice,
             'quantity' => $quantity,
             'price' => round($dppUnitPrice, 10),
             'discount' => 0,

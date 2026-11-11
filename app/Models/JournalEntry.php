@@ -52,6 +52,11 @@ class JournalEntry extends Model
         return $this->belongsTo(ChartOfAccount::class, 'coa_id')->withDefault();
     }
 
+    public function chartOfAccount()
+    {
+        return $this->coa();
+    }
+
     public function source()
     {
         return $this->morphTo(__FUNCTION__, 'source_type', 'source_id')->withDefault();

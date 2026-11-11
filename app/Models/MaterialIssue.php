@@ -279,6 +279,15 @@ class MaterialIssue extends Model
             return false;
         }
 
+        // Guard: If already completed or approved, do not re-process
+        $fresh = $this->fresh();
+        if ($fresh && in_array($fresh->status, [self::STATUS_COMPLETED, self::STATUS_APPROVED], true)) {
+            Log::info('approveFromWarehouseConfirmation skipped: MaterialIssue already ' . $fresh->status, [
+                'material_issue_id' => $this->id,
+            ]);
+            return true;
+        }
+
         $summary = $this->warehouseConfirmationStatusSummary();
 
         if ($summary['all_confirmed']) {

@@ -139,6 +139,17 @@ class MaterialIssueObserver
     protected function createStockMovements(MaterialIssue $materialIssue): void
     {
         try {
+            // Guard: Prevent duplicate stock movements for the same MaterialIssue
+            $alreadyExists = \App\Models\StockMovement::where('from_model_type', MaterialIssue::class)
+                ->where('from_model_id', $materialIssue->id)
+                ->exists();
+            if ($alreadyExists) {
+                Log::info('createStockMovements skipped: StockMovement already exists for MaterialIssue', [
+                    'material_issue_id' => $materialIssue->id,
+                ]);
+                return;
+            }
+
             $materialIssue->loadMissing('items');
             
             // Process items in chunks to prevent memory issues

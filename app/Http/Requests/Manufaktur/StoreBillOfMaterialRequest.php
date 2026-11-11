@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Manufaktur;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreBillOfMaterialRequest extends FormRequest
 {
@@ -30,7 +31,7 @@ class StoreBillOfMaterialRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'max:255', 'unique:bill_of_materials,code'],
+            'code' => ['required', 'string', 'max:255', Rule::unique('bill_of_materials', 'code')->whereNull('deleted_at')],
             'nama_bom' => ['required', 'string', 'max:255'],
             'product_id' => ['required', 'exists:products,id'],
             'quantity' => ['required', 'numeric', 'min:0.0001'],
