@@ -58,7 +58,7 @@ class AssetDepreciationController extends Controller
         $totalRecordedUnits = (clone $monthQuery)->where('status', 'recorded')->count();
 
         // Total akumulasi seluruh aset aktif
-        $activeAssetQuery = Asset::where('status', 'active');
+        $activeAssetQuery = Asset::whereIn('status', ['active', 'posted']);
         if (!$canManageAll && $user?->cabang_id) {
             $activeAssetQuery->where('cabang_id', $user->cabang_id);
         } elseif ($cabangId) {
@@ -155,7 +155,7 @@ class AssetDepreciationController extends Controller
         }
 
         try {
-            $query = Asset::where('status', 'active')
+            $query = Asset::whereIn('status', ['active', 'posted'])
                 ->where('usage_date', '<=', $date);
 
             if ($cabangId) {

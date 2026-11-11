@@ -331,7 +331,7 @@ class JournalController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'reference' => ['required', 'string', 'max:50', 'unique:journal_entries,reference'],
+            'reference' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('journal_entries', 'reference')->whereNull('deleted_at')],
             'date' => ['required', 'date'],
             'cabang_id' => ['nullable', 'exists:cabangs,id'],
             'description' => ['required', 'string', 'max:500'],

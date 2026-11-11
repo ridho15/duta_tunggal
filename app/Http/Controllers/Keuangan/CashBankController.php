@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Keuangan;
 
-use App\Helpers\MoneyHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Models\CashBankAccount;
@@ -13,8 +12,6 @@ use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Services\CashBankService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Carbon\Carbon;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -64,12 +61,13 @@ class CashBankController extends Controller
                 $debit = $jEntry ? (float) $jEntry->total_debit : 0.0;
                 $credit = $jEntry ? (float) $jEntry->total_credit : 0.0;
                 $acc->current_balance = (float) ($coa?->opening_balance ?? 0) + $debit - $credit;
+
                 return $acc;
             });
 
         // Rekapitulasi KPI Saldo Likuiditas
-        $totalSaldoKas = $cashBankAccounts->filter(fn($a) => str_starts_with($a->coa?->code ?? '', '1111'))->sum('current_balance');
-        $totalSaldoBank = $cashBankAccounts->filter(fn($a) => str_starts_with($a->coa?->code ?? '', '1112'))->sum('current_balance');
+        $totalSaldoKas = $cashBankAccounts->filter(fn ($a) => str_starts_with($a->coa?->code ?? '', '1111'))->sum('current_balance');
+        $totalSaldoBank = $cashBankAccounts->filter(fn ($a) => str_starts_with($a->coa?->code ?? '', '1112'))->sum('current_balance');
         $totalLikuiditas = $totalSaldoKas + $totalSaldoBank;
 
         // Mutasi Bulan Berjalan (In & Out)
@@ -77,7 +75,7 @@ class CashBankController extends Controller
         $endOfMonth = now()->endOfMonth()->toDateString();
 
         $monthTransactionsQuery = CashBankTransaction::whereBetween('date', [$startOfMonth, $endOfMonth]);
-        if (!$canManageAll && $user?->cabang_id) {
+        if (! $canManageAll && $user?->cabang_id) {
             $monthTransactionsQuery->where('cabang_id', $user->cabang_id);
         }
         $totalMasukBulanIni = (clone $monthTransactionsQuery)->whereIn('type', ['cash_in', 'bank_in'])->sum('amount');
@@ -87,7 +85,7 @@ class CashBankController extends Controller
         $baseTrxQuery = CashBankTransaction::with(['accountCoa', 'offsetCoa', 'cabang', 'transactionDetails.chartOfAccount', 'journalEntries']);
         $baseTrfQuery = CashBankTransfer::with(['fromCoa', 'toCoa', 'otherCostsCoa', 'cabang', 'journalEntries']);
 
-        if (!$canManageAll && $user?->cabang_id) {
+        if (! $canManageAll && $user?->cabang_id) {
             $baseTrxQuery->where('cabang_id', $user->cabang_id);
             $baseTrfQuery->where('cabang_id', $user->cabang_id);
         }
@@ -109,10 +107,10 @@ class CashBankController extends Controller
             if ($search) {
                 $trfQuery->where(function ($q) use ($search) {
                     $q->where('number', 'like', "%{$search}%")
-                      ->orWhere('reference', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%")
-                      ->orWhereHas('fromCoa', fn($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                      ->orWhereHas('toCoa', fn($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
+                        ->orWhere('reference', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('fromCoa', fn ($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                        ->orWhereHas('toCoa', fn ($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
                 });
             }
 
@@ -129,7 +127,7 @@ class CashBankController extends Controller
                 if ($selectedAcc?->coa_id) {
                     $trfQuery->where(function ($q) use ($selectedAcc) {
                         $q->where('from_coa_id', $selectedAcc->coa_id)
-                          ->orWhere('to_coa_id', $selectedAcc->coa_id);
+                            ->orWhere('to_coa_id', $selectedAcc->coa_id);
                     });
                 }
             }
@@ -147,10 +145,10 @@ class CashBankController extends Controller
             if ($search) {
                 $trxQuery->where(function ($q) use ($search) {
                     $q->where('number', 'like', "%{$search}%")
-                      ->orWhere('counterparty', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%")
-                      ->orWhereHas('accountCoa', fn($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                      ->orWhereHas('offsetCoa', fn($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
+                        ->orWhere('counterparty', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('accountCoa', fn ($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                        ->orWhereHas('offsetCoa', fn ($sub) => $sub->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
                 });
             }
 
@@ -198,20 +196,22 @@ class CashBankController extends Controller
         $defaultType = $request->query('type', 'cash_out');
         $suggestedNumber = $this->cashBankService->generateNumber('CB');
 
-        // Akun Kas & Bank (1111* dan 1112*)
+        // Akun Kas & Bank (1111* dan 1112*) - hanya akun transaksi leaf
         $cashBankCoas = ChartOfAccount::where('is_active', true)
+            ->whereDoesntHave('children')
             ->where(function ($q) {
                 $q->where('code', 'like', '1111%')
-                  ->orWhere('code', 'like', '1112%');
+                    ->orWhere('code', 'like', '1112%');
             })
             ->orderBy('code')
             ->get();
 
-        // Akun Lawan (seluruh akun non-kas/bank aktif)
+        // Akun Lawan (seluruh akun non-kas/bank aktif - hanya akun transaksi leaf)
         $offsetCoas = ChartOfAccount::where('is_active', true)
+            ->whereDoesntHave('children')
             ->where(function ($q) {
                 $q->where('code', 'not like', '1111%')
-                  ->where('code', 'not like', '1112%');
+                    ->where('code', 'not like', '1112%');
             })
             ->orderBy('code')
             ->get();
@@ -273,12 +273,12 @@ class CashBankController extends Controller
                 $details = $request->input('details', []);
                 $offsetCoaId = $validated['offset_coa_id'] ?? null;
 
-                if (!empty($details)) {
-                    $totalDetails = collect($details)->sum(fn($d) => (float) ($d['amount'] ?? 0));
+                if (! empty($details)) {
+                    $totalDetails = collect($details)->sum(fn ($d) => (float) ($d['amount'] ?? 0));
                     if (abs($totalDetails - (float) $validated['amount']) > 0.01) {
-                        throw new \Exception('Total nominal rincian (Rp ' . number_format($totalDetails, 0, ',', '.') . ') tidak sama dengan jumlah transaksi (Rp ' . number_format($validated['amount'], 0, ',', '.') . ').');
+                        throw new \Exception('Total nominal rincian (Rp '.number_format($totalDetails, 0, ',', '.').') tidak sama dengan jumlah transaksi (Rp '.number_format($validated['amount'], 0, ',', '.').').');
                     }
-                    if (!$offsetCoaId && isset($details[0]['chart_of_account_id'])) {
+                    if (! $offsetCoaId && isset($details[0]['chart_of_account_id'])) {
                         $offsetCoaId = $details[0]['chart_of_account_id'];
                     }
                 }
@@ -297,9 +297,9 @@ class CashBankController extends Controller
                     'cabang_id' => $validated['cabang_id'] ?? Auth::user()?->cabang_id,
                 ]);
 
-                if (!empty($details)) {
+                if (! empty($details)) {
                     foreach ($details as $detail) {
-                        if (!empty($detail['chart_of_account_id']) && (float) ($detail['amount'] ?? 0) != 0) {
+                        if (! empty($detail['chart_of_account_id']) && (float) ($detail['amount'] ?? 0) != 0) {
                             CashBankTransactionDetail::create([
                                 'cash_bank_transaction_id' => $trx->id,
                                 'chart_of_account_id' => $detail['chart_of_account_id'],
@@ -323,7 +323,7 @@ class CashBankController extends Controller
                 Storage::disk('public')->delete($attachmentPath);
             }
 
-            return back()->withInput()->with('error', 'Gagal menyimpan transaksi: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal menyimpan transaksi: '.$e->getMessage());
         }
     }
 
@@ -337,7 +337,7 @@ class CashBankController extends Controller
             'offsetCoa',
             'cabang',
             'transactionDetails.chartOfAccount',
-            'journalEntries.coa'
+            'journalEntries.coa',
         ]);
 
         return view('keuangan.cashbank.show', compact('transaction'));
@@ -367,7 +367,7 @@ class CashBankController extends Controller
             return redirect()->route('keuangan.cashbank.index')
                 ->with('success', "Transaksi {$transaction->number} dan jurnal akuntansinya berhasil dihapus.");
         } catch (Throwable $e) {
-            return back()->with('error', 'Gagal membatalkan transaksi: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan transaksi: '.$e->getMessage());
         }
     }
 
@@ -380,13 +380,14 @@ class CashBankController extends Controller
             'accountCoa',
             'offsetCoa',
             'cabang',
-            'transactionDetails.chartOfAccount'
+            'transactionDetails.chartOfAccount',
         ]);
 
         $pdf = Pdf::loadView('pdf.cash-bank-voucher', compact('transaction'))
             ->setPaper('a4', 'portrait');
 
         $filename = "Voucher_{$transaction->type}_{$transaction->number}.pdf";
+
         return $pdf->stream($filename);
     }
 
@@ -397,17 +398,19 @@ class CashBankController extends Controller
     {
         $suggestedNumber = $this->cashBankService->generateTransferNumber();
 
-        // Akun Kas & Bank
+        // Akun Kas & Bank - hanya akun transaksi leaf
         $cashBankCoas = ChartOfAccount::where('is_active', true)
+            ->whereDoesntHave('children')
             ->where(function ($q) {
                 $q->where('code', 'like', '1111%')
-                  ->orWhere('code', 'like', '1112%');
+                    ->orWhere('code', 'like', '1112%');
             })
             ->orderBy('code')
             ->get();
 
-        // Akun Biaya Admin Bank (default ke akun beban admin / biaya lainnya)
+        // Akun Biaya Admin Bank (default ke akun beban admin / biaya lainnya) - hanya leaf
         $expenseCoas = ChartOfAccount::where('is_active', true)
+            ->whereDoesntHave('children')
             ->where('type', 'Expense')
             ->orderBy('code')
             ->get();
@@ -488,7 +491,7 @@ class CashBankController extends Controller
                 Storage::disk('public')->delete($attachmentPath);
             }
 
-            return back()->withInput()->with('error', 'Gagal memproses transfer: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal memproses transfer: '.$e->getMessage());
         }
     }
 
@@ -502,7 +505,7 @@ class CashBankController extends Controller
             'toCoa',
             'otherCostsCoa',
             'cabang',
-            'journalEntries.coa'
+            'journalEntries.coa',
         ]);
 
         return view('keuangan.cashbank.transfer.show', compact('transfer'));
@@ -527,7 +530,7 @@ class CashBankController extends Controller
             return redirect()->route('keuangan.cashbank.index', ['tab' => 'transfer'])
                 ->with('success', "Transfer {$transfer->number} dan jurnalnya berhasil dibatalkan.");
         } catch (Throwable $e) {
-            return back()->with('error', 'Gagal membatalkan transfer: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan transfer: '.$e->getMessage());
         }
     }
 
@@ -540,13 +543,14 @@ class CashBankController extends Controller
             'fromCoa',
             'toCoa',
             'otherCostsCoa',
-            'cabang'
+            'cabang',
         ]);
 
         $pdf = Pdf::loadView('pdf.cash-bank-transfer', compact('transfer'))
             ->setPaper('a4', 'portrait');
 
         $filename = "Transfer_{$transfer->number}.pdf";
+
         return $pdf->stream($filename);
     }
 }

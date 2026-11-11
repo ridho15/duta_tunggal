@@ -287,8 +287,9 @@
                                         <select data-searchable
                                             :name="'details[' + index + '][chart_of_account_id]'"
                                             x-model="detail.chart_of_account_id"
+                                            :disabled="mode !== 'breakdown'"
+                                            :required="mode === 'breakdown'"
                                             class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-                                            required
                                         >
                                             <option value="">-- Pilih Akun --</option>
                                             @foreach ($offsetCoas as $c)
@@ -301,6 +302,7 @@
                                             type="text"
                                             :name="'details[' + index + '][description]'"
                                             x-model="detail.description"
+                                            :disabled="mode !== 'breakdown'"
                                             class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                                             placeholder="Deskripsi rincian pos..."
                                         >
@@ -311,14 +313,16 @@
                                                 type="text"
                                                 x-model="detail.amount_display"
                                                 @input="onDetailAmountInput(index, $event.target.value)"
+                                                :disabled="mode !== 'breakdown'"
+                                                :required="mode === 'breakdown'"
                                                 class="w-full px-2 py-1.5 text-xs text-right font-bold border border-gray-300 rounded focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                                                 placeholder="0"
-                                                required
                                             >
                                             <input
                                                 type="hidden"
                                                 :name="'details[' + index + '][amount]'"
                                                 :value="detail.amount"
+                                                :disabled="mode !== 'breakdown'"
                                             >
                                         </div>
                                     </td>

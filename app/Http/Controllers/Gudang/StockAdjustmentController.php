@@ -65,8 +65,15 @@ class StockAdjustmentController extends Controller
         $this->authorizeAccess();
         $data = $this->validated($request);
 
-        $adjustment = DB::transaction(fn () => $this->persist(new StockAdjustment(['status' => 'draft', 'created_by' => Auth::id(),
-            'adjustment_number' => StockAdjustment::generateAdjustmentNumber()]), $data));
+        $adjNumber = $request->filled('adjustment_number')
+            ? trim((string) $request->input('adjustment_number'))
+            : StockAdjustment::generateAdjustmentNumber();
+
+        $adjustment = DB::transaction(fn () => $this->persist(new StockAdjustment([
+            'status' => 'draft',
+            'created_by' => Auth::id(),
+            'adjustment_number' => $adjNumber,
+        ]), $data));
 
         return redirect()->route('gudang.adjustment.show', $adjustment)->with('success', "Draft penyesuaian {$adjustment->adjustment_number} berhasil dibuat.");
     }

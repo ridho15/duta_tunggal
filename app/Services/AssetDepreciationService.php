@@ -30,8 +30,8 @@ class AssetDepreciationService
                 throw new \Exception('Penyusutan untuk periode ini sudah ada');
             }
             
-            // Check if asset is active
-            if ($asset->status !== 'active') {
+            // Check if asset is active or posted
+            if (!in_array($asset->status, ['active', 'posted'], true)) {
                 throw new \Exception('Aset tidak aktif');
             }
             
@@ -92,7 +92,7 @@ class AssetDepreciationService
      */
     public function generateAllMonthlyDepreciation(Carbon $date)
     {
-        $assets = Asset::where('status', 'active')
+        $assets = Asset::whereIn('status', ['active', 'posted'])
             ->where('usage_date', '<=', $date)
             ->get();
         

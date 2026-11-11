@@ -88,7 +88,6 @@
         id="{{ $elementId }}"
         value="{{ (string) $initialValue }}"
         x-model="selected"
-        @if ($required) required @endif
     >
 
     {{-- Trigger Button --}}

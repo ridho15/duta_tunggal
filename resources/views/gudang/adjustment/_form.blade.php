@@ -25,6 +25,7 @@
         <div>
             <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Nomor</label>
             <div class="{{ $inputClass }} bg-gray-50 text-gray-600">{{ $adjustment->adjustment_number }}</div>
+            <input type="hidden" name="adjustment_number" id="adjustment_number" value="{{ old('adjustment_number', $adjustment->adjustment_number) }}">
         </div>
         <div>
             <label for="adjustment_date" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Tanggal <span class="text-rose-500">*</span></label>

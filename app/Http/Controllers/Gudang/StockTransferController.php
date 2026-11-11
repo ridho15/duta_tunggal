@@ -507,7 +507,6 @@ class StockTransferController extends Controller
         $this->authorizeAccess('view any stock transfer');
 
         $raks = Rak::where('warehouse_id', $warehouse->id)
-            ->where('status', 1)
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 

@@ -44,7 +44,7 @@
         </div>
 
         {{-- Top Actions --}}
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2" x-data>
             <a href="{{ route('gudang.transfer.index') }}"
                class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                 ← Kembali
@@ -320,7 +320,7 @@
         name="approve-transfer"
         title="Setujui Transfer Stok Antar Gudang"
         variant="success"
-        confirm-text="Ya, Setujui &amp; Mutasi Stok"
+        confirm-text="Ya, Setujui dan Mutasi Stok"
         cancel-text="Batal"
         action="{{ route('gudang.transfer.approve', $transfer) }}"
         method="POST"
