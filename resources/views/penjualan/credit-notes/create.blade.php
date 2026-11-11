@@ -70,17 +70,16 @@
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
                         Customer (Pelanggan) <span class="text-rose-500">*</span>
                     </label>
-                    <select data-searchable
-                        class="w-full text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-[#15803d] focus:border-[#15803d]"
-                        x-model="customerId"
-                        @change="onCustomerChange()"
-                        required
-                    >
-                        <option value="">-- Pilih Customer --</option>
-                        @foreach ($customers as $c)
-                            <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->code ?? '-' }})</option>
-                        @endforeach
-                    </select>
+                    <div @change="if ($event.detail !== undefined) { customerId = $event.detail; onCustomerChange(); }">
+                        <x-searchable-select
+                            name="customer_id"
+                            :options="$customers"
+                            :remote-url="route('penjualan.customers.search')"
+                            :value="$selectedCustomer->id ?? null"
+                            placeholder="-- Pilih Customer --"
+                            :required="true"
+                        />
+                    </div>
                 </div>
 
                 {{-- Pilih Invoice --}}

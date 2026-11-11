@@ -9,6 +9,7 @@ use App\Models\AccountReceivable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\CustomerReceipt;
 use App\Models\CustomerReceiptItem;
 use App\Models\Deposit;
@@ -163,20 +164,8 @@ class CustomerReceiptController extends Controller
             }
         }
 
-        // Daftar pelanggan yang memiliki tagihan belum lunas
-        $customersWithDebt = Customer::query()
-            ->whereExists(function ($sub) {
-                $sub->selectRaw('1')
-                    ->from('account_receivables')
-                    ->whereColumn('account_receivables.customer_id', 'customers.id')
-                    ->where('account_receivables.remaining', '>', 1.00)
-                    ->whereNull('account_receivables.deleted_at');
-            })
-            ->orderBy('name')
-            ->get(['id', 'name', 'phone']);
-
-        // Pelanggan lainnya (bila ada customer baru atau pelunasan khusus)
-        $allCustomers = Customer::query()->orderBy('name')->get(['id', 'name', 'phone']);
+        // Master customer tidak dimuat: customer terpilih + 25 pelanggan berpiutang teratas; sisanya dicari lewat AJAX (debtors_first).
+        $customers = CustomerPicker::prefill([$preselectedCustomerId], debtors: 25);
 
         // Data akun COA yang diperbolehkan per metode pembayaran
         $methods = ['Cash', 'Transfer', 'Giro', 'Cheque', 'Deposit'];
@@ -200,8 +189,7 @@ class CustomerReceiptController extends Controller
         }
 
         return view('penjualan.receipts.create', compact(
-            'customersWithDebt',
-            'allCustomers',
+            'customers',
             'coasByMethod',
             'defaultCoaByMethod',
             'preselectedCustomerId',

@@ -116,8 +116,8 @@
             <div class="min-w-[180px]">
                 <x-searchable-select
                     name="customer_id"
-                    :options="collect($customers)->map(fn ($c) => ['id' => $c->id, 'label' => $c->name . ($c->perusahaan ? ' (' . $c->perusahaan . ')' : '')])->values()"
-                    :search-url="route('penjualan.so.customers.search')"
+                    :options="$customers"
+                    :remote-url="route('penjualan.customers.search')"
                     :value="$customerId"
                     placeholder="Semua Pelanggan"
                     :auto-submit="true"

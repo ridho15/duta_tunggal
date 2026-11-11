@@ -425,4 +425,20 @@ class BladeCustomerReceiptWorkflowTest extends TestCase
         $response->assertSessionHasErrors('reason');
         $this->assertEquals('Paid', $receipt->fresh()->status);
     }
+
+    public function test_receipts_create_page_prefills_debtors_without_shipping_customer_master_and_search_puts_debtors_first()
+    {
+        $this->createInvoiceWithAR(500000); // $this->customer berpiutang
+        $other = \App\Models\Customer::factory()->create(['name' => 'PT Aaa Tanpa Piutang Cari', 'cabang_id' => $this->cabang->id]);
+        $debtor = \App\Models\Customer::factory()->create(['name' => 'PT Zzz Tanpa Piutang Cari', 'cabang_id' => $this->cabang->id]);
+        \Illuminate\Support\Facades\DB::table('account_receivables')->where('customer_id', $this->customer->id)->update(['customer_id' => $debtor->id]);
+
+        $page = $this->actingAs($this->user)->get(route('penjualan.receipts.create'));
+        $page->assertOk()->assertSee('PT Zzz Tanpa Piutang Cari')->assertDontSee('PT Aaa Tanpa Piutang Cari');
+
+        $ids = collect($this->actingAs($this->user)
+            ->getJson(route('penjualan.customers.search', ['q' => 'Tanpa Piutang Cari', 'debtors_first' => 1]))
+            ->assertOk()->json('results'))->pluck('id')->all();
+        $this->assertSame([$debtor->id, $other->id], $ids);
+    }
 }

@@ -85,7 +85,7 @@
                         id="customer_id"
                         label="Pelanggan (Customer)"
                         :options="$customers"
-                        :search-url="route('penjualan.so.customers.search')"
+                        :remote-url="route('penjualan.customers.search')"
                         :value="old('customer_id')"
                         placeholder="-- Cari atau Pilih Pelanggan --"
                         :required="true"
@@ -728,13 +728,8 @@
         document.getElementById('txtGrandTotal').innerText = 'Rp ' + formatNumber(grandTotal);
     }
 
-    // Alamat & tempo customer: dari opsi terpilih (server) dan dari hasil pencarian AJAX (meta).
-    const customersData = {};
-    @json($customers).forEach(o => { customersData[o.id] = o.meta || {}; });
-    document.addEventListener('option-selected', e => {
-        const o = e.detail;
-        if (o && o.meta && (o.meta.address !== undefined || o.meta.tempo !== undefined)) customersData[o.id] = o.meta;
-    });
+    // Cache data customer: hanya yang terpilih dari server; sisanya diisi saat dipilih dari hasil pencarian AJAX.
+    const customersData = @json(\App\Support\CustomerPicker::dataMap($customers));
 
     const currenciesData = {
         @foreach($currencies as $curr)
@@ -768,6 +763,10 @@
             }
         }
     }
+
+    document.getElementById('customer_id')?.closest('[x-data]')?.addEventListener('option-selected', function (e) {
+        customersData[e.detail.id] = e.detail.data;
+    });
 
     document.getElementById('customer_id')?.addEventListener('change', function() {
         handleCustomerChange(this.value);

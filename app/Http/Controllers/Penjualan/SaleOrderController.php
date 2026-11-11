@@ -8,6 +8,7 @@ use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -182,8 +183,7 @@ class SaleOrderController extends Controller
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR')
             ?? Currency::query()->orderBy('id')->value('id');
 
-        // Payload halaman hanya berisi customer & produk yang sudah terpilih (quotation / input lama);
-        // sisanya dicari lewat AJAX (searchCustomers, searchProducts). ±18 ribu customer tidak lagi ikut dikirim.
+        // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
         $selectedQuotationId = $request->query('quotation_id');
 
         // "Salin ke SO Baru" dari SO yang ditolak/dibatalkan: isi ulang customer, pengiriman, barang, harga, diskon, pajak, ongkir.
@@ -193,9 +193,7 @@ class SaleOrderController extends Controller
 
         $prefillCustomerId = old('customer_id')
             ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : $copyFrom?->customer_id);
-        $customers = $this->customerPayload(
-            $prefillCustomerId ? $this->customerQuery()->whereKey($prefillCustomerId)->get() : collect()
-        );
+        $customers = \App\Support\CustomerPicker::prefill([$prefillCustomerId]);
 
 
         $prefillIds = collect(old('items', []))->pluck('product_id')
@@ -244,6 +242,9 @@ class SaleOrderController extends Controller
             $prefillTaxType = $this->formTaxType($copyFrom->saleOrderItem->first()?->tipe_pajak);
         }
 
+        // Master customer TIDAK dikirim di halaman ini: hanya customer terpilih (input lama / penawaran); sisanya dicari lewat AJAX (searchCustomers).
+        $customers = CustomerPicker::prefill([old('customer_id'), $selectedQuotation?->customer_id]);
+
         $nextSoNumber = $this->salesOrderService->generateSoNumber($canAccessAll ? null : $user?->cabang_id);
 
         return view('penjualan.so.create', [
@@ -281,62 +282,6 @@ class SaleOrderController extends Controller
         $products = $query->orderByRaw('sku = ? desc', [$q])->orderBy('name')->limit(25)->get();
 
         return response()->json(['success' => true, 'products' => $this->productPayload($products)]);
-    }
-
-    /**
-     * Pencarian customer untuk form Buat SO (AJAX). Menggantikan pengiriman seluruh master customer di payload halaman.
-     * Setiap kata harus cocok di nama, kode, atau perusahaan; kode yang persis sama diurutkan lebih dulu.
-     */
-    public function searchCustomers(Request $request): JsonResponse
-    {
-        $q = trim((string) $request->query('q', ''));
-        abort_if($q === '', 422, 'Kata pencarian wajib diisi.');
-
-        $query = $this->customerQuery();
-        foreach (preg_split('/\s+/', $q, -1, PREG_SPLIT_NO_EMPTY) as $term) {
-            $like = '%'.addcslashes($term, '\\%_').'%';
-            $query->where(fn ($w) => $w->where('name', 'like', $like)
-                ->orWhere('code', 'like', $like)
-                ->orWhere('perusahaan', 'like', $like));
-        }
-
-        $customers = $query->orderByRaw('code = ? desc', [$q])->orderBy('name')->limit(25)->get();
-
-        return response()->json(['success' => true, 'options' => $this->customerPayload($customers)]);
-    }
-
-    private function customerQuery()
-    {
-        // Saldo titip = Σ deposit aktif customer (tiap setoran/kelebihan bayar adalah baris deposit sendiri).
-        return Customer::query()->select([
-            'id', 'code', 'name', 'perusahaan', 'address', 'phone', 'telephone',
-            'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe',
-        ])->selectSub(
-            \App\Models\Deposit::query()->selectRaw('COALESCE(SUM(remaining_amount), 0)')
-                ->where('from_model_type', Customer::class)->whereColumn('from_model_id', 'customers.id')->where('status', 'active'),
-            'deposit_balance'
-        );
-    }
-
-    /** Bentuk opsi customer untuk searchable-select; `meta` dibaca JS form SO (limit kredit, deposit, alamat kirim). */
-    private function customerPayload($customers)
-    {
-        return $customers->map(fn ($c) => [
-            'id' => (string) $c->id,
-            'label' => $c->name.($c->code ? ' ('.$c->code.')' : ''),
-            'subtext' => ($c->address ? Str::limit($c->address, 35) : '').' | Limit: Rp '.number_format((float) $c->kredit_limit, 0, ',', '.').' | Tipe: '.$c->tipe_pembayaran,
-            'badge' => $c->tipe_pembayaran ?? 'Customer',
-            'meta' => [
-                'id' => (string) $c->id,
-                'name' => $c->name,
-                'tipe' => $c->tipe_pembayaran ?? 'Tunai',
-                'limit' => (float) $c->kredit_limit,
-                'tempo' => (int) $c->tempo_kredit,
-                'address' => $c->address ?? '',
-                'phone' => $c->phone ?: ($c->telephone ?? ''),
-                'deposit' => (float) ($c->deposit_balance ?? 0),
-            ],
-        ])->values();
     }
 
     /** Tipe pajak untuk isian form SO (None / Eksklusif / Inklusif). Kosong = tanpa pajak (bukan default Eksklusif TaxService). */

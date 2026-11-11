@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
+use App\Support\CustomerPicker;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
@@ -131,7 +132,7 @@ class QuotationController extends Controller
         $quotations = $query->orderByDesc('id')->paginate(15)->withQueryString();
 
         // Master data untuk dropdown filter
-        $customers = $customerId ? Customer::query()->whereKey($customerId)->get(['id', 'name', 'perusahaan']) : collect();
+        $customers = CustomerPicker::prefill([$customerId]); // pencarian lewat AJAX; master customer tidak dimuat
         $cabangs = $canAccessAll ? Cabang::query()->orderBy('nama')->get(['id', 'nama', 'kode']) : collect();
         $cabangNama = (! $canAccessAll && $cabangId) ? (Cabang::find($cabangId)?->nama ?? 'Pusat') : 'Semua Cabang';
 
@@ -171,8 +172,7 @@ class QuotationController extends Controller
 
         $nextNumber = $this->quotationService->generateCode($selectedCabangId);
 
-        // Hanya customer terpilih; customer lain dicari lewat AJAX (penjualan.so.customers.search).
-        $customers = $this->formCustomers(old('customer_id'));
+        $customers = CustomerPicker::prefill([old('customer_id')]);
 
         $currencies = Currency::query()->orderBy('name')->get(['id', 'name', 'code', 'symbol', 'to_rupiah']);
         $defaultCurrencyId = CurrencyConversionResolver::resolveCurrencyIdByCode('IDR') ?? $currencies->first()?->id ?? 1;
@@ -341,8 +341,7 @@ class QuotationController extends Controller
         $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
 
         $cabangs = Cabang::query()->orderBy('nama')->get(['id', 'nama', 'kode']);
-        // Hanya customer terpilih; customer lain dicari lewat AJAX (penjualan.so.customers.search).
-        $customers = $this->formCustomers(old('customer_id', $quotation->customer_id ?? null));
+        $customers = CustomerPicker::prefill([old('customer_id', $quotation->customer_id)]);
         $currencies = Currency::query()->orderBy('name')->get(['id', 'name', 'code', 'symbol', 'to_rupiah']);
 
         // Hanya produk yang sudah dipakai di form; sisanya dicari lewat AJAX (penjualan.so.products.search).
@@ -567,24 +566,6 @@ class QuotationController extends Controller
         $filename = 'Quotation-' . str_replace('/', '-', $quotation->quotation_number) . '.pdf';
 
         return $pdf->stream($filename);
-    }
-
-    /** Opsi customer untuk form (hanya yang terpilih) dalam format searchable-select + meta alamat/tempo. */
-    private function formCustomers($customerId)
-    {
-        if (! $customerId) {
-            return collect();
-        }
-
-        return Customer::query()->whereKey($customerId)
-            ->get(['id', 'name', 'perusahaan', 'address', 'phone', 'telephone', 'tempo_kredit', 'tipe_pembayaran'])
-            ->map(fn ($c) => [
-                'id' => (string) $c->id,
-                'label' => $c->name.($c->perusahaan ? ' — '.$c->perusahaan : ''),
-                'subtext' => ($c->address ? \Illuminate\Support\Str::limit($c->address, 35) : '').(($c->phone ?: $c->telephone) ? ' | Telp: '.($c->phone ?: $c->telephone) : '').' | Tempo: '.($c->tempo_kredit ?? 30).' hari',
-                'badge' => $c->tipe_pembayaran ?? 'Customer',
-                'meta' => ['address' => $c->address ?? '', 'tempo' => (int) ($c->tempo_kredit ?? 30)],
-            ])->values();
     }
 
     /** Katalog awal produk form (hanya id yang diberikan); bentuk sama dengan hasil penjualan.so.products.search. */

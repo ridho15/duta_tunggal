@@ -195,6 +195,17 @@ class BladeCreditNoteWorkflowTest extends TestCase
         $response->assertSee('Customer (Pelanggan)');
     }
 
+    public function test_create_page_does_not_ship_customer_master_but_prefills_selected_customer(): void
+    {
+        $other = \App\Models\Customer::factory()->create(['name' => 'PT Bukan Pilihan Nota Kredit', 'cabang_id' => $this->cabang->id]);
+
+        $plain = $this->actingAs($this->user)->get(route('penjualan.credit-notes.create'));
+        $plain->assertDontSee('PT Bukan Pilihan Nota Kredit')->assertSee('penjualan\/customers\/search', false);
+
+        $picked = $this->actingAs($this->user)->get(route('penjualan.credit-notes.create', ['customer_id' => $other->id]));
+        $picked->assertSee('PT Bukan Pilihan Nota Kredit');
+    }
+
     public function test_customer_invoices_api_returns_creditable_invoices(): void
     {
         $response = $this->actingAs($this->user)->getJson(

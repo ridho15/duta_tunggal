@@ -157,17 +157,14 @@
                     <label class="block text-xs font-bold text-gray-700 mb-1">
                         Customer
                     </label>
-                    <select
+                    <x-searchable-select
                         name="customer_id"
-                        class="w-full text-xs rounded-xl border border-gray-200 px-3 py-2 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] transition"
-                    >
-                        <option value="">-- Semua Customer --</option>
-                        @foreach ($customers as $c)
-                            <option value="{{ $c->id }}" {{ (string)$customerId === (string)$c->id ? 'selected' : '' }}>
-                                {{ $c->code }} - {{ $c->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                        :options="$customers"
+                        :remote-url="route('penjualan.customers.search')"
+                        :value="$customerId"
+                        placeholder="-- Semua Customer --"
+                        size="sm"
+                    />
                 </div>
 
                 {{-- Search No. Dokumen --}}
