@@ -37,7 +37,10 @@ class CustomerReturnService
      *
      * @throws \Exception if the return is already processed or has no warehouse set
      */
-    public function processCompletion(CustomerReturn $customerReturn): void
+    /**
+     * @return array{restored_qty: float, repair_qty: float, rejected_qty: float, warehouse: ?string} ringkasan untuk pesan ke user
+     */
+    public function processCompletion(CustomerReturn $customerReturn): array
     {
         if ($customerReturn->stock_restored_at) {
             throw new \Exception("Customer return #{$customerReturn->return_number} has already been processed.");
@@ -45,14 +48,19 @@ class CustomerReturnService
 
         $warehouseId = $customerReturn->warehouse_id;
 
-        if (! $warehouseId) {
-            Log::warning('CustomerReturnService: warehouse_id is null — stock restoration will be skipped', [
-                'return_id'     => $customerReturn->id,
-                'return_number' => $customerReturn->return_number,
-            ]);
+        // Barang yang kembali (bukan klaim ditolak) wajib punya gudang penerima. Dulu tanpa gudang stok dilewati diam-diam,
+        // padahal pesan sukses menyatakan stok sudah dipulihkan (temuan UAT 11 Nov 2026).
+        $customerReturn->loadMissing('customerReturnItems');
+        $needsWarehouse = $customerReturn->customerReturnItems
+            ->contains(fn ($i) => $i->decision !== CustomerReturnItem::DECISION_REJECT && (float) $i->quantity > 0);
+        if (! $warehouseId && $needsWarehouse) {
+            throw new \Exception('Gudang penerima retur belum diisi. Isi "Gudang Penerima" pada form Inspeksi QC, simpan, lalu selesaikan retur lagi.');
         }
 
-        DB::transaction(function () use ($customerReturn, $warehouseId) {
+        $summary = ['restored_qty' => 0.0, 'repair_qty' => 0.0, 'rejected_qty' => 0.0,
+            'warehouse' => $warehouseId ? \App\Models\Warehouse::withoutGlobalScopes()->whereKey($warehouseId)->value('name') : null];
+
+        DB::transaction(function () use ($customerReturn, $warehouseId, &$summary) {
             $totalRestoredCost = 0.0;
             $repairCost = 0.0;
             $replaceCost = 0.0;
@@ -85,6 +93,7 @@ class CustomerReturnService
                 }
 
                 if ($item->decision === CustomerReturnItem::DECISION_REJECT) {
+                    $summary['rejected_qty'] += (float) $item->quantity;
                     continue;
                 }
 
@@ -120,6 +129,7 @@ class CustomerReturnService
                 // For 'repair' items, goods come back for fixing but are NOT immediately
                 // returned to saleable stock — they go to a WIP/In-Repair holding account.
                 if ($item->decision === CustomerReturnItem::DECISION_REPAIR) {
+                    $summary['repair_qty'] += $qty;
                     $repairCost += $itemCostTotal;
                     $totalRestoredCost += $itemCostTotal;
 
@@ -159,6 +169,7 @@ class CustomerReturnService
 
                 // ── 1. Restore inventory stock (replace / standard return) ─────────
                 if ($warehouseId) {
+                    $summary['restored_qty'] += $qty;
                     $stock = InventoryStock::firstOrNew([
                         'product_id'   => $item->product_id,
                         'warehouse_id' => $warehouseId,
@@ -234,6 +245,8 @@ class CustomerReturnService
                 'total_financial'    => $totalReturnFin,
             ]);
         });
+
+        return $summary;
     }
 
     /**

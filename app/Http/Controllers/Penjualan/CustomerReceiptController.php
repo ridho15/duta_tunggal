@@ -289,13 +289,22 @@ class CustomerReceiptController extends Controller
             'bank_name' => ['nullable', 'string', 'max:100'],
             'proof' => ['nullable', 'file', 'mimes:jpeg,png,jpg,pdf', 'max:5120'],
             'notes' => ['nullable', 'string', 'max:500'],
-            'selected_invoices' => ['required', 'array', 'min:1'],
+            // Kosong + deposit_amount > 0 = Titip Dana (deposit customer sebelum ada invoice, mis. COD bayar di muka)
+            'selected_invoices' => ['nullable', 'array'],
             'selected_invoices.*' => ['integer'],
-            'invoice_receipts' => ['required', 'array'],
+            'invoice_receipts' => ['nullable', 'array'],
             'overpayment_as_deposit' => ['nullable', 'boolean'],
+            'deposit_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $paymentMethod = $validated['payment_method'];
+        $depositOnly = empty($validated['selected_invoices']) && (float) ($validated['deposit_amount'] ?? 0) > 0;
+
+        if (! $depositOnly && empty($validated['selected_invoices'])) {
+            throw ValidationException::withMessages([
+                'selected_invoices' => 'Pilih minimal satu invoice, atau isi nominal Titip Dana bila customer belum punya tagihan.',
+            ]);
+        }
 
         // Validasi referensi untuk metode non-tunai (Transfer, Giro, Cheque)
         if (CustomerReceiptReference::requiresReference($paymentMethod) && empty(trim((string) ($validated['payment_reference'] ?? '')))) {
@@ -312,6 +321,10 @@ class CustomerReceiptController extends Controller
             throw ValidationException::withMessages([
                 'coa_id' => $e->errors()['coa_id'] ?? 'Akun Kas/Bank tidak sesuai dengan metode pembayaran yang dipilih.',
             ]);
+        }
+
+        if ($depositOnly) {
+            return $this->storeDepositOnly($request, $validated);
         }
 
         $allowDepositOverpayment = (bool) ($request->boolean('overpayment_as_deposit'));
@@ -477,6 +490,59 @@ class CustomerReceiptController extends Controller
         }
 
         return redirect()->route('penjualan.receipts.show', $receipt->id)->with('success', $msg);
+    }
+
+    /**
+     * Titip Dana: uang masuk dari customer yang belum punya tagihan (mis. COD membayar sebelum barang dikirim).
+     * Dicatat sebagai Deposit Customer — Dr Kas/Bank / Cr Deposit Pelanggan — dan menambah saldo titip yang dipakai
+     * verifikasi kasir untuk SO COD serta pelunasan invoice berikutnya (metode Deposit Pelanggan).
+     */
+    private function storeDepositOnly(Request $request, array $validated): RedirectResponse
+    {
+        if ($validated['payment_method'] === 'Deposit') {
+            throw ValidationException::withMessages([
+                'payment_method' => 'Metode "Deposit Pelanggan" tidak dapat dipakai untuk menambah saldo deposit. Pilih Tunai, Transfer, Giro, atau Cek.',
+            ]);
+        }
+
+        if (! ChartOfAccount::where('code', config('coa.customer_deposit'))->exists()) {
+            throw ValidationException::withMessages([
+                'deposit_amount' => 'Akun Deposit Pelanggan (' . config('coa.customer_deposit') . ') belum ada di Chart of Account, sehingga titip dana belum dapat dicatat.',
+            ]);
+        }
+
+        $amount = round((float) $validated['deposit_amount'], 2);
+        $customer = Customer::findOrFail((int) $validated['customer_id']);
+        $reference = trim((string) ($validated['payment_reference'] ?? ''));
+        $note = 'Titip dana customer (' . $validated['payment_method'] . ($reference !== '' ? ' ' . $reference : '') . ')'
+            . (! empty($validated['notes']) ? ' — ' . $validated['notes'] : '');
+
+        $deposit = DB::transaction(function () use ($validated, $amount, $customer, $note) {
+            $deposit = Deposit::create([
+                'deposit_number' => app(DepositNumberGenerator::class)->generate(),
+                'from_model_type' => Customer::class,
+                'from_model_id' => $customer->id,
+                'amount' => $amount,
+                'used_amount' => 0,
+                'remaining_amount' => $amount,
+                'coa_id' => (int) $validated['coa_id'],
+                'payment_coa_id' => (int) $validated['coa_id'],
+                'note' => mb_substr($note, 0, 255),
+                'status' => 'active',
+                'created_by' => Auth::id(),
+            ]);
+
+            $this->ledgerService->postDeposit($deposit, Auth::user()?->cabang_id ? (int) Auth::user()->cabang_id : null);
+
+            return $deposit;
+        });
+
+        $balance = (float) Deposit::where('from_model_type', Customer::class)->where('from_model_id', $customer->id)
+            ->where('status', 'active')->sum('remaining_amount');
+
+        return redirect()->route('penjualan.receipts.index')->with('success',
+            "Titip dana {$customer->name} sebesar " . MoneyHelper::rupiah($amount) . " tercatat ({$deposit->deposit_number}). "
+            . 'Saldo titip sekarang ' . MoneyHelper::rupiah($balance) . '.');
     }
 
     /**

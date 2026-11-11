@@ -608,10 +608,23 @@ class CustomerReturnController extends Controller
         }
 
         try {
-            $this->returnService->processCompletion($customerReturn);
+            $summary = $this->returnService->processCompletion($customerReturn);
+
+            // Pesan jujur: sebutkan apa yang benar-benar masuk stok (dulu selalu "stok dipulihkan" walau tidak).
+            $fmt = fn (float $q) => rtrim(rtrim(number_format($q, 2, ',', '.'), '0'), ',');
+            $parts = [];
+            if ($summary['restored_qty'] > 0) {
+                $parts[] = $fmt($summary['restored_qty']).' pcs masuk stok '.($summary['warehouse'] ?? 'gudang');
+            }
+            if ($summary['repair_qty'] > 0) {
+                $parts[] = $fmt($summary['repair_qty']).' pcs dicatat sebagai barang dalam perbaikan (belum masuk stok jual)';
+            }
+            if ($summary['rejected_qty'] > 0) {
+                $parts[] = $fmt($summary['rejected_qty']).' pcs klaim ditolak (tidak masuk stok)';
+            }
 
             return redirect()->route('penjualan.returns.show', $customerReturn->id)
-                ->with('success', 'Customer Return berhasil Diselesaikan! Stok barang telah dipulihkan ke gudang dan jurnal akuntansi telah diposting secara seimbang.');
+                ->with('success', 'Retur penjualan diselesaikan: '.($parts ? implode('; ', $parts) : 'tidak ada barang yang masuk stok').'. Jurnal akuntansi telah diposting.');
         } catch (Throwable $e) {
             Log::error('CustomerReturnController::complete failed: ' . $e->getMessage(), [
                 'exception' => $e,

@@ -33,6 +33,12 @@
         <!-- Kolom Kiri: Form Input -->
         <div class="w-full lg:flex-1 flex flex-col gap-4 min-w-0">
             
+            @if(!empty($copyFrom))
+                <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
+                    <span class="font-bold">Disalin dari SO {{ $copyFrom->so_number }}</span> ({{ \App\Models\SaleOrder::statusLabel($copyFrom->status) }}). Periksa dan perbaiki isinya, lalu simpan sebagai SO baru.
+                </div>
+            @endif
+
             <!-- Section 1: Customer -->
             <section class="bg-white border border-gray-100 rounded-2xl p-5 sm:p-6 flex flex-col gap-4 shadow-sm">
                 <div class="flex items-center gap-3 pb-3.5 border-b border-gray-100">
@@ -41,7 +47,8 @@
                 </div>
 
                 @if(isset($quotations) && $quotations->isNotEmpty())
-                    <div class="flex flex-col gap-1.5 pb-2 border-b border-gray-100">
+                    <div class="flex flex-col gap-1.5 pb-2 border-b border-gray-100"
+                         @change="if ($event.detail !== undefined && String($event.detail) !== String(@js($selectedQuotationId ?? ''))) window.location = @js(route('penjualan.so.create')) + ($event.detail ? '?quotation_id=' + encodeURIComponent($event.detail) : '')">
                         <x-searchable-select
                             name="quotation_id"
                             id="quotationSelect"
@@ -56,6 +63,9 @@
                             placeholder="-- Tanpa Penawaran (SO Langsung) --"
                             :required="false"
                         />
+                        @if($selectedQuotation)
+                            <p class="text-[11px] text-emerald-800 font-semibold">Referensi Penawaran: {{ $selectedQuotation->quotation_number }} — customer, barang, harga, diskon, dan tipe pajak diisi dari penawaran ini.</p>
+                        @endif
                     </div>
                 @else
                     <input type="hidden" name="quotation_id" value="{{ old('quotation_id', $selectedQuotationId ?? '') }}">
@@ -69,7 +79,7 @@
                             label="Customer"
                             :options="$customers"
                             :search-url="route('penjualan.so.customers.search')"
-                            :value="old('customer_id', $selectedQuotation->customer_id ?? null)"
+                            :value="old('customer_id', ($selectedQuotation->customer_id ?? $copyFrom?->customer_id) ?? null)"
                             placeholder="-- Pilih Customer --"
                             :required="true"
                         />
@@ -120,8 +130,8 @@
                     <div class="flex flex-col gap-1.5">
                         <label class="text-xs font-semibold text-gray-700">Tipe Pengiriman <span class="text-red-500">*</span></label>
                         <select name="tipe_pengiriman" class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white">
-                            <option value="Kirim Langsung" {{ old('tipe_pengiriman') === 'Kirim Langsung' ? 'selected' : '' }}>Kirim Langsung</option>
-                            <option value="Ambil Sendiri" {{ old('tipe_pengiriman') === 'Ambil Sendiri' ? 'selected' : '' }}>Ambil Sendiri</option>
+                            <option value="Kirim Langsung" {{ old('tipe_pengiriman', $copyFrom?->tipe_pengiriman) === 'Kirim Langsung' ? 'selected' : '' }}>Kirim Langsung</option>
+                            <option value="Ambil Sendiri" {{ old('tipe_pengiriman', $copyFrom?->tipe_pengiriman) === 'Ambil Sendiri' ? 'selected' : '' }}>Ambil Sendiri</option>
                         </select>
                     </div>
                 </div>
@@ -135,7 +145,7 @@
                         </label>
                         <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                             <input type="checkbox" id="sameAsCustomer" name="same_as_customer" value="1"
-                                   {{ old('same_as_customer', (old('shipping_recipient_name', $selectedQuotation->shipping_recipient_name ?? '') || old('shipped_to', $selectedQuotation->shipped_to ?? '')) ? '0' : '1') === '1' ? 'checked' : '' }}
+                                   {{ old('same_as_customer', (old('shipping_recipient_name', ($selectedQuotation->shipping_recipient_name ?? $copyFrom?->shipping_recipient_name) ?? '') || old('shipped_to', ($selectedQuotation->shipped_to ?? $copyFrom?->shipped_to) ?? '')) ? '0' : '1') === '1' ? 'checked' : '' }}
                                    class="rounded border-gray-300 text-[#15803d] focus:ring-[#15803d] w-4 h-4 cursor-pointer">
                             <span class="text-xs font-semibold text-gray-700">Sama dengan alamat kantor pembeli</span>
                         </label>
@@ -145,14 +155,14 @@
                         <div class="flex flex-col gap-1.5">
                             <label class="text-xs font-semibold text-gray-700">Nama Penerima / Nama Proyek</label>
                             <input type="text" name="shipping_recipient_name" id="shippingRecipientName"
-                                   value="{{ old('shipping_recipient_name', $selectedQuotation->shipping_recipient_name ?? '') }}"
+                                   value="{{ old('shipping_recipient_name', ($selectedQuotation->shipping_recipient_name ?? $copyFrom?->shipping_recipient_name) ?? '') }}"
                                    placeholder="Contoh: Proyek RSUD Hasan Sadikin / Gudang Proyek"
                                    class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
                         </div>
                         <div class="flex flex-col gap-1.5">
                             <label class="text-xs font-semibold text-gray-700">PIC Proyek & No. Telepon</label>
                             <input type="text" name="shipping_recipient_phone" id="shippingRecipientPhone"
-                                   value="{{ old('shipping_recipient_phone', $selectedQuotation->shipping_recipient_phone ?? '') }}"
+                                   value="{{ old('shipping_recipient_phone', ($selectedQuotation->shipping_recipient_phone ?? $copyFrom?->shipping_recipient_phone) ?? '') }}"
                                    placeholder="Contoh: Bpk. Hendra (0812-3456-7890)"
                                    class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
                         </div>
@@ -161,7 +171,7 @@
                     <div class="flex flex-col gap-1.5">
                         <label class="text-xs font-semibold text-gray-700">Alamat Lengkap Pengiriman / Proyek</label>
                         <input type="text" name="shipped_to" id="shippedToInput"
-                               value="{{ old('shipped_to', $selectedQuotation->shipped_to ?? '') }}"
+                               value="{{ old('shipped_to', ($selectedQuotation->shipped_to ?? $copyFrom?->shipped_to) ?? '') }}"
                                placeholder="Otomatis dari data customer jika sama"
                                class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
                     </div>
@@ -255,11 +265,11 @@
                         <label class="text-xs font-semibold text-gray-700">Ongkos Kirim</label>
                         <div class="relative">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-semibold text-gray-400 pointer-events-none">Rp</span>
-                            <input type="text" id="shippingCostDisplay" value="{{ old('shipping_cost') ? number_format(old('shipping_cost'), 0, ',', '.') : '0' }}"
+                            <input type="text" id="shippingCostDisplay" value="{{ old('shipping_cost', $copyFrom?->shipping_cost) ? number_format((float) old('shipping_cost', $copyFrom?->shipping_cost), 0, ',', '.') : '0' }}"
                                    oninput="handleShippingCostInput(this.value)"
                                    placeholder="0"
                                    class="w-full pl-9 pr-3 py-2 text-sm text-right font-mono font-semibold text-gray-800 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]">
-                            <input type="hidden" name="shipping_cost" id="shippingCostInput" value="{{ old('shipping_cost', 0) }}">
+                            <input type="hidden" name="shipping_cost" id="shippingCostInput" value="{{ old('shipping_cost', (float) ($copyFrom?->shipping_cost ?? 0)) }}">
                         </div>
                     </div>
                     <div class="flex flex-col gap-1.5">
@@ -274,6 +284,16 @@
                             :value="old('currency_id', $defaultCurrencyId)"
                             placeholder="-- Pilih Mata Uang --"
                         />
+                    </div>
+                    <div class="flex flex-col gap-1.5 sm:col-span-2">
+                        <label for="taxTypeSelect" class="text-xs font-semibold text-gray-700">Tipe Pajak <span class="text-red-500">*</span></label>
+                        <select name="tax_type" id="taxTypeSelect" onchange="calculateTotals()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] bg-white">
+                            @php $taxSel = old('tax_type', $prefillTaxType ?? 'None'); @endphp
+                            <option value="None" {{ $taxSel === 'None' ? 'selected' : '' }}>Non Pajak</option>
+                            <option value="Eksklusif" {{ $taxSel === 'Eksklusif' ? 'selected' : '' }}>PPN Eksklusif (harga belum termasuk PPN)</option>
+                            <option value="Inklusif" {{ $taxSel === 'Inklusif' ? 'selected' : '' }}>PPN Inklusif (harga sudah termasuk PPN)</option>
+                        </select>
+                        <span class="text-[11px] text-gray-500">Berlaku untuk semua barang di SO ini dan terbawa ke faktur.</span>
                     </div>
                 </div>
 
@@ -299,6 +319,14 @@
             <div class="flex justify-between text-sm text-gray-600">
                 <span>Subtotal barang</span>
                 <span class="font-mono font-semibold text-gray-900" id="summarySubtotal">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600" id="summaryDppRow">
+                <span>DPP Nilai Lain (11/12)</span>
+                <span class="font-mono font-semibold text-gray-900" id="summaryDpp">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600" id="summaryPpnRow">
+                <span>PPN (12% × DPP)</span>
+                <span class="font-mono font-semibold text-gray-900" id="summaryPpn">Rp 0</span>
             </div>
             <div class="flex justify-between text-sm text-gray-600">
                 <span>Ongkos kirim</span>
@@ -610,6 +638,11 @@
                         </div>
                         <div class="text-[10.5px] text-gray-500 mt-1" id="item-floor-info-${idx}">Min. Rp 0</div>
                     </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-gray-700">Diskon (%)</label>
+                        <input type="number" name="items[${idx}][discount]" id="discount-${idx}" value="${parseFloat(prefill.discount) || 0}" min="0" max="100" step="any" oninput="calculateTotals()"
+                               class="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 text-right font-mono focus:outline-none focus:border-emerald-600">
+                    </div>
                 </div>
             </div>
         `;
@@ -688,7 +721,9 @@
 
             const qty = parseFloat(qtyInput?.value || 0);
             const price = parseFloat(priceInput?.value || 0);
-            const lineSubtotal = qty * price;
+            const disc = Math.min(100, Math.max(0, parseFloat(document.getElementById(`discount-${idx}`)?.value || 0)));
+            const effectivePrice = price * (1 - disc / 100);
+            const lineSubtotal = qty * effectivePrice;
 
             const subtotalEl = document.getElementById(`item-subtotal-${idx}`);
             if (subtotalEl) {
@@ -703,7 +738,7 @@
                 const floorInfo = document.getElementById(`item-floor-info-${idx}`);
                 const warningEl = document.getElementById(`item-stock-warning-${idx}`);
 
-                if (bottom > 0 && price < bottom) {
+                if (bottom > 0 && effectivePrice < bottom) {
                     hasPriceViolation = true;
                     if (floorInfo) {
                         floorInfo.innerText = `Di bawah min. ${formatRupiah(bottom)}`;
@@ -737,7 +772,22 @@
         });
 
         const ongkir = parseFloat(document.getElementById('shippingCostInput').value || 0);
-        const grandTotal = subtotalBarang + ongkir;
+        // Pajak: Eksklusif → PPN 11% ditambahkan; Inklusif → PPN sudah di dalam harga. DPP Nilai Lain = 11/12 × harga jual (PMK 131/2024).
+        const taxType = document.getElementById('taxTypeSelect')?.value || 'None';
+        let hargaJual = subtotalBarang, ppn = 0, barangTotal = subtotalBarang;
+        if (taxType === 'Eksklusif') {
+            ppn = subtotalBarang * 0.11;
+            barangTotal = subtotalBarang + ppn;
+        } else if (taxType === 'Inklusif') {
+            hargaJual = subtotalBarang / 1.11;
+            ppn = subtotalBarang - hargaJual;
+        }
+        const grandTotal = barangTotal + ongkir;
+        const taxed = taxType !== 'None';
+        document.getElementById('summaryDppRow')?.classList.toggle('hidden', !taxed);
+        document.getElementById('summaryPpnRow')?.classList.toggle('hidden', !taxed);
+        if (document.getElementById('summaryDpp')) document.getElementById('summaryDpp').innerText = formatRupiah(hargaJual * 11 / 12);
+        if (document.getElementById('summaryPpn')) document.getElementById('summaryPpn').innerText = formatRupiah(ppn);
 
         document.getElementById('summarySubtotal').innerText = formatRupiah(subtotalBarang);
         document.getElementById('summaryOngkir').innerText = formatRupiah(ongkir);
@@ -1135,14 +1185,8 @@
         document.getElementById('soForm').submit();
     }
 
-    @php
-        $qoItemsData = $selectedQuotation ? $selectedQuotation->quotationItem->map(fn($item) => [
-            'product_id' => $item->product_id,
-            'quantity' => (float)$item->quantity,
-            'unit_price' => (float)$item->unit_price,
-        ])->values()->all() : [];
-    @endphp
-    const quotationItems = @json($qoItemsData);
+    // Baris awal: dari penawaran (beserta diskon) atau dari SO yang disalin
+    const quotationItems = @json($prefillItems ?? []);
 
     // Buat item awal saat halaman pertama kali dibuka
     window.addEventListener('DOMContentLoaded', () => {
@@ -1157,7 +1201,7 @@
             itemsList.forEach((item, index) => {
                 createItemRow(item, index === itemsList.length - 1, false);
             });
-        @elseif($selectedQuotation && count($qoItemsData) > 0)
+        @elseif(!empty($prefillItems))
             if (quotationItems && quotationItems.length > 0) {
                 quotationItems.forEach((item, idx) => createItemRow(item, idx === 0, false));
             } else {

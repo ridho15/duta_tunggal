@@ -288,6 +288,18 @@
                 <span class="text-gray-400 mt-0.5 block">Customer ini tidak memiliki invoice dengan sisa piutang dagang.</span>
             </div>
 
+            {{-- Titip Dana / Deposit: uang masuk sebelum ada invoice (mis. customer COD membayar di muka) --}}
+            <div x-show="customerId && invoices.length === 0 && !isLoading" x-cloak class="mx-auto max-w-md p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-2 text-left">
+                <label for="deposit_amount_display" class="block text-xs font-bold text-blue-900">Catat sebagai Titip Dana (Saldo Deposit Customer)</label>
+                <p class="text-[11px] text-blue-800">Untuk customer COD yang membayar sebelum barang dikirim. Saldo ini dipakai kasir saat memverifikasi SO COD dan dapat dipakai melunasi invoice berikutnya (metode Deposit Pelanggan).</p>
+                <input type="text" id="deposit_amount_display" inputmode="numeric" placeholder="Nominal titip dana, contoh 1.500.000"
+                       :value="depositOnlyAmount > 0 ? depositOnlyAmount.toLocaleString('id-ID') : ''"
+                       @input="depositOnlyAmount = parseFloat(String($event.target.value).replace(/\D/g, '')) || 0"
+                       class="w-full px-3 py-2 border border-blue-300 rounded-xl text-sm font-bold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]">
+                <input type="hidden" name="deposit_amount" :value="invoices.length === 0 ? depositOnlyAmount : 0">
+                <p x-show="paymentMethod === 'Deposit'" class="text-[11px] font-bold text-red-700">Metode "Deposit Pelanggan" tidak dapat dipakai untuk menambah saldo deposit. Pilih Tunai, Transfer, Giro, atau Cek.</p>
+            </div>
+
             {{-- Tabel Invoices --}}
             <div x-show="invoices.length > 0 && !isLoading" class="border border-gray-200 rounded-xl overflow-hidden">
                 <div class="overflow-x-auto">
@@ -443,14 +455,15 @@
 
                 <button
                     type="submit"
-                    :disabled="selectedInvoices.length === 0 || totalAllocated <= 0 || (totalOverpayment > 0 && !overpaymentAsDeposit)"
+                    :disabled="isDepositOnly ? (depositOnlyAmount <= 0 || paymentMethod === 'Deposit') : (selectedInvoices.length === 0 || totalAllocated <= 0 || (totalOverpayment > 0 && !overpaymentAsDeposit))"
                     class="px-6 py-3 rounded-xl bg-[#15803d] hover:bg-[#14532d] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-black text-sm shadow-sm transition flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 13l4 4L19 7"></path>
                     </svg>
-                    <span>Simpan & Proses Penerimaan</span>
-                    <span x-show="totalAllocated > 0" x-text="'(' + formatRupiah(totalAllocated + (overpaymentAsDeposit ? totalOverpayment : 0)) + ')'"></span>
+                    <span x-text="isDepositOnly ? 'Simpan Titip Dana' : 'Simpan & Proses Penerimaan'"></span>
+                    <span x-show="isDepositOnly && depositOnlyAmount > 0" x-text="'(' + formatRupiah(depositOnlyAmount) + ')'"></span>
+                    <span x-show="!isDepositOnly && totalAllocated > 0" x-text="'(' + formatRupiah(totalAllocated + (overpaymentAsDeposit ? totalOverpayment : 0)) + ')'"></span>
                 </button>
             </div>
         </div>
@@ -476,6 +489,12 @@ function customerReceiptForm(config) {
         invoiceAmounts: {},
         overpaymentAsDeposit: false,
         isLoading: false,
+        depositOnlyAmount: 0,
+
+        /** Customer tanpa tagihan: penerimaan dicatat sebagai titip dana (deposit). */
+        get isDepositOnly() {
+            return !!this.customerId && this.invoices.length === 0 && !this.isLoading;
+        },
 
         init() {
             this.setPaymentMethod('Cash');

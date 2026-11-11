@@ -300,13 +300,13 @@
                             if (in_array($taxType, ['ppn excluded', 'eksklusif'])) {
                                 $taxNominal = $net * 0.11;
                                 $rowTotal = $net + $taxNominal;
-                                $calcTotalDpp += $net;
+                                $calcTotalDpp += $net * 11 / 12;   // DPP Nilai Lain = 11/12 × harga jual (PMK 131/2024)
                                 $calcTotalTax += $taxNominal;
                             } elseif (in_array($taxType, ['ppn included', 'inklusif', 'inclusive'])) {
-                                $dpp = $net / 1.11;
+                                $dpp = $net / 1.11;               // harga jual sebelum PPN
                                 $taxNominal = $net - $dpp;
                                 $rowTotal = $net;
-                                $calcTotalDpp += $dpp;
+                                $calcTotalDpp += $dpp * 11 / 12;   // DPP Nilai Lain = 11/12 × harga jual (PMK 131/2024)
                                 $calcTotalTax += $taxNominal;
                             } else {
                                 $taxNominal = 0;
@@ -376,11 +376,11 @@
                     <span class="text-red-600 font-semibold font-mono">- Rp {{ number_format($calcTotalDisc, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between text-gray-600 font-medium">
-                    <span>Dasar Pengenaan Pajak (DPP):</span>
+                    <span>DPP Nilai Lain (11/12):</span>
                     <span class="font-semibold text-gray-900 font-mono">Rp {{ number_format($calcTotalDpp, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between text-gray-600 font-medium">
-                    <span>Total PPN (11%):</span>
+                    <span>Total PPN (12% × DPP):</span>
                     <span class="font-semibold text-gray-900 font-mono">Rp {{ number_format($calcTotalTax, 0, ',', '.') }}</span>
                 </div>
                 <div class="pt-2.5 border-t border-gray-100 flex justify-between text-sm font-black text-gray-900">
