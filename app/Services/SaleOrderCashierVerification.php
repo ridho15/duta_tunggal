@@ -46,10 +46,9 @@ class SaleOrderCashierVerification
             }
 
             $required = $locked->grandTotal();
-            $deposit = $locked->customer
-                ? Deposit::query()->where('from_model_type', $locked->customer::class)->where('from_model_id', $locked->customer_id)->lockForUpdate()->first()
-                : null;
-            $balance = $deposit ? (float) $deposit->remaining_amount : 0.0;
+            // Saldo titip = Σ semua deposit aktif customer (setiap setoran / kelebihan bayar adalah baris deposit sendiri).
+            $deposits = $this->activeDeposits($locked);
+            $balance = (float) $deposits->sum('remaining_amount');
             $shortfall = max(0.0, round($required - $balance, 2));
             $overridden = false;
 
@@ -83,20 +82,29 @@ class SaleOrderCashierVerification
                 $overridden = true;
             }
 
-            $use = min($required, $balance);
-            if ($use > 0.005 && $deposit) {
+            $use = round(min($required, $balance), 2);
+            $left = $use;
+            foreach ($deposits as $deposit) {   // setoran terlama dipakai lebih dulu
+                if ($left <= 0.005) {
+                    break;
+                }
+                $take = round(min($left, (float) $deposit->remaining_amount), 2);
+                if ($take <= 0.005) {
+                    continue;
+                }
                 $deposit->update([
-                    'used_amount' => (float) $deposit->used_amount + $use,
-                    'remaining_amount' => $balance - $use,
+                    'used_amount' => (float) $deposit->used_amount + $take,
+                    'remaining_amount' => round((float) $deposit->remaining_amount - $take, 2),
                 ]);
                 $deposit->depositLog()->create([
                     'type' => 'use',
                     'reference_type' => SaleOrder::class,
                     'reference_id' => $locked->id,
-                    'amount' => $use,
+                    'amount' => $take,
                     'note' => "Dipakai untuk verifikasi kasir COD SO {$locked->so_number}".($overridden ? ' (PENGECUALIAN saldo kurang)' : '').(filled($note) ? " ({$note})" : ''),
                     'created_by' => $actor?->getKey(),
                 ]);
+                $left = round($left - $take, 2);
             }
 
             $locked->update([
@@ -109,6 +117,19 @@ class SaleOrderCashierVerification
         });
     }
 
+    /** Deposit aktif customer bersaldo, terlama dulu, dikunci untuk transaksi ini. */
+    private function activeDeposits(SaleOrder $saleOrder): \Illuminate\Support\Collection
+    {
+        if (! $saleOrder->customer) {
+            return collect();
+        }
+
+        return Deposit::query()
+            ->where('from_model_type', $saleOrder->customer::class)->where('from_model_id', $saleOrder->customer_id)
+            ->where('status', 'active')->where('remaining_amount', '>', 0)
+            ->orderBy('id')->lockForUpdate()->get();
+    }
+
     /**
      * Kembalikan saldo titip yang dipakai SO ini (dipanggil saat SO dibatalkan). Idempoten: hanya sisa (use − return) yang dikembalikan.
      */
@@ -117,36 +138,39 @@ class SaleOrderCashierVerification
         $actor ??= Auth::user();
 
         return DB::transaction(function () use ($saleOrder, $actor) {
-            $deposit = $saleOrder->customer
-                ? Deposit::query()->where('from_model_type', $saleOrder->customer::class)->where('from_model_id', $saleOrder->customer_id)->lockForUpdate()->first()
-                : null;
-            if (! $deposit) {
+            if (! $saleOrder->customer) {
                 return 0.0;
             }
 
-            $logs = $deposit->depositLog()->where('reference_type', SaleOrder::class)->where('reference_id', $saleOrder->id);
-            $used = (float) (clone $logs)->where('type', 'use')->sum('amount');
-            $returned = (float) (clone $logs)->where('type', 'return')->sum('amount');
-            $refundable = round($used - $returned, 2);
+            // Kembalikan ke tiap baris deposit sebesar yang dipakai SO ini dari baris itu (use − return).
+            $deposits = Deposit::query()->where('from_model_type', $saleOrder->customer::class)->where('from_model_id', $saleOrder->customer_id)
+                ->orderBy('id')->lockForUpdate()->get();
+            $total = 0.0;
+            foreach ($deposits as $deposit) {
+                $logs = $deposit->depositLog()->where('reference_type', SaleOrder::class)->where('reference_id', $saleOrder->id);
+                $used = (float) (clone $logs)->where('type', 'use')->sum('amount');
+                $returned = (float) (clone $logs)->where('type', 'return')->sum('amount');
+                $refundable = round($used - $returned, 2);
+                if ($refundable <= 0.005) {
+                    continue;
+                }
 
-            if ($refundable <= 0.005) {
-                return 0.0;
+                $deposit->update([
+                    'used_amount' => max(0.0, (float) $deposit->used_amount - $refundable),
+                    'remaining_amount' => (float) $deposit->remaining_amount + $refundable,
+                ]);
+                $deposit->depositLog()->create([
+                    'type' => 'return',
+                    'reference_type' => SaleOrder::class,
+                    'reference_id' => $saleOrder->id,
+                    'amount' => $refundable,
+                    'note' => "Dikembalikan: SO {$saleOrder->so_number} dibatalkan",
+                    'created_by' => $actor?->getKey(),
+                ]);
+                $total += $refundable;
             }
 
-            $deposit->update([
-                'used_amount' => max(0.0, (float) $deposit->used_amount - $refundable),
-                'remaining_amount' => (float) $deposit->remaining_amount + $refundable,
-            ]);
-            $deposit->depositLog()->create([
-                'type' => 'return',
-                'reference_type' => SaleOrder::class,
-                'reference_id' => $saleOrder->id,
-                'amount' => $refundable,
-                'note' => "Dikembalikan: SO {$saleOrder->so_number} dibatalkan",
-                'created_by' => $actor?->getKey(),
-            ]);
-
-            return $refundable;
+            return round($total, 2);
         });
     }
 }

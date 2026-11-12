@@ -24,7 +24,7 @@ class CustomerPicker
     /** Setiap kata harus cocok di nama, kode, kode lama, perusahaan, atau NIK/NPWP; customer yang sudah digabung tidak ditawarkan. */
     public static function search(string $q, bool $debtorsFirst = false): array
     {
-        $query = Customer::query()->with('deposit')->whereNull('merged_into');
+        $query = self::withDepositBalance(Customer::query())->whereNull('merged_into');
         foreach (preg_split('/\s+/', trim($q), -1, PREG_SPLIT_NO_EMPTY) as $term) {
             $like = '%'.addcslashes($term, '\\%_').'%';
             $query->where(fn ($w) => $w->where('name', 'like', $like)->orWhere('code', 'like', $like)->orWhere('legacy_code', 'like', $like)
@@ -45,7 +45,7 @@ class CustomerPicker
             // MySQL tidak mendukung LIMIT di dalam IN (subquery): ambil id pelanggan berpiutang lebih dulu.
             $ids = $ids->merge(Customer::query()->whereRaw('exists ('.self::debtSql().')')->orderBy('name')->limit($debtors)->pluck('id'));
         }
-        $query = Customer::query()->with('deposit')->whereIn('id', $ids->unique()->values());
+        $query = self::withDepositBalance(Customer::query())->whereIn('id', $ids->unique()->values());
 
         return self::options($query->orderBy('name')->get(self::COLUMNS));
     }
@@ -65,7 +65,8 @@ class CustomerPicker
                 'tempo' => (int) $c->tempo_kredit,
                 'address' => $c->address ?? '',
                 'phone' => $c->phone ?? ($c->telephone ?? ''),
-                'deposit' => (float) ($c->deposit?->remaining_amount ?? 0),
+                // Saldo titip = Σ semua deposit aktif (tiap setoran/kelebihan bayar adalah baris deposit sendiri).
+                'deposit' => (float) ($c->deposit_balance ?? 0),
             ],
         ])->values()->all();
     }
@@ -74,6 +75,12 @@ class CustomerPicker
     public static function dataMap(array $options): object
     {
         return (object) collect($options)->mapWithKeys(fn ($o) => [$o['id'] => $o['data']])->all();
+    }
+
+    private static function withDepositBalance($query)
+    {
+        return $query->addSelect(['deposit_balance' => \App\Models\Deposit::query()->selectRaw('COALESCE(SUM(remaining_amount), 0)')
+            ->where('from_model_type', Customer::class)->whereColumn('from_model_id', 'customers.id')->where('status', 'active')]);
     }
 
     private static function debtSql(): string

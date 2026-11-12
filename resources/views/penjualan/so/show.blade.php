@@ -37,6 +37,9 @@
                 · {{ $saleOrder->tipe_pengiriman }}
                 · {{ $saleOrder->order_date ? $saleOrder->order_date->translatedFormat('d F Y') : '-' }}
                 · Cabang <span class="font-semibold text-gray-700">{{ $saleOrder->cabang?->nama ?? '-' }}</span>
+                @if($saleOrder->quotation_id && $saleOrder->quotation)
+                    · Penawaran <a href="{{ route('penjualan.quotations.show', $saleOrder->quotation_id) }}" class="font-semibold text-[#15803d] hover:underline">{{ $saleOrder->quotation->quotation_number }}</a>
+                @endif
             </div>
         </div>
 
@@ -45,6 +48,12 @@
                 <svg class="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 Cetak SO
             </a>
+
+            @if(in_array($saleOrder->status, ['reject', 'canceled'], true))
+                <a href="{{ route('penjualan.so.create', ['copy_from' => $saleOrder->id]) }}" class="px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-xl transition-colors">
+                    Salin ke SO Baru
+                </a>
+            @endif
 
             @if(in_array($saleOrder->status, ['draft', 'request_approve']))
                 <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors">
@@ -130,6 +139,7 @@
                                     <div class="font-bold text-gray-900">{{ $item->product?->name }}</div>
                                     <div class="text-xs text-gray-500 mt-0.5">
                                         {{ $item->product?->sku }} · Rp {{ number_format($item->unit_price, 0, ',', '.') }} / {{ $item->product?->uom?->abbreviation ?? 'PCS' }}
+                                        @if((float) $item->discount > 0) · Diskon {{ rtrim(rtrim(number_format((float) $item->discount, 2, ',', '.'), '0'), ',') }}% @endif
                                     </div>
                                 </td>
                                 <td class="py-3 px-2 text-right font-medium text-gray-800">
@@ -151,9 +161,33 @@
             </div>
 
             <!-- Total Ringkasan -->
+            @php
+                $taxLabel = ['none' => 'Non Pajak', 'eklusif' => 'PPN Eksklusif', 'eksklusif' => 'PPN Eksklusif', 'inklusif' => 'PPN Inklusif'];
+                $soTaxType = strtolower((string) ($saleOrder->saleOrderItem->first()?->tipe_pajak ?? 'none'));
+                $soHargaJual = 0.0; $soPpn = 0.0;
+                foreach ($saleOrder->saleOrderItem as $taxItem) {
+                    $amt = \App\Support\LineAmounts::calculate($taxItem->quantity, $taxItem->unit_price, $taxItem->discount, $taxItem->tax, $taxItem->tipe_pajak ?: 'none');
+                    $soHargaJual += (float) $amt['dpp'];
+                    $soPpn += (float) $amt['ppn'];
+                }
+            @endphp
             <div class="flex flex-col items-end gap-1.5 pt-4 border-t border-gray-100 text-sm mt-3">
                 <div class="flex justify-between w-64 text-gray-600">
-                    <span>Subtotal barang</span>
+                    <span>Tipe pajak</span>
+                    <span class="font-semibold text-gray-900">{{ $taxLabel[$soTaxType] ?? ucfirst($soTaxType) }}</span>
+                </div>
+                @if($soPpn > 0)
+                    <div class="flex justify-between w-64 text-gray-600">
+                        <span>DPP Nilai Lain (11/12)</span>
+                        <span class="font-semibold text-gray-900">Rp {{ number_format($soHargaJual * 11 / 12, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="flex justify-between w-64 text-gray-600">
+                        <span>PPN (12% × DPP)</span>
+                        <span class="font-semibold text-gray-900">Rp {{ number_format($soPpn, 0, ',', '.') }}</span>
+                    </div>
+                @endif
+                <div class="flex justify-between w-64 text-gray-600">
+                    <span>Subtotal barang{{ $soPpn > 0 ? ' (termasuk PPN)' : '' }}</span>
                     <span class="font-semibold text-gray-900">Rp {{ number_format($saleOrder->total_amount, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between w-64 text-gray-600">
