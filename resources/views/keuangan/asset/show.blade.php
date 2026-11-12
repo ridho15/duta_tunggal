@@ -1,9 +1,9 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', "Detail Aset {$asset->code} – Duta Tunggal ERP")
 
 @section('content')
-<div class="space-y-6 max-w-7xl mx-auto">
+<div class="space-y-6 max-w-7xl mx-auto" x-data>
     {{-- Header & Aksi Cepat --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -571,7 +571,7 @@
     <x-confirmation-modal
         name="depreciate-single"
         title="Proses Penyusutan Aset Bulan Ini"
-        type="success"
+        variant="success"
         confirm-text="Ya, Proses Penyusutan"
         cancel-text="Batal"
         method="POST"
@@ -588,7 +588,7 @@
     <x-confirmation-modal
         name="reverse-depreciation"
         title="Batalkan (Reverse) Depresiasi Periode"
-        type="danger"
+        variant="danger"
         confirm-text="Ya, Batalkan Depresiasi"
         cancel-text="Batal"
         method="POST"

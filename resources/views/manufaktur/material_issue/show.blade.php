@@ -1,9 +1,9 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', $materialIssue->issue_number . ' – Detail Pengeluaran / Retur Bahan Baku')
 
 @section('content')
-<div class="space-y-6 max-w-7xl mx-auto pb-16">
+<div class="space-y-6 max-w-7xl mx-auto pb-16" x-data>
     {{-- Top Bar & Action Toolbar --}}
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>

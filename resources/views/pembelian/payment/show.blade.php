@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Pembayaran ' . $payment->payment_number . ' – Duta Tunggal ERP')
 
@@ -600,7 +600,7 @@
     <x-confirmation-modal
         name="post-payment"
         title="Posting Pembayaran ke Buku Besar"
-        type="success"
+        variant="success"
         confirm-text="Ya, Posting Pembayaran"
         cancel-text="Batal"
         method="POST"

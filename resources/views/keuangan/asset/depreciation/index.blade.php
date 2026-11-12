@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Pusat Depresiasi Bulanan Aset – Duta Tunggal ERP')
 
@@ -412,7 +412,7 @@
     <x-confirmation-modal
         name="batch-depreciation"
         title="Konfirmasi Eksekusi Penyusutan Massal"
-        type="success"
+        variant="success"
         confirm-text="Ya, Proses Penyusutan Massal"
         cancel-text="Batal"
         :has-form="false"
@@ -438,7 +438,7 @@
     <x-confirmation-modal
         name="reverse-depreciation"
         title="Batalkan (Reverse) Penyusutan Aset"
-        type="danger"
+        variant="danger"
         confirm-text="Ya, Batalkan Penyusutan"
         cancel-text="Batal"
         method="POST"

@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Detail Manifes Jadwal ' . $deliverySchedule->schedule_number])
+﻿@extends('layouts.app', ['title' => 'Detail Manifes Jadwal ' . $deliverySchedule->schedule_number])
 
 @section('content')
 <div class="space-y-6" x-data="{}">
@@ -466,7 +466,7 @@ function closeCancelModal() {
     <x-confirmation-modal
         name="start-schedule"
         title="Mulai Pengiriman Armada"
-        type="info"
+        variant="info"
         confirm-text="Ya, Mulai Pengiriman"
         cancel-text="Batal"
         method="POST"
@@ -483,7 +483,7 @@ function closeCancelModal() {
     <x-confirmation-modal
         name="complete-schedule"
         title="Tandai Jadwal Pengiriman Selesai"
-        type="success"
+        variant="success"
         confirm-text="Ya, Selesaikan Jadwal"
         cancel-text="Batal"
         method="POST"
@@ -500,7 +500,7 @@ function closeCancelModal() {
     <x-confirmation-modal
         name="delete-schedule"
         title="Hapus Jadwal Pengiriman"
-        type="danger"
+        variant="danger"
         confirm-text="Ya, Hapus Jadwal"
         cancel-text="Batal"
         method="DELETE"

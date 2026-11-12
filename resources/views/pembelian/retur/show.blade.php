@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Detail Retur Pembelian ' . $return->nota_retur . ' – Duta Tunggal ERP')
 
@@ -930,7 +930,7 @@
     <x-confirmation-modal
         name="submit-return"
         title="Ajukan Retur Pembelian"
-        type="warning"
+        variant="warning"
         confirm-text="Ya, Ajukan Persetujuan"
         cancel-text="Batal"
         method="POST"

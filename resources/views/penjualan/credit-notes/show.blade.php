@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', "Detail Nota Kredit {$creditNote->credit_note_number} – Duta Tunggal ERP")
 
@@ -624,7 +624,7 @@
     <x-confirmation-modal
         name="delete-credit-note"
         title="Hapus Draf Nota Kredit"
-        type="danger"
+        variant="danger"
         confirm-text="Ya, Hapus Draf"
         cancel-text="Batal"
         method="DELETE"

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Permintaan Pembelian: ' . $orderRequest->request_number . ' – Duta Tunggal ERP')
 
@@ -501,7 +501,7 @@
     <x-confirmation-modal
         name="approve-or"
         title="Setujui Permintaan Pembelian"
-        type="success"
+        variant="success"
         confirm-text="Ya, Setujui Permintaan"
         cancel-text="Batal"
         method="POST"
@@ -518,7 +518,7 @@
     <x-confirmation-modal
         name="delete-or"
         title="Hapus Draf Permintaan Pembelian"
-        type="danger"
+        variant="danger"
         confirm-text="Ya, Hapus Draf"
         cancel-text="Batal"
         method="DELETE"

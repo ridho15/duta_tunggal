@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Detail Retur Penjualan ' . $customerReturn->return_number])
+﻿@extends('layouts.app', ['title' => 'Detail Retur Penjualan ' . $customerReturn->return_number])
 
 @section('content')
 @php
@@ -717,7 +717,7 @@
     <x-confirmation-modal
         name="mark-received"
         title="Konfirmasi Penerimaan Fisik Retur"
-        type="info"
+        variant="info"
         confirm-text="Ya, Barang Sudah Sampai"
         cancel-text="Batal"
         method="POST"
@@ -734,7 +734,7 @@
     <x-confirmation-modal
         name="approve-return"
         title="Setujui Pengajuan Retur"
-        type="success"
+        variant="success"
         confirm-text="Ya, Setujui Retur"
         cancel-text="Batal"
         method="POST"
@@ -751,7 +751,7 @@
     <x-confirmation-modal
         name="complete-return"
         title="Selesaikan Retur Penjualan"
-        type="success"
+        variant="success"
         confirm-text="Ya, Selesaikan Retur"
         cancel-text="Batal"
         method="POST"

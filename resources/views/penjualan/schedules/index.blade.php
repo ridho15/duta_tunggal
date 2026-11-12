@@ -1,7 +1,7 @@
-@extends('layouts.app', ['title' => 'Jadwal Kirim & Armada'])
+﻿@extends('layouts.app', ['title' => 'Jadwal Kirim & Armada'])
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-6" x-data>
 
     {{-- Breadcrumbs & Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -551,7 +551,7 @@ function closeCancelModal() {
     <x-confirmation-modal
         name="start-schedule"
         title="Mulai Pengiriman Armada"
-        type="info"
+        variant="info"
         confirm-text="Ya, Mulai Pengiriman"
         cancel-text="Batal"
         method="POST"
@@ -568,7 +568,7 @@ function closeCancelModal() {
     <x-confirmation-modal
         name="complete-schedule"
         title="Tandai Jadwal Pengiriman Selesai"
-        type="success"
+        variant="success"
         confirm-text="Ya, Selesaikan Jadwal"
         cancel-text="Batal"
         method="POST"

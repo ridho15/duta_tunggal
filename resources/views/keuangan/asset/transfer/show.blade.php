@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Detail Mutasi Aset Tetap – Duta Tunggal ERP')
 
@@ -303,7 +303,7 @@
     <x-confirmation-modal
         name="approve-transfer"
         title="Setujui Mutasi Aset"
-        type="success"
+        variant="success"
         confirm-text="Ya, Setujui Mutasi"
         cancel-text="Batal"
         method="POST"
@@ -320,7 +320,7 @@
     <x-confirmation-modal
         name="complete-transfer"
         title="Selesaikan Mutasi & Serah Terima Aset"
-        type="success"
+        variant="success"
         confirm-text="Ya, Selesaikan Mutasi"
         cancel-text="Batal"
         method="POST"

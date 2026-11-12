@@ -1,9 +1,9 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Retur Pembelian & Debit Note – Duta Tunggal ERP')
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-6" x-data>
     {{-- Header Halaman --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -546,7 +546,7 @@
     <x-confirmation-modal
         name="submit-return"
         title="Ajukan Retur Pembelian"
-        type="info"
+        variant="info"
         confirm-text="Ya, Ajukan Retur"
         cancel-text="Batal"
         method="POST"
