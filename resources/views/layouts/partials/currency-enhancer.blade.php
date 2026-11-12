@@ -134,7 +134,7 @@
         form.querySelectorAll('input[data-currency]').forEach(function(input) {
             // Jika input ini adalah form submit payload langsung (tanpa hidden target)
             if (!input.dataset.targetHidden && input.name) {
-                input.value = window.parseRupiah(input.value);
+                input.value = input.value.trim() === '' ? '' : window.parseRupiah(input.value);
             }
         });
     }, true);

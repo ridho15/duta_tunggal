@@ -11,6 +11,7 @@ use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Product;
 use App\Services\AssetService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,11 +31,23 @@ class AssetController extends Controller
         $this->assetService = $assetService;
     }
 
+    private function authorizeAsset(string $action): void
+    {
+        match ($action) {
+            'create' => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create asset'], 'Anda tidak memiliki hak akses untuk mendaftarkan Aset Tetap.'),
+            'update' => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['update asset'], 'Anda tidak memiliki hak akses untuk mengubah Aset Tetap.'),
+            'delete' => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete asset'], 'Anda tidak memiliki hak akses untuk menghapus Aset Tetap.'),
+            default  => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset', 'view asset'], 'Anda tidak memiliki hak akses untuk melihat modul Aset Tetap.'),
+        };
+    }
+
     /**
      * Tampilkan daftar Master Aset Tetap dan 5 KPI Utama.
      */
     public function index(Request $request): View
     {
+        $this->authorizeAsset('read');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -126,6 +139,8 @@ class AssetController extends Controller
      */
     public function create(): View
     {
+        $this->authorizeAsset('create');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -178,6 +193,8 @@ class AssetController extends Controller
      */
     public function store(StoreAssetRequest $request): RedirectResponse
     {
+        $this->authorizeAsset('create');
+
         $validated = $request->validated();
         $creditCoaId = $validated['credit_coa_id'] ?? null;
         unset($validated['credit_coa_id']);
@@ -223,6 +240,8 @@ class AssetController extends Controller
      */
     public function show(Asset $asset): View
     {
+        $this->authorizeAsset('read');
+
         $asset->load([
             'cabang',
             'product',
@@ -251,6 +270,8 @@ class AssetController extends Controller
      */
     public function edit(Asset $asset): View
     {
+        $this->authorizeAsset('update');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -284,6 +305,8 @@ class AssetController extends Controller
      */
     public function update(UpdateAssetRequest $request, Asset $asset): RedirectResponse
     {
+        $this->authorizeAsset('update');
+
         $validated = $request->validated();
 
         try {
@@ -315,6 +338,8 @@ class AssetController extends Controller
      */
     public function destroy(Asset $asset): RedirectResponse
     {
+        $this->authorizeAsset('delete');
+
         // Proteksi jika memiliki entri depresiasi aktif
         if ($asset->depreciationEntries()->where('status', '!=', 'reversed')->exists()) {
             return back()->with('error', 'Aset tidak dapat dihapus karena sudah memiliki riwayat penyusutan tercatat.');
@@ -337,6 +362,8 @@ class AssetController extends Controller
      */
     public function postAcquisitionJournal(Asset $asset, Request $request): RedirectResponse
     {
+        $this->authorizeAsset('update');
+
         if ($asset->hasPostedJournals()) {
             return back()->with('error', 'Jurnal akuisisi untuk aset ini sudah pernah diposting.');
         }
@@ -357,6 +384,8 @@ class AssetController extends Controller
      */
     public function calculateDepreciation(Asset $asset): RedirectResponse
     {
+        $this->authorizeAsset('update');
+
         try {
             $asset->calculateDepreciation();
 
@@ -371,6 +400,8 @@ class AssetController extends Controller
      */
     public function pdf(Asset $asset): Response
     {
+        $this->authorizeAsset('read');
+
         $asset->load(['cabang', 'product', 'assetCoa']);
 
         $pdf = Pdf::loadView('keuangan.asset.pdf', compact('asset'))

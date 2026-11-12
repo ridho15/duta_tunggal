@@ -11,6 +11,7 @@ use App\Models\CashBankTransfer;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Services\CashBankService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,6 +36,8 @@ class CashBankController extends Controller
      */
     public function index(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::CASHBANK_READ_ROLES, ['view any cash bank transaction', 'view cash bank transaction', 'view any cash bank account'], 'Anda tidak memiliki hak akses untuk melihat Kas & Bank.');
+
         $tab = $request->query('tab', 'semua');
         $search = trim((string) $request->query('q', ''));
         $accountId = $request->query('account_id');
@@ -193,6 +196,8 @@ class CashBankController extends Controller
      */
     public function create(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create cash bank transaction'], 'Anda tidak memiliki hak akses untuk mencatat transaksi Kas & Bank.');
+
         $defaultType = $request->query('type', 'cash_out');
         $suggestedNumber = $this->cashBankService->generateNumber('CB');
 
@@ -232,6 +237,8 @@ class CashBankController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create cash bank transaction'], 'Anda tidak memiliki hak akses untuk mencatat transaksi Kas & Bank.');
+
         $hasDetails = is_array($request->input('details')) && count($request->input('details')) > 0;
 
         $validated = $request->validate([
@@ -332,6 +339,8 @@ class CashBankController extends Controller
      */
     public function show(CashBankTransaction $transaction): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::CASHBANK_READ_ROLES, ['view any cash bank transaction', 'view cash bank transaction', 'view any cash bank account'], 'Anda tidak memiliki hak akses untuk melihat Kas & Bank.');
+
         $transaction->load([
             'accountCoa',
             'offsetCoa',
@@ -348,6 +357,8 @@ class CashBankController extends Controller
      */
     public function destroy(CashBankTransaction $transaction): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete cash bank transaction'], 'Anda tidak memiliki hak akses untuk menghapus transaksi Kas & Bank.');
+
         try {
             DB::transaction(function () use ($transaction) {
                 // Hapus jurnal terkait
@@ -376,6 +387,8 @@ class CashBankController extends Controller
      */
     public function pdf(CashBankTransaction $transaction): Response
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::CASHBANK_READ_ROLES, ['view any cash bank transaction', 'view cash bank transaction', 'view any cash bank account'], 'Anda tidak memiliki hak akses untuk mencetak bukti Kas & Bank.');
+
         $transaction->load([
             'accountCoa',
             'offsetCoa',
@@ -396,6 +409,8 @@ class CashBankController extends Controller
      */
     public function createTransfer(): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create cash bank transfer'], 'Anda tidak memiliki hak akses untuk membuat transfer antar rekening.');
+
         $suggestedNumber = $this->cashBankService->generateTransferNumber();
 
         // Akun Kas & Bank - hanya akun transaksi leaf
@@ -430,6 +445,8 @@ class CashBankController extends Controller
      */
     public function storeTransfer(Request $request): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create cash bank transfer'], 'Anda tidak memiliki hak akses untuk membuat transfer antar rekening.');
+
         $validated = $request->validate([
             'number' => ['required', 'string', 'max:50', 'unique:cash_bank_transfers,number'],
             'date' => ['required', 'date'],
@@ -500,6 +517,8 @@ class CashBankController extends Controller
      */
     public function showTransfer(CashBankTransfer $transfer): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any cash bank transfer', 'view cash bank transfer'], 'Anda tidak memiliki hak akses untuk melihat transfer antar rekening.');
+
         $transfer->load([
             'fromCoa',
             'toCoa',
@@ -516,6 +535,8 @@ class CashBankController extends Controller
      */
     public function destroyTransfer(CashBankTransfer $transfer): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete cash bank transfer'], 'Anda tidak memiliki hak akses untuk membatalkan transfer antar rekening.');
+
         try {
             DB::transaction(function () use ($transfer) {
                 $transfer->journalEntries()->delete();
@@ -539,6 +560,8 @@ class CashBankController extends Controller
      */
     public function pdfTransfer(CashBankTransfer $transfer): Response
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any cash bank transfer', 'view cash bank transfer'], 'Anda tidak memiliki hak akses untuk mencetak bukti transfer.');
+
         $transfer->load([
             'fromCoa',
             'toCoa',

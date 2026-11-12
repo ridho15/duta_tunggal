@@ -10,6 +10,7 @@ use App\Models\JournalEntry;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AssetDepreciationWorkflowTest extends TestCase
@@ -36,6 +37,7 @@ class AssetDepreciationWorkflowTest extends TestCase
             'cabang_id' => $this->cabang->id,
             'manage_type' => ['all'],
         ]);
+        $this->user->assignRole(Role::firstOrCreate(['name' => 'Finance Manager', 'guard_name' => 'web']));
 
         // COA Setup
         $this->assetCoa = ChartOfAccount::factory()->create([

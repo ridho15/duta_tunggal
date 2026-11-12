@@ -10,6 +10,7 @@ use App\Models\JournalEntry;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 
 uses(RefreshDatabase::class);
 
@@ -40,6 +41,7 @@ beforeEach(function () {
         'manage_type' => 'cabang',
     ]);
     $roleKasir = Role::firstOrCreate(['name' => 'Kasir Treasury', 'guard_name' => 'web']);
+    $roleKasir->givePermissionTo(Permission::firstOrCreate(['name' => 'create cash bank transaction', 'guard_name' => 'web']));
     $this->kasir->assignRole($roleKasir);
 
     // Role 2: Supervisor Keuangan
@@ -49,6 +51,7 @@ beforeEach(function () {
         'manage_type' => 'cabang',
     ]);
     $roleSpv = Role::firstOrCreate(['name' => 'Supervisor Keuangan', 'guard_name' => 'web']);
+    $roleSpv->givePermissionTo(Permission::firstOrCreate(['name' => 'create cash bank transfer', 'guard_name' => 'web']));
     $this->supervisorFinance->assignRole($roleSpv);
 
     // Role 3: Senior Accountant
@@ -58,6 +61,7 @@ beforeEach(function () {
         'manage_type' => 'cabang',
     ]);
     $roleAkuntan = Role::firstOrCreate(['name' => 'Senior Akuntan', 'guard_name' => 'web']);
+    $roleAkuntan->givePermissionTo(Permission::firstOrCreate(['name' => 'create journal entry', 'guard_name' => 'web']));
     $this->akuntan->assignRole($roleAkuntan);
 });
 

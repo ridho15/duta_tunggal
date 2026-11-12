@@ -175,9 +175,10 @@ class CreditNoteController extends Controller
         }
 
         if (! empty($invoiceId)) {
-            $selectedInvoice = Invoice::with(['accountReceivable', 'invoiceItem.product'])->find($invoiceId);
+            $selectedInvoice = Invoice::with(['accountReceivable.customer', 'invoiceItem.product'])->find($invoiceId);
             if ($selectedInvoice && ! $selectedCustomer) {
-                $selectedCustomer = $selectedInvoice->customer;
+                $selectedCustomer = $selectedInvoice->accountReceivable?->customer
+                    ?? $selectedInvoice->fromModel?->customer;
                 $customerId = $selectedCustomer?->id;
             }
         }

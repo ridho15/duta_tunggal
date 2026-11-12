@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AssetDisposal;
 use App\Models\Cabang;
 use App\Services\AssetDisposalService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,8 @@ class AssetDisposalController extends Controller
      */
     public function index(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset disposal', 'view asset disposal'], 'Anda tidak memiliki hak akses untuk melihat pelepasan aset.');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -89,6 +92,8 @@ class AssetDisposalController extends Controller
      */
     public function create(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create asset disposal'], 'Anda tidak memiliki hak akses untuk mencatat pelepasan aset.');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -117,6 +122,8 @@ class AssetDisposalController extends Controller
      */
     public function store(StoreAssetDisposalRequest $request): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create asset disposal'], 'Anda tidak memiliki hak akses untuk mencatat pelepasan aset.');
+
         $validated = $request->validated();
         $asset = Asset::findOrFail($validated['asset_id']);
 
@@ -149,6 +156,8 @@ class AssetDisposalController extends Controller
      */
     public function show(AssetDisposal $disposal): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset disposal', 'view asset disposal'], 'Anda tidak memiliki hak akses untuk melihat pelepasan aset.');
+
         $disposal->load([
             'asset.cabang',
             'asset.assetCoa',
@@ -165,6 +174,8 @@ class AssetDisposalController extends Controller
      */
     public function pdf(AssetDisposal $disposal): Response
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset disposal', 'view asset disposal'], 'Anda tidak memiliki hak akses untuk mencetak berita acara pelepasan aset.');
+
         $disposal->load([
             'asset.cabang',
             'asset.assetCoa',

@@ -9,6 +9,7 @@ use App\Models\Asset;
 use App\Models\AssetDepreciation;
 use App\Models\Cabang;
 use App\Services\AssetDepreciationService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -33,6 +34,8 @@ class AssetDepreciationController extends Controller
      */
     public function index(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset depreciation', 'view asset depreciation'], 'Anda tidak memiliki hak akses untuk melihat penyusutan aset.');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -143,6 +146,8 @@ class AssetDepreciationController extends Controller
      */
     public function processMonthly(ProcessDepreciationRequest $request): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create asset depreciation'], 'Anda tidak memiliki hak akses untuk memproses penyusutan aset.');
+
         $validated = $request->validated();
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
@@ -215,6 +220,8 @@ class AssetDepreciationController extends Controller
      */
     public function processSingle(Asset $asset, Request $request): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create asset depreciation'], 'Anda tidak memiliki hak akses untuk memproses penyusutan aset.');
+
         $year = (int) ($request->input('period_year') ?: now()->year);
         $month = (int) ($request->input('period_month') ?: now()->month);
         $date = Carbon::createFromDate($year, $month, 1)->endOfMonth();
@@ -235,6 +242,8 @@ class AssetDepreciationController extends Controller
      */
     public function reverse(AssetDepreciation $depreciation): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete asset depreciation'], 'Anda tidak memiliki hak akses untuk membatalkan penyusutan aset.');
+
         if ($depreciation->status === 'reversed') {
             return back()->with('error', 'Entri penyusutan ini sudah pernah dibatalkan sebelumnya.');
         }
@@ -258,6 +267,8 @@ class AssetDepreciationController extends Controller
      */
     public function pdf(Request $request): Response
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset depreciation', 'view asset depreciation'], 'Anda tidak memiliki hak akses untuk mencetak laporan penyusutan aset.');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 

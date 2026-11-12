@@ -49,6 +49,35 @@
     {{-- Pemformat Mata Uang Rupiah (Pemisah ribuan & Masking) --}}
     @include('layouts.partials.currency-enhancer')
 
+    {{-- Proteksi Double-Submit Global pada Form POST --}}
+    <script>
+        document.addEventListener('submit', function (e) {
+            const form = e.target;
+            if (!form || form.tagName !== 'FORM' || e.defaultPrevented) return;
+            const method = (form.getAttribute('method') || 'GET').toUpperCase();
+            if (method === 'GET' || form.target === '_blank' || form.hasAttribute('data-no-disable')) return;
+            if (form.dataset.submitting === '1') {
+                e.preventDefault();
+                return;
+            }
+            form.dataset.submitting = '1';
+            const btn = e.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+            if (btn) {
+                setTimeout(function () {
+                    btn.disabled = true;
+                    btn.classList.add('opacity-60', 'cursor-wait');
+                }, 0);
+            }
+            setTimeout(function () {
+                delete form.dataset.submitting;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'cursor-wait');
+                }
+            }, 8000);
+        });
+    </script>
+
     @stack('scripts')
 </body>
 </html>

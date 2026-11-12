@@ -7,6 +7,7 @@ use App\Models\Cabang;
 use App\Services\BalanceSheetService;
 use App\Services\IncomeStatementService;
 use App\Services\TrialBalanceService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -46,10 +47,23 @@ class FinancialReportController extends Controller
     }
 
     /**
+     * Pastikan hanya peran Keuangan / Manajemen (atau yang berizin laporan) yang dapat mengakses Laporan Keuangan.
+     */
+    protected function authorizeReportAccess(): void
+    {
+        MenuAccess::authorizeRolesOrPermissions(
+            MenuAccess::FINANCE_READ_ROLES,
+            ['view any financial report', 'view financial report', 'view any journal entry'],
+            'Anda tidak memiliki hak akses untuk melihat Laporan Keuangan.'
+        );
+    }
+
+    /**
      * Hub Utama Laporan Keuangan (Redirects atau menampilkan tab aktif).
      */
     public function index(Request $request): View
     {
+        $this->authorizeReportAccess();
         $tab = $request->query('tab', 'neraca-saldo');
 
         if ($tab === 'laba-rugi') {
@@ -66,6 +80,7 @@ class FinancialReportController extends Controller
      */
     public function trialBalance(Request $request): View
     {
+        $this->authorizeReportAccess();
         $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', now()->endOfMonth()->toDateString());
         $cabangId = $this->resolveCabangId($request->query('cabang_id'));
@@ -97,6 +112,7 @@ class FinancialReportController extends Controller
      */
     public function trialBalancePdf(Request $request): Response
     {
+        $this->authorizeReportAccess();
         $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', now()->endOfMonth()->toDateString());
         $cabangId = $this->resolveCabangId($request->query('cabang_id'));
@@ -127,6 +143,7 @@ class FinancialReportController extends Controller
      */
     public function incomeStatement(Request $request): View
     {
+        $this->authorizeReportAccess();
         $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', now()->endOfMonth()->toDateString());
         $cabangId = $this->resolveCabangId($request->query('cabang_id'));
@@ -155,6 +172,7 @@ class FinancialReportController extends Controller
      */
     public function incomeStatementPdf(Request $request): Response
     {
+        $this->authorizeReportAccess();
         $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', now()->endOfMonth()->toDateString());
         $cabangId = $this->resolveCabangId($request->query('cabang_id'));
@@ -183,6 +201,7 @@ class FinancialReportController extends Controller
      */
     public function balanceSheet(Request $request): View
     {
+        $this->authorizeReportAccess();
         $asOfDate = $request->query('as_of_date', now()->toDateString());
         $cabangId = $this->resolveCabangId($request->query('cabang_id'));
         $showZero = filter_var($request->query('show_zero_balance', false), FILTER_VALIDATE_BOOLEAN);
@@ -212,6 +231,7 @@ class FinancialReportController extends Controller
      */
     public function balanceSheetPdf(Request $request): Response
     {
+        $this->authorizeReportAccess();
         $asOfDate = $request->query('as_of_date', now()->toDateString());
         $cabangId = $this->resolveCabangId($request->query('cabang_id'));
         $showZero = filter_var($request->query('show_zero_balance', false), FILTER_VALIDATE_BOOLEAN);

@@ -9,6 +9,7 @@ use App\Models\ChartOfAccount;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AssetTransferWorkflowTest extends TestCase
@@ -43,6 +44,7 @@ class AssetTransferWorkflowTest extends TestCase
             'cabang_id' => $this->cabangA->id,
             'manage_type' => ['all'],
         ]);
+        $this->user->assignRole(Role::firstOrCreate(['name' => 'Finance Manager', 'guard_name' => 'web']));
 
         $this->assetCoa = ChartOfAccount::factory()->create([
             'code' => '1210.01',

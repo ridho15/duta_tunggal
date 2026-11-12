@@ -39,8 +39,17 @@ class Customer extends Model
         // Removed CabangScope - customers are global entities that can buy from multiple branches
         // static::addGlobalScope(new CabangScope);
 
-        // Ensure cabang_id is set when creating via Filament forms that may hide the field
+        // Ensure cabang_id and non-nullable string fields have safe defaults
         static::creating(function ($model) {
+            if ($model->telephone === null) {
+                $model->telephone = '';
+            }
+            if ($model->fax === null) {
+                $model->fax = '';
+            }
+            if ($model->email === null) {
+                $model->email = '';
+            }
             if (empty($model->cabang_id)) {
                 $model->cabang_id = Auth::user()?->cabang_id
                     ?? \App\Models\Cabang::first()?->id

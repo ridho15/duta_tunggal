@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AssetTransfer;
 use App\Models\Cabang;
 use App\Services\AssetTransferService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,11 +28,22 @@ class AssetTransferController extends Controller
         $this->transferService = $transferService;
     }
 
+    private function authorizeTransfer(string $action): void
+    {
+        match ($action) {
+            'create' => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create asset transfer'], 'Anda tidak memiliki hak akses untuk mengajukan mutasi aset.'),
+            'update' => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['update asset transfer'], 'Anda tidak memiliki hak akses untuk memproses mutasi aset.'),
+            default  => MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any asset transfer', 'view asset transfer'], 'Anda tidak memiliki hak akses untuk melihat mutasi transfer aset.'),
+        };
+    }
+
     /**
      * Tampilkan daftar mutasi transfer aset antar cabang & 4 KPI Cards.
      */
     public function index(Request $request): View
     {
+        $this->authorizeTransfer('read');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -98,6 +110,8 @@ class AssetTransferController extends Controller
      */
     public function create(Request $request): View
     {
+        $this->authorizeTransfer('create');
+
         $user = Auth::user();
         $canManageAll = in_array('all', (array) ($user?->manage_type ?? []), true);
 
@@ -126,6 +140,8 @@ class AssetTransferController extends Controller
      */
     public function store(StoreAssetTransferRequest $request): RedirectResponse
     {
+        $this->authorizeTransfer('create');
+
         $validated = $request->validated();
         $asset = Asset::findOrFail($validated['asset_id']);
 
@@ -163,6 +179,8 @@ class AssetTransferController extends Controller
      */
     public function show(AssetTransfer $transfer): View
     {
+        $this->authorizeTransfer('read');
+
         $transfer->load([
             'asset.cabang',
             'fromCabang',
@@ -180,6 +198,8 @@ class AssetTransferController extends Controller
      */
     public function approve(AssetTransfer $transfer): RedirectResponse
     {
+        $this->authorizeTransfer('update');
+
         try {
             $this->transferService->approveTransfer($transfer);
 
@@ -194,6 +214,8 @@ class AssetTransferController extends Controller
      */
     public function complete(AssetTransfer $transfer): RedirectResponse
     {
+        $this->authorizeTransfer('update');
+
         try {
             $this->transferService->completeTransfer($transfer);
 
@@ -208,6 +230,8 @@ class AssetTransferController extends Controller
      */
     public function cancel(AssetTransfer $transfer, Request $request): RedirectResponse
     {
+        $this->authorizeTransfer('update');
+
         $request->validate([
             'cancel_reason' => ['required', 'string', 'min:5', 'max:500'],
         ], [
@@ -230,6 +254,8 @@ class AssetTransferController extends Controller
      */
     public function pdf(AssetTransfer $transfer): Response
     {
+        $this->authorizeTransfer('read');
+
         $transfer->load([
             'asset.cabang',
             'asset.assetCoa',

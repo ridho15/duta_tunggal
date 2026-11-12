@@ -426,6 +426,8 @@ function creditNoteCreate(config) {
                     this.invoiceDetails = data.invoice;
                     this.items = (data.items || []).map(item => ({
                         ...item,
+                        original_subtotal: parseFloat(item.subtotal_original ?? item.subtotal) || ((parseFloat(item.unit_price) || 0) * (parseFloat(item.original_qty) || 0)),
+                        original_tax_amount: parseFloat(item.tax_amount) || 0,
                         credit_qty: this.type === 'pembatalan' ? item.creditable_qty : 0,
                         subtotal: 0,
                         tax_amount: 0,
@@ -470,8 +472,8 @@ function creditNoteCreate(config) {
                 const qty = parseFloat(item.credit_qty) || 0;
                 if (qty > 0 && item.original_qty > 0) {
                     const ratio = qty / item.original_qty;
-                    item.subtotal = Math.round(item.subtotal_original || (item.unit_price * qty) * 100) / 100;
-                    item.tax_amount = Math.round((item.tax_amount / item.original_qty * qty) * 100) / 100;
+                    item.subtotal = Math.round((item.original_subtotal * ratio) * 100) / 100;
+                    item.tax_amount = Math.round((item.original_tax_amount * ratio) * 100) / 100;
                     item.total = Math.round((item.subtotal + item.tax_amount) * 100) / 100;
 
                     subtotal += item.subtotal;

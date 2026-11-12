@@ -8,6 +8,7 @@ use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AssetMasterManagementTest extends TestCase
@@ -35,6 +36,7 @@ class AssetMasterManagementTest extends TestCase
             'cabang_id' => $this->cabang->id,
             'manage_type' => ['all'],
         ]);
+        $this->user->assignRole(Role::firstOrCreate(['name' => 'Finance Manager', 'guard_name' => 'web']));
 
         // Setup COA
         $this->assetCoa = ChartOfAccount::factory()->create([

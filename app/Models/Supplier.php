@@ -36,8 +36,20 @@ class Supplier extends Model
         // Removed CabangScope - suppliers are global entities that can serve multiple branches
         // static::addGlobalScope(new CabangScope);
 
-        // Ensure cabang_id is set when creating via Filament forms that may hide the field
+        // Ensure cabang_id and non-nullable string fields have safe defaults
         static::creating(function ($model) {
+            if ($model->email === null) {
+                $model->email = '';
+            }
+            if ($model->handphone === null) {
+                $model->handphone = '';
+            }
+            if ($model->fax === null) {
+                $model->fax = '';
+            }
+            if ($model->npwp === null) {
+                $model->npwp = '';
+            }
             if (empty($model->cabang_id)) {
                 $model->cabang_id = Auth::user()?->cabang_id
                     ?? \App\Models\Cabang::first()?->id;

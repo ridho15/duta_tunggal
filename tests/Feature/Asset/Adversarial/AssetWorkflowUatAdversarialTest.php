@@ -9,6 +9,7 @@ use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Models\Role;
 use App\Models\User;
+use Spatie\Permission\Models\Permission;
 use App\Services\AssetDepreciationService;
 use App\Services\AssetDisposalService;
 use App\Services\AssetService;
@@ -29,6 +30,7 @@ beforeEach(function () {
         'manage_type' => 'all',
     ]);
     $roleStaf = Role::firstOrCreate(['name' => 'Staf Aset', 'guard_name' => 'web']);
+    $roleStaf->givePermissionTo(Permission::firstOrCreate(['name' => 'update asset', 'guard_name' => 'web']));
     $this->stafAset->assignRole($roleStaf);
 
     // Role 2: Supervisor Keuangan
@@ -38,6 +40,7 @@ beforeEach(function () {
         'manage_type' => 'all',
     ]);
     $roleSpv = Role::firstOrCreate(['name' => 'Supervisor Aset', 'guard_name' => 'web']);
+    $roleSpv->givePermissionTo(Permission::firstOrCreate(['name' => 'create asset depreciation', 'guard_name' => 'web']));
     $this->spvAset->assignRole($roleSpv);
 
     // Role 3: Manajer Keuangan / Direksi
@@ -47,6 +50,7 @@ beforeEach(function () {
         'manage_type' => 'all',
     ]);
     $roleMgr = Role::firstOrCreate(['name' => 'Manajer Keuangan', 'guard_name' => 'web']);
+    $roleMgr->givePermissionTo(Permission::firstOrCreate(['name' => 'create asset disposal', 'guard_name' => 'web']));
     $this->manajerKeuangan->assignRole($roleMgr);
 });
 

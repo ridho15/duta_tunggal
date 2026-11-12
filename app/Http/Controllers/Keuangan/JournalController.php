@@ -8,6 +8,7 @@ use App\Models\AccountingPeriod;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,8 @@ class JournalController extends Controller
      */
     public function index(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any journal entry', 'view journal entry'], 'Anda tidak memiliki hak akses untuk melihat Jurnal Umum.');
+
         $tab = $request->query('tab', 'semua');
         $search = trim((string) $request->query('q', ''));
         $coaId = $request->query('coa_id');
@@ -166,6 +169,8 @@ class JournalController extends Controller
      */
     public function ledger(Request $request): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any journal entry', 'view journal entry'], 'Anda tidak memiliki hak akses untuk melihat Buku Besar.');
+
         $coaId = $request->query('coa_id');
         $cabangId = $request->query('cabang_id');
         $startDate = $request->query('start_date', now()->startOfMonth()->toDateString());
@@ -308,6 +313,8 @@ class JournalController extends Controller
      */
     public function create(): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create journal entry'], 'Anda tidak memiliki hak akses untuk membuat Jurnal Umum.');
+
         $dateStr = now()->format('Ymd');
         $suggestedReference = 'JV-' . $dateStr . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
 
@@ -330,6 +337,8 @@ class JournalController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create journal entry'], 'Anda tidak memiliki hak akses untuk membuat Jurnal Umum.');
+
         $validated = $request->validate([
             'reference' => ['required', 'string', 'max:50', \Illuminate\Validation\Rule::unique('journal_entries', 'reference')->whereNull('deleted_at')],
             'date' => ['required', 'date'],
@@ -409,6 +418,8 @@ class JournalController extends Controller
      */
     public function show(string $reference): View
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any journal entry', 'view journal entry'], 'Anda tidak memiliki hak akses untuk melihat Jurnal Umum.');
+
         $lines = JournalEntry::with(['coa', 'cabang', 'source'])
             ->where('reference', $reference)
             ->orderBy('id', 'asc')
@@ -441,6 +452,8 @@ class JournalController extends Controller
      */
     public function destroy(string $reference): RedirectResponse
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete journal entry'], 'Anda tidak memiliki hak akses untuk menghapus Jurnal Umum.');
+
         $lines = JournalEntry::where('reference', $reference)->get();
 
         if ($lines->isEmpty()) {
@@ -474,6 +487,8 @@ class JournalController extends Controller
      */
     public function pdf(string $reference): Response
     {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_READ_ROLES, ['view any journal entry', 'view journal entry'], 'Anda tidak memiliki hak akses untuk mencetak Jurnal Umum.');
+
         $lines = JournalEntry::with(['coa', 'cabang'])
             ->where('reference', $reference)
             ->orderBy('id', 'asc')

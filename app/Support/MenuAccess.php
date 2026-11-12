@@ -9,8 +9,46 @@ use Illuminate\Support\Facades\Auth;
  */
 class MenuAccess
 {
+    public const FINANCE_READ_ROLES = ['Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor'];
+    public const FINANCE_WRITE_ROLES = ['Finance Manager', 'Accounting', 'Admin Keuangan'];
+    public const FINANCE_DELETE_ROLES = ['Finance Manager'];
+    public const CASHBANK_READ_ROLES = ['Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor', 'Kasir'];
+
     /** Cache kode peran per objek user (WeakMap: aman untuk test & antar-request). */
     protected static ?\WeakMap $codeCache = null;
+
+    /**
+     * Otorisasi akses backend berbasis role Spatie atau permission granular (deny by default).
+     *
+     * @param  array<int, string>  $allowedRoles
+     * @param  string|array<int, string>|null  $permissions
+     */
+    public static function authorizeRolesOrPermissions(
+        array $allowedRoles,
+        string|array|null $permissions = null,
+        string $message = 'Anda tidak memiliki hak akses untuk modul ini.'
+    ): void {
+        $user = Auth::user();
+        if (! $user) {
+            abort(401);
+        }
+
+        if (static::isSuper($user)) {
+            return;
+        }
+
+        if (! empty($allowedRoles) && method_exists($user, 'hasAnyRole') && $user->hasAnyRole($allowedRoles)) {
+            return;
+        }
+
+        foreach ((array) $permissions as $permission) {
+            if ($permission && $user->can($permission)) {
+                return;
+            }
+        }
+
+        abort(403, $message);
+    }
 
     /**
      * Apakah user yang login boleh membuka menu ini. Kunci menu TIDAK boleh mengandung titik
