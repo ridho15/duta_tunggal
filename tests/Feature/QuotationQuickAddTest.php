@@ -71,7 +71,7 @@ class QuotationQuickAddTest extends TestCase
         $responseCreate->assertSee('container.prepend', false);
 
         // Verifikasi dropdown select produk di baris form items tetap dipertahankan
-        $responseCreate->assertSee('select data-searchable name="items[${idx}][product_id]"', false);
+        $responseCreate->assertSee('name="items[${idx}][product_id]" id="product_id_${idx}" class="product-select"', false);
         $responseCreate->assertSee('id="btnAddRow"', false);
 
         // 2. Test Edit View
@@ -95,7 +95,7 @@ class QuotationQuickAddTest extends TestCase
             $responseEdit->assertSee('calculateRow', false);
 
             // Verifikasi dropdown select produk di baris form items tetap dipertahankan
-            $responseEdit->assertSee('select data-searchable name="items[${idx}][product_id]"', false);
+            $responseEdit->assertSee('name="items[${idx}][product_id]" id="product_id_${idx}" class="product-select"', false);
         }
     }
 }

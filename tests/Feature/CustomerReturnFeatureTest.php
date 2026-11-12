@@ -808,3 +808,28 @@ test('warehouse relationship loads on customer return', function () {
     expect($customerReturn->warehouse->id)->toBe($warehouse->id);
 });
 
+
+test('processCompletion tanpa gudang penerima ditolak dan stok tidak berubah (UAT 11 Nov)', function () {
+    $data = setupCustomerReturnPrerequisites();
+    $result = buildApprovedReturn($data, CustomerReturnItem::DECISION_REPLACE);
+    $customerReturn = $result['customerReturn'];
+    $customerReturn->update(['warehouse_id' => null]);
+
+    expect(fn () => app(CustomerReturnService::class)->processCompletion($customerReturn->fresh()))
+        ->toThrow(\Exception::class, 'Gudang penerima retur belum diisi');
+
+    expect($customerReturn->fresh()->status)->toBe(CustomerReturn::STATUS_APPROVED)
+        ->and($customerReturn->fresh()->stock_restored_at)->toBeNull()
+        ->and(StockMovement::where('from_model_type', CustomerReturn::class)->where('from_model_id', $customerReturn->id)->count())->toBe(0);
+});
+
+test('processCompletion mengembalikan ringkasan qty yang dipulihkan', function () {
+    $data = setupCustomerReturnPrerequisites();
+    $result = buildApprovedReturn($data, CustomerReturnItem::DECISION_REPLACE);
+
+    $summary = app(CustomerReturnService::class)->processCompletion($result['customerReturn']);
+
+    expect((float) $summary['restored_qty'])->toBe(3.0)
+        ->and((float) $summary['repair_qty'])->toBe(0.0)
+        ->and($summary['warehouse'])->toBe($result['warehouse']->name);
+});

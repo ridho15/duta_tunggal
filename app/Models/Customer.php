@@ -87,6 +87,13 @@ class Customer extends Model
         return $this->morphOne(Deposit::class, 'from_model')->withDefault();
     }
 
+    /** Saldo titip customer = Σ sisa semua deposit aktif (tiap setoran / kelebihan bayar adalah baris deposit sendiri). */
+    public function depositBalance(): float
+    {
+        return (float) Deposit::query()->where('from_model_type', self::class)->where('from_model_id', $this->id)
+            ->where('status', 'active')->sum('remaining_amount');
+    }
+
     public function depositLog()
     {
         return $this->morphMany(DepositLog::class, 'reference');
@@ -193,7 +200,7 @@ class Customer extends Model
         }
 
         // 3. Saldo deposit aktif
-        if ($this->deposit && (float) $this->deposit->remaining_amount > 0) {
+        if ($this->depositBalance() > 0) {
             $blockers[] = 'masih memiliki saldo deposit aktif';
         }
 

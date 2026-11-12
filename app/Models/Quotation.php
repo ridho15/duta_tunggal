@@ -18,6 +18,13 @@ class Quotation extends Model
     public const STATUS_REQUEST_APPROVE = 'request_approve';
     public const STATUS_APPROVE = 'approve';
     public const STATUS_REJECT = 'reject';
+
+    /**
+     * Status SO yang MELEPAS penawaran sehingga bisa dipakai lagi. Status yang dipakai sistem adalah `reject` (ditolak kasir/atasan)
+     * dan `canceled`; ejaan `rejected`/`cancelled` dipertahankan untuk data lama. Dulu hanya ejaan lama yang dicek, sehingga
+     * penawaran yang SO-nya ditolak tidak pernah bisa dibuatkan SO lagi.
+     */
+    public const RELEASED_SALE_ORDER_STATUSES = ['reject', 'rejected', 'canceled', 'cancelled'];
     public const STATUS_EXPIRED = 'expired';
 
     /**
@@ -80,8 +87,8 @@ class Quotation extends Model
             return "Quotation {$number} sudah digantikan oleh revisi yang lebih baru. Gunakan versi terbaru.";
         }
 
-        if ($this->saleOrders()->whereNotIn('status', ['cancelled', 'rejected'])->exists()) {
-            $soNumbers = $this->saleOrders()->whereNotIn('status', ['cancelled', 'rejected'])->pluck('so_number')->implode(', ');
+        if ($this->saleOrders()->whereNotIn('status', self::RELEASED_SALE_ORDER_STATUSES)->exists()) {
+            $soNumbers = $this->saleOrders()->whereNotIn('status', self::RELEASED_SALE_ORDER_STATUSES)->pluck('so_number')->implode(', ');
             return "Quotation {$number} sudah digunakan untuk Sales Order ({$soNumbers}).";
         }
 
@@ -97,7 +104,7 @@ class Quotation extends Model
                 $q->whereNull('valid_until')->orWhereDate('valid_until', '>=', now()->toDateString());
             })
             ->whereDoesntHave('saleOrders', function (Builder $q) {
-                $q->whereNotIn('status', ['cancelled', 'rejected']);
+                $q->whereNotIn('status', self::RELEASED_SALE_ORDER_STATUSES);
             });
     }
 

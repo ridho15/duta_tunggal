@@ -36,6 +36,13 @@
             <p class="text-xs text-gray-500 mt-0.5">
                 Klaim pengembalian dari {{ $customerReturn->customer->name ?? 'Pelanggan' }} atas faktur {{ $customerReturn->invoice->invoice_number ?? '-' }}.
             </p>
+            @if(in_array($st, [\App\Models\CustomerReturn::STATUS_PENDING, \App\Models\CustomerReturn::STATUS_RECEIVED, \App\Models\CustomerReturn::STATUS_QC_INSPECTION, \App\Models\CustomerReturn::STATUS_APPROVED], true))
+                <p class="mt-2 inline-block rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+                    Stok gudang baru bertambah saat retur <span class="font-black">Diselesaikan</span> (setelah QC & persetujuan).
+                    Alur: Diterima Gudang → Inspeksi QC → Setujui → Selesaikan.
+                    @if(!$customerReturn->warehouse_id) Gudang penerima belum diisi — isi pada form QC. @endif
+                </p>
+            @endif
         </div>
 
         {{-- Action Buttons --}}

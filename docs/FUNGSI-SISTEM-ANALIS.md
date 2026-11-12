@@ -200,6 +200,21 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 - **Butir 6 — salah kirim gudang (REVISI dari keputusan 2 Nov).** Ko Handy meluruskan: PO menentukan **Gudang A** sebagai penerima; bila supplier salah kirim ke **Gudang B**, **Gudang A tetap melakukan Terima Barang** (GRN di Gudang A), lalu dibuat **mutasi Gudang A → Gudang B** dengan kolom keterangan (mis. "Mutasi karena supplier salah kirim lokasi gudang"). Tujuannya **arus barang jelas ter-record**. → **SUDAH (10 Nov).** Arah mutasi dibalik ke **A→B**: tombol "Buat Mutasi Stok ke Gudang Lain" di detail GRN selesai mengisi awal Pindah Stok dengan gudang asal = gudang GRN (tujuan PO), gudang tujuan dikosongkan (dipilih user), barang dari qty diterima, dan keterangan default. Kolom `notes` ditambahkan ke `stock_transfers` (migrasi `2026_11_10_000000`) dan tampil di form Pindah Stok. Form GRN mengarahkan ke alur ini.
   - *Catatan:* path lama "terima di gudang berbeda + alasan" (4 Nov) **dibiarkan** sebagai jaring pengaman audit (bukan dihapus), karena menghapus JS form GRN yang rumit berisiko regresi. Bila Ko Handy ingin benar-benar mengunci GRN hanya ke gudang tujuan PO, itu pengerasan lanjutan.
 
+**Temuan UAT — 11 Nov 2026** (status = kondisi kode di branch ini)
+
+| # | Temuan | Penyelesaian |
+|---|---|---|
+| A1 | DPP di detail Penawaran belum ×11/12 | **Sudah.** Detail, form Buat & Ubah Penawaran memakai **DPP Nilai Lain = 11/12 × harga jual** dan **PPN = 12% × DPP** (setara 11% efektif). Eksklusif: harga jual = netto; Inklusif: harga jual = netto/1,11. |
+| A2 | Penawaran lambat (termasuk approve) | **Sudah.** Penyebab: index, Buat & Ubah Penawaran mengirim **seluruh** master customer (±18 ribu) dan produk (±29 ribu) ke halaman. Kini customer & produk dicari lewat AJAX (endpoint yang sama dengan SO); halaman hanya memuat customer/produk yang terpilih. Proses approve sendiri ringan — lambatnya dari halaman yang dimuat sesudahnya. |
+| B1 | SO ditolak kasir tidak bisa dipakai lagi | **Sudah.** Penawaran yang SO-nya **ditolak/dibatalkan** dilepas dan bisa dipilih lagi saat buat SO (dulu kode mengecek status `rejected/cancelled`, padahal SO memakai `reject/canceled`). Detail SO yang ditolak/dibatalkan punya tombol **"Salin ke SO Baru"** (isi form SO dari SO lama). |
+| B2 | Nomor referensi penawaran tidak muncul di Buat SO | **Sudah.** Memilih penawaran memuat ulang form dengan customer, alamat, dan item penawaran terisi; tampil "Referensi Penawaran: …". Detail SO menautkan nomor penawaran. |
+| B3 | Tipe pajak tidak tampil di SO | **Sudah.** Form SO punya pilihan **Tipe Pajak** (Tanpa Pajak / Eksklusif / Inklusif) + ringkasan DPP & PPN; tersimpan per item (`tipe_pajak`, `tax` = tarif PPN aktif) sehingga invoice mengikuti. Detail SO menampilkan tipe pajak, DPP Nilai Lain, PPN. Diskon per item juga bisa diisi. |
+| B4 | Saldo titip customer COD ada di mana? | **Sudah.** **Terima Pembayaran** → pilih customer → bila tidak ada tagihan muncul panel **"Catat sebagai Titip Dana"** (isi nominal → *Simpan Titip Dana*). Tercatat sebagai Deposit aktif, jurnal Dr Kas/Bank, Cr Deposit Pelanggan. Saldo titip tampil di pilihan customer form SO; verifikasi kasir COD memakai **seluruh** baris titip aktif (FIFO) dan mengembalikannya bila SO dibatalkan. |
+| C1 | Retur setelah SJ diterima gudang tetapi stok tidak bertambah | **Sudah.** Stok bertambah saat retur **Diselesaikan** (alur: Diterima Gudang → Inspeksi QC → Setujui → Selesaikan), bukan saat "Diterima Gudang". Dulu retur tanpa **Gudang Penerima** dilewati diam-diam tetapi pesan menyatakan stok pulih; kini ditolak dengan pesan jelas, dan pesan sukses menyebut qty yang benar-benar kembali ke stok / perbaikan / ditolak. Detail retur menampilkan penjelasan alur. |
+| C2 | Retur by DO (sebelum SJ) ada di mana? | **Gudang → Siapkan & Kirim** → buka DO (layar pengecekan) → **"Ada kurang / rusak"**. Hanya tersedia sebelum SJ terbit. Detail DO yang menunggu pengecekan kini punya tautan **"Buat Retur by DO"**. |
+
+*Catatan lanjutan:* rumus DPP 11/12 di dokumen lain (invoice, PO, nota kredit, retur) belum diperiksa dalam batch ini.
+
 ---
 
 ## 9. Cara Menguji

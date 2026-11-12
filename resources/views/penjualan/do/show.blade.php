@@ -134,6 +134,11 @@
                 <div class="mt-0.5 text-blue-800">
                     Perintah kirim ini siap dicek oleh Checker Gudang di modul <a href="{{ route('gudang.kiriman.check', $deliveryOrder->id) }}" class="underline font-bold">Siapkan & Kirim</a>. Setelah seluruh item dicentang dan dikonfirmasi, Surat Jalan dapat diterbitkan.
                 </div>
+                <div class="mt-1.5 text-blue-800">
+                    Ada barang kurang / rusak / ditolak saat pengecekan sebelum Surat Jalan?
+                    <a href="{{ route('gudang.kiriman.retur', $deliveryOrder->id) }}" class="underline font-bold">Buat Retur by DO</a>
+                    — barang kembali ke gudang (reject ke karantina) dan DO pengganti ({{ $deliveryOrder->do_number }}C) terbit otomatis.
+                </div>
             </div>
         </div>
     @elseif($deliveryOrder->status === 'confirmed' && ! $deliveryOrder->hasIssuedSuratJalan())

@@ -185,15 +185,20 @@ class SaleOrderController extends Controller
 
         // Payload halaman hanya berisi produk yang sudah dipilih (item quotation / input lama); sisanya dicari lewat AJAX (searchProducts).
         $selectedQuotationId = $request->query('quotation_id');
+
+        // "Salin ke SO Baru" dari SO yang ditolak/dibatalkan: isi ulang customer, pengiriman, barang, harga, diskon, pajak, ongkir.
+        $copyFrom = $request->query('copy_from')
+            ? SaleOrder::query()->with('saleOrderItem')->whereIn('status', ['reject', 'canceled'])->find($request->query('copy_from'))
+            : null;
+
         $prefillCustomerId = old('customer_id')
-            ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : null);
-        $customers = $this->customerPayload(
-            $prefillCustomerId ? $this->customerQuery()->whereKey($prefillCustomerId)->get() : collect()
-        );
+            ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : $copyFrom?->customer_id);
+        $customers = \App\Support\CustomerPicker::prefill([$prefillCustomerId]);
 
 
         $prefillIds = collect(old('items', []))->pluck('product_id')
             ->merge($selectedQuotationId ? QuotationItem::where('quotation_id', $selectedQuotationId)->pluck('product_id') : [])
+            ->merge($copyFrom ? $copyFrom->saleOrderItem->pluck('product_id') : [])
             ->filter()->unique()->values();
         $products = $this->productPayload($this->activeProducts()->whereIn('id', $prefillIds)->get());
 
@@ -209,6 +214,32 @@ class SaleOrderController extends Controller
             $selectedQuotation = Quotation::query()
                 ->with(['customer', 'quotationItem.product.uom'])
                 ->find($selectedQuotationId);
+
+            // Penawaran yang dipilih/dikonversi selalu tampil di dropdown walau di luar 50 terbaru (dulu nomornya bisa tidak muncul).
+            if ($selectedQuotation && ! $quotations->contains('id', $selectedQuotation->id)) {
+                $quotations->prepend($selectedQuotation);
+            }
+        }
+
+        // Baris awal form: dari penawaran (beserta diskon & tipe pajak) atau dari SO yang disalin.
+        $prefillItems = [];
+        $prefillTaxType = 'None';
+        if ($selectedQuotation) {
+            $prefillItems = $selectedQuotation->quotationItem->map(fn ($item) => [
+                'product_id' => $item->product_id,
+                'quantity' => (float) $item->quantity,
+                'unit_price' => (float) $item->unit_price,
+                'discount' => (float) ($item->discount ?? 0),
+            ])->values()->all();
+            $prefillTaxType = $this->formTaxType($selectedQuotation->quotationItem->first()?->tax_type);
+        } elseif ($copyFrom) {
+            $prefillItems = $copyFrom->saleOrderItem->map(fn ($item) => [
+                'product_id' => $item->product_id,
+                'quantity' => (float) $item->quantity,
+                'unit_price' => (float) $item->unit_price,
+                'discount' => (float) ($item->discount ?? 0),
+            ])->values()->all();
+            $prefillTaxType = $this->formTaxType($copyFrom->saleOrderItem->first()?->tipe_pajak);
         }
 
         // Master customer TIDAK dikirim di halaman ini: hanya customer terpilih (input lama / penawaran); sisanya dicari lewat AJAX (searchCustomers).
@@ -226,6 +257,9 @@ class SaleOrderController extends Controller
             'quotations' => $quotations,
             'selectedQuotation' => $selectedQuotation,
             'selectedQuotationId' => $selectedQuotationId,
+            'copyFrom' => $copyFrom,
+            'prefillItems' => $prefillItems,
+            'prefillTaxType' => $prefillTaxType,
             'user' => $user,
         ]);
     }
@@ -250,55 +284,10 @@ class SaleOrderController extends Controller
         return response()->json(['success' => true, 'products' => $this->productPayload($products)]);
     }
 
-    /**
-     * Pencarian customer untuk form Buat SO (AJAX). Menggantikan pengiriman seluruh master customer di payload halaman.
-     * Setiap kata harus cocok di nama, kode, atau perusahaan; kode yang persis sama diurutkan lebih dulu.
-     */
-    public function searchCustomers(Request $request): JsonResponse
+    /** Tipe pajak untuk isian form SO (None / Eksklusif / Inklusif). Kosong = tanpa pajak (bukan default Eksklusif TaxService). */
+    private function formTaxType(?string $raw): string
     {
-        $q = trim((string) $request->query('q', ''));
-        abort_if($q === '', 422, 'Kata pencarian wajib diisi.');
-
-        $query = $this->customerQuery();
-        foreach (preg_split('/\s+/', $q, -1, PREG_SPLIT_NO_EMPTY) as $term) {
-            $like = '%'.addcslashes($term, '\\%_').'%';
-            $query->where(fn ($w) => $w->where('name', 'like', $like)
-                ->orWhere('code', 'like', $like)
-                ->orWhere('perusahaan', 'like', $like));
-        }
-
-        $customers = $query->orderByRaw('code = ? desc', [$q])->orderBy('name')->limit(25)->get();
-
-        return response()->json(['success' => true, 'options' => $this->customerPayload($customers)]);
-    }
-
-    private function customerQuery()
-    {
-        return Customer::query()->with('deposit')->select([
-            'id', 'code', 'name', 'perusahaan', 'address', 'phone', 'telephone',
-            'tempo_kredit', 'kredit_limit', 'tipe_pembayaran', 'tipe',
-        ]);
-    }
-
-    /** Bentuk opsi customer untuk searchable-select; `meta` dibaca JS form SO (limit kredit, deposit, alamat kirim). */
-    private function customerPayload($customers)
-    {
-        return $customers->map(fn ($c) => [
-            'id' => (string) $c->id,
-            'label' => $c->name.($c->code ? ' ('.$c->code.')' : ''),
-            'subtext' => ($c->address ? Str::limit($c->address, 35) : '').' | Limit: Rp '.number_format((float) $c->kredit_limit, 0, ',', '.').' | Tipe: '.$c->tipe_pembayaran,
-            'badge' => $c->tipe_pembayaran ?? 'Customer',
-            'meta' => [
-                'id' => (string) $c->id,
-                'name' => $c->name,
-                'tipe' => $c->tipe_pembayaran ?? 'Tunai',
-                'limit' => (float) $c->kredit_limit,
-                'tempo' => (int) $c->tempo_kredit,
-                'address' => $c->address ?? '',
-                'phone' => $c->phone ?: ($c->telephone ?? ''),
-                'deposit' => (float) ($c->deposit?->remaining_amount ?? 0),
-            ],
-        ])->values();
+        return trim((string) $raw) === '' ? 'None' : \App\Services\SalesInvoiceTaxResolver::normalizeType($raw);
     }
 
     /**
@@ -378,6 +367,8 @@ class SaleOrderController extends Controller
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0|max:100',
             'items.*.tax_type' => 'nullable|in:None,Inklusif,Eksklusif',
+            // Tipe pajak SO (berlaku untuk semua baris; faktur membaca tipe & tarif dari baris SO)
+            'tax_type' => 'nullable|in:None,Inklusif,Eksklusif',
         ], [
             'customer_id.required' => 'Customer wajib dipilih.',
             'cabang_id.required' => 'Cabang wajib dipilih.',
@@ -396,6 +387,12 @@ class SaleOrderController extends Controller
         $approvedQuotePrices = $this->approvedQuotationEffectivePrices($validated['quotation_id'] ?? null);
         $priceErrors = [];
         $totalItemsAmount = 0;
+        $ppnRate = (float) (\App\Models\TaxSetting::activeRate('PPN') ?: 11.0);
+        $lineTax = function (array $item) use ($validated, $ppnRate): array {
+            $type = strtolower((string) ($validated['tax_type'] ?? ($item['tax_type'] ?? 'None')));
+
+            return [$type, $type === 'none' ? 0.0 : $ppnRate];
+        };
 
         foreach ($validated['items'] as $idx => $item) {
             $product = Product::find($item['product_id']);
@@ -410,7 +407,8 @@ class SaleOrderController extends Controller
                 $priceErrors["items.{$idx}.unit_price"] = $message.' Harga di bawah batas hanya bisa lewat Penawaran yang sudah di-approve.';
             }
 
-            $subtotal = HelperController::hitungSubtotal($qty, $unitPrice, $disc, 0, 'None');
+            [$taxType, $taxRate] = $lineTax($item);
+            $subtotal = HelperController::hitungSubtotal($qty, $unitPrice, $disc, $taxRate, $taxType);
             $totalItemsAmount += (float) $subtotal;
         }
 
@@ -439,7 +437,7 @@ class SaleOrderController extends Controller
 
         $soNumber = $this->salesOrderService->generateSoNumber((int) $validated['cabang_id']);
 
-        $saleOrder = DB::transaction(function () use ($validated, $soNumber, $customer, $currencyId, $exchangeRate, $shippingCost, $status) {
+        $saleOrder = DB::transaction(function () use ($validated, $soNumber, $customer, $currencyId, $exchangeRate, $shippingCost, $status, $lineTax) {
             $so = SaleOrder::create([
                 'so_number' => $soNumber,
                 'customer_id' => $validated['customer_id'],
@@ -468,9 +466,9 @@ class SaleOrderController extends Controller
                 $qty = (float) $item['quantity'];
                 $price = (float) $item['unit_price'];
                 $disc = (float) ($item['discount'] ?? 0);
-                $taxType = strtolower($item['tax_type'] ?? 'none');
+                [$taxType, $taxRate] = $lineTax($item);
 
-                $subtotal = HelperController::hitungSubtotal($qty, $price, $disc, 0, $taxType);
+                $subtotal = HelperController::hitungSubtotal($qty, $price, $disc, $taxRate, $taxType);
                 $total += $subtotal;
 
                 SaleOrderItem::create([
@@ -480,7 +478,7 @@ class SaleOrderController extends Controller
                     'delivered_quantity' => 0,
                     'unit_price' => $price,
                     'discount' => $disc,
-                    'tax' => 0,
+                    'tax' => $taxRate,             // tarif PPN — dibaca faktur (SalesInvoiceTaxResolver)
                     'tipe_pajak' => $taxType,
                 ]);
             }

@@ -109,7 +109,7 @@ class CreditExposure
             'overdue_count' => (int) ($overdue->n ?? 0),
             'overdue_total' => (float) ($overdue->total ?? 0),
             'oldest_overdue_days' => $overdue && $overdue->oldest ? (int) Carbon::parse($overdue->oldest)->diffInDays(Carbon::now()) : 0,
-            'deposit_balance' => (float) ($customer->deposit?->remaining_amount ?? 0),
+            'deposit_balance' => $customer->depositBalance(),
         ];
     }
 }
