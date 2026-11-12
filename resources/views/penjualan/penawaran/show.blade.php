@@ -462,6 +462,14 @@
         <p class="text-sm text-gray-600">
             Apakah Anda yakin ingin menyetujui penawaran harga <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span>? Dokumen penawaran resmi dapat diterbitkan ke pelanggan atau dikonversi menjadi Sales Order (SO).
         </p>
+        @if($quotation->created_by && $quotation->created_by === auth()->id())
+            <label class="block mt-3 text-xs font-bold text-gray-700">
+                Alasan menyetujui penawaran buatan sendiri
+                <textarea name="override_reason" rows="2" maxlength="500"
+                          placeholder="Wajib bila aturan persetujuan aktif, minimal 10 karakter"
+                          class="mt-1 w-full py-2 px-3 text-xs font-normal bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"></textarea>
+            </label>
+        @endif
     </x-confirmation-modal>
 
     {{-- Modal Buat Revisi --}}

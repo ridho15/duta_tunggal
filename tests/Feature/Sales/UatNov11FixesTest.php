@@ -149,3 +149,17 @@ it('A2: form penawaran tidak memuat seluruh master customer/produk', function ()
         ->assertViewHas('products', fn ($p) => count($p) === 0)
         ->assertSee('so\\/products\\/search', false);
 });
+
+it('UAT 12 Nov: tombol Setujui penawaran berada dalam scope Alpine (layout <main x-data>) dan modal punya kolom alasan untuk pembuat', function () {
+    $ctx = stkContext();
+    Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $ctx['user']->assignRole('Super Admin');
+    $quotation = Quotation::factory()->create(['customer_id' => $ctx['customer']->id, 'cabang_id' => $ctx['cabang']->id,
+        'status' => Quotation::STATUS_REQUEST_APPROVE, 'created_by' => $ctx['user']->id, 'valid_until' => now()->addDays(10)]);
+
+    $this->actingAs($ctx['user'])->get(route('penjualan.quotations.show', $quotation))
+        ->assertOk()
+        ->assertSee('<main x-data', false)
+        ->assertSee("open-modal-approve-quotation", false)
+        ->assertSee('name="override_reason"', false);
+});
