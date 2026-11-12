@@ -3,7 +3,7 @@
 @section('title', 'Penawaran ' . $quotation->quotation_number . ' – ERP Duta Tunggal')
 
 @section('content')
-<div class="max-w-[1100px] mx-auto space-y-6">
+<div class="max-w-[1100px] mx-auto space-y-6" x-data>
     {{-- Header & Breadcrumbs --}}
     <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 pb-4 border-b border-gray-200">
         <div>
@@ -440,7 +440,7 @@
     <x-confirmation-modal
         name="request-approve-quotation"
         title="Ajukan Persetujuan Penawaran"
-        type="warning"
+        variant="warning"
         confirm-text="Ya, Ajukan Persetujuan"
         cancel-text="Batal"
         method="POST"
@@ -454,7 +454,7 @@
     <x-confirmation-modal
         name="approve-quotation"
         title="Setujui Penawaran Harga"
-        type="success"
+        variant="success"
         confirm-text="Ya, Setujui Penawaran"
         cancel-text="Batal"
         method="POST"
@@ -468,7 +468,7 @@
     <x-confirmation-modal
         name="revision-quotation"
         title="Terbitkan Revisi Penawaran"
-        type="info"
+        variant="info"
         confirm-text="Ya, Buat Dokumen Revisi"
         cancel-text="Batal"
         method="POST"
@@ -485,7 +485,7 @@
     <x-confirmation-modal
         name="delete-quotation"
         title="Hapus Penawaran Harga"
-        type="danger"
+        variant="danger"
         confirm-text="Ya, Hapus Draft"
         cancel-text="Batal"
         method="DELETE"

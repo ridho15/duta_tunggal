@@ -124,10 +124,8 @@ class BladeUomCategoryTest extends TestCase
             'abbreviation' => 'ST' . rand(10, 99),
         ]);
 
-        $product = Product::first();
-        if ($product) {
-            $product->update(['uom_id' => $uom->id]);
-        }
+        $product = Product::first() ?? Product::factory()->create();
+        $product->update(['uom_id' => $uom->id]);
 
         $response = $this->actingAs($this->user)->delete(route('master.satuan.destroy', $uom));
 
@@ -245,10 +243,8 @@ class BladeUomCategoryTest extends TestCase
             'kode' => 'KTB-' . rand(100, 999),
         ]);
 
-        $product = Product::first();
-        if ($product) {
-            $product->update(['product_category_id' => $cat->id]);
-        }
+        $product = Product::first() ?? Product::factory()->create();
+        $product->update(['product_category_id' => $cat->id]);
 
         $response = $this->actingAs($this->user)->delete(route('master.kategori.destroy', $cat));
 

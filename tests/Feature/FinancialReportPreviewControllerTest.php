@@ -177,6 +177,7 @@ class FinancialReportPreviewControllerTest extends TestCase
     public function test_profit_loss_multi_division_excel_export_downloads_expected_file(): void
     {
         Excel::fake();
+        \Carbon\Carbon::setTestNow(now());
 
         $user = User::factory()->create();
 
@@ -190,6 +191,8 @@ class FinancialReportPreviewControllerTest extends TestCase
         Excel::assertDownloaded('profit-loss-multi-division-' . now()->format('Ymd_His') . '.xlsx', function ($export) {
             return $export instanceof ProfitLossMultiDivisionExport;
         });
+
+        \Carbon\Carbon::setTestNow();
     }
 
     public function test_cash_flow_preview_matches_cash_flow_service(): void
