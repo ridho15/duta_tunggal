@@ -237,6 +237,9 @@ class AssetDisposalTest extends TestCase
         $cabang = Cabang::factory()->create();
         $user = User::factory()->create();
 
+        ChartOfAccount::factory()->create(['code' => '1101', 'type' => 'Asset', 'name' => 'Kas']);
+        ChartOfAccount::factory()->create(['code' => '4190', 'type' => 'Revenue', 'name' => 'Gain on Asset Disposal']);
+
         $asset = Asset::factory()->create([
             'name' => 'Test Asset',
             'status' => 'active',
@@ -278,6 +281,9 @@ class AssetDisposalTest extends TestCase
     {
         $cabang = Cabang::factory()->create();
         $user = User::factory()->create();
+
+        ChartOfAccount::factory()->create(['code' => '1101', 'type' => 'Asset', 'name' => 'Kas']);
+        ChartOfAccount::factory()->create(['code' => '4190', 'type' => 'Revenue', 'name' => 'Gain on Asset Disposal']);
 
         $asset = Asset::factory()->create([
             'purchase_cost' => 1000000,

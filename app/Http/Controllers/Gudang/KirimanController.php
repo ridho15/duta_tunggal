@@ -10,6 +10,7 @@ use App\Models\DeliveryOrderItemCheck;
 use App\Models\Rak;
 use App\Models\Warehouse;
 use App\Support\HpWarehouse;
+use App\Support\MenuAccess;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,11 +20,27 @@ use Illuminate\View\View;
 
 class KirimanController extends Controller
 {
+    private function authorizeWarehouseAccess(): void
+    {
+        abort_unless(
+            MenuAccess::allows('hp_kiriman', Auth::user()),
+            403,
+            'Anda tidak memiliki hak akses untuk modul Siapkan & Kirim Gudang.'
+        );
+
+        MenuAccess::authorizeRolesOrPermissions(
+            ['Owner', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Checker', 'Checker Gudang'],
+            ['check delivery order', 'update delivery order'],
+            'Anda tidak memiliki hak akses untuk modul Siapkan & Kirim Gudang.'
+        );
+    }
+
     /**
      * Menampilkan daftar kiriman checker gudang (Mockup F1_Kiriman-HP.html).
      */
     public function index(Request $request): View
     {
+        $this->authorizeWarehouseAccess();
         $user = Auth::user();
         $warehouses = HpWarehouse::options($user);
         $currentWarehouseId = $request->query('warehouse_id') ? (int) $request->query('warehouse_id') : HpWarehouse::currentId($user);
@@ -100,6 +117,7 @@ class KirimanController extends Controller
      */
     public function check(DeliveryOrder $deliveryOrder): View|RedirectResponse
     {
+        $this->authorizeWarehouseAccess();
         if (in_array($deliveryOrder->status, ['request_stock', 'request_approve'], true)) {
             return redirect()->route('gudang.kiriman.index', ['tab' => 'menunggu_stok', 'warehouse_id' => $deliveryOrder->warehouse_id])
                 ->with('error', "Konfirmasi stok {$deliveryOrder->do_number} dulu sebelum barangnya dicek.");
@@ -120,6 +138,7 @@ class KirimanController extends Controller
      */
     public function submitCheck(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
+        $this->authorizeWarehouseAccess();
         if (! in_array($deliveryOrder->status, ['approved', 'confirmed'], true)) {
             return back()->with('error', "{$deliveryOrder->do_number} berstatus \"".DeliveryOrder::statusLabel($deliveryOrder->status).'", belum bisa dicek.');
         }
@@ -154,6 +173,7 @@ class KirimanController extends Controller
      */
     public function editQty(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
+        $this->authorizeWarehouseAccess();
         $data = $request->validate([
             'quantities' => ['required', 'array'],
             'quantities.*' => ['required', 'numeric', 'min:0'],
@@ -179,6 +199,7 @@ class KirimanController extends Controller
      */
     public function retur(DeliveryOrder $deliveryOrder): View|RedirectResponse
     {
+        $this->authorizeWarehouseAccess();
         if ($deliveryOrder->hasIssuedSuratJalan()) {
             return redirect()->route('gudang.kiriman.check', $deliveryOrder->id)
                 ->with('error', "{$deliveryOrder->do_number} sudah punya Surat Jalan aktif, jadi tidak bisa diretur dari sini.");
@@ -198,6 +219,7 @@ class KirimanController extends Controller
      */
     public function submitRetur(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
+        $this->authorizeWarehouseAccess();
         if ($deliveryOrder->hasIssuedSuratJalan()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'lines' => "{$deliveryOrder->do_number} sudah punya Surat Jalan aktif, jadi tidak bisa diretur dari sini.",
@@ -225,6 +247,7 @@ class KirimanController extends Controller
      */
     public function pickingList(Request $request): View
     {
+        $this->authorizeWarehouseAccess();
         $warehouseId = $request->query('warehouse_id') ?? HpWarehouse::currentId(Auth::user());
         $warehouse = Warehouse::findOrFail($warehouseId);
 

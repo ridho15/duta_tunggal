@@ -9,6 +9,7 @@ use App\Models\CreditNote;
 use App\Models\CreditNoteItem;
 use App\Models\Customer;
 use App\Support\CustomerPicker;
+use App\Support\MenuAccess;
 use App\Models\CustomerReturn;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -41,11 +42,20 @@ class CreditNoteController extends Controller
         $this->docBuilder = $docBuilder;
     }
 
+    private function authorizeAccess(array $roles, string|array $permissions): void
+    {
+        MenuAccess::authorizeRolesOrPermissions($roles, $permissions, 'Anda tidak memiliki hak akses untuk modul Nota Kredit.');
+    }
+
     /**
      * Menampilkan daftar transaksi Nota Kredit (Credit Note).
      */
     public function index(Request $request): View
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor'],
+            ['view any credit note', 'view credit note']
+        );
         $tab = $request->query('tab', 'semua');
         $search = $request->query('q');
         $type = $request->query('type');
@@ -152,6 +162,10 @@ class CreditNoteController extends Controller
      */
     public function create(Request $request): View
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan'],
+            'create credit note'
+        );
         $customerId = $request->query('customer_id');
         $invoiceId = $request->query('invoice_id');
         $returnId = $request->query('return_id');
@@ -201,6 +215,10 @@ class CreditNoteController extends Controller
      */
     public function customerInvoices(Customer $customer): JsonResponse
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor'],
+            ['view any credit note', 'view credit note', 'create credit note']
+        );
         $customerId = $customer->id;
         $invoices = Invoice::query()
             ->where(function ($q) use ($customerId, $customer) {
@@ -260,6 +278,10 @@ class CreditNoteController extends Controller
      */
     public function invoiceDetails(Invoice $invoice): JsonResponse
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor'],
+            ['view any credit note', 'view credit note', 'create credit note']
+        );
         $invoice->load(['invoiceItem.product', 'accountReceivable']);
         $creditableMap = $this->creditNoteService->creditableQuantities($invoice, includeDrafts: true);
         $ar = AccountReceivable::where('invoice_id', $invoice->id)->first();
@@ -307,6 +329,10 @@ class CreditNoteController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan'],
+            'create credit note'
+        );
         $validated = $request->validate([
             'invoice_id' => 'required|exists:invoices,id',
             'type' => 'required|in:' . implode(',', array_keys(CreditNote::TYPE_LABELS)),
@@ -374,6 +400,10 @@ class CreditNoteController extends Controller
      */
     public function storeFromReturn(CustomerReturn $customerReturn): RedirectResponse
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan'],
+            'create credit note'
+        );
         $user = Auth::user();
 
         try {
@@ -399,6 +429,10 @@ class CreditNoteController extends Controller
      */
     public function show(CreditNote $creditNote): View
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor'],
+            ['view any credit note', 'view credit note']
+        );
         $creditNote->load([
             'customer',
             'invoice.invoiceItem.product',
@@ -429,6 +463,10 @@ class CreditNoteController extends Controller
      */
     public function issue(Request $request, CreditNote $creditNote): RedirectResponse
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Finance Manager', 'Accounting'],
+            'approve credit note'
+        );
         $request->validate([
             'tax_document_number' => 'nullable|string|max:100',
             'override_reason' => 'nullable|string|max:500',
@@ -465,6 +503,10 @@ class CreditNoteController extends Controller
      */
     public function updateTaxDocument(Request $request, CreditNote $creditNote): RedirectResponse
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Finance Manager', 'Accounting'],
+            'approve credit note'
+        );
         $request->validate([
             'tax_document_number' => 'nullable|string|max:100',
         ]);
@@ -497,6 +539,10 @@ class CreditNoteController extends Controller
      */
     public function destroy(CreditNote $creditNote): RedirectResponse
     {
+        $this->authorizeAccess(
+            ['Finance Manager', 'Sales Manager'],
+            'delete credit note'
+        );
         try {
             $cnNumber = $creditNote->credit_note_number;
             $this->creditNoteService->deleteDraft($creditNote);
@@ -520,6 +566,10 @@ class CreditNoteController extends Controller
      */
     public function pdf(CreditNote $creditNote): Response
     {
+        $this->authorizeAccess(
+            ['Sales Manager', 'Kasir', 'Finance Manager', 'Accounting', 'Admin Keuangan', 'Auditor'],
+            ['view any credit note', 'view credit note']
+        );
         try {
             $creditNote->load([
                 'customer',

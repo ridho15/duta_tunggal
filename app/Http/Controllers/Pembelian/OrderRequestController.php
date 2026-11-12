@@ -12,6 +12,7 @@ use App\Models\OrderRequest;
 use App\Models\OrderRequestItem;
 use App\Models\Product;
 use App\Models\Supplier;
+use App\Support\MenuAccess;
 use App\Support\TaxTypeHelper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -28,8 +29,17 @@ class OrderRequestController extends Controller
     /**
      * Tampilkan daftar Permintaan Pembelian (Order Request / OR)
      */
+    private function authorizeOrderRequest(array $roles, string|array $permissions): void
+    {
+        MenuAccess::authorizeRolesOrPermissions($roles, $permissions, 'Anda tidak memiliki hak akses untuk modul Permintaan Pembelian (OR).');
+    }
+
     public function index(Request $request): View
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Checker', 'Sales', 'Customer Service', 'Sales Manager'],
+            ['view any order request', 'view order request']
+        );
         $user = Auth::user();
         $cabangId = $user?->cabang_id;
         $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
@@ -149,6 +159,10 @@ class OrderRequestController extends Controller
      */
     public function create(): View
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Sales', 'Customer Service'],
+            'create order request'
+        );
         $user = Auth::user();
         $defaultCabangId = $user?->cabang_id ?? Cabang::first()?->id ?? 1;
 
@@ -174,6 +188,10 @@ class OrderRequestController extends Controller
      */
     public function store(StoreOrderRequestRequest $request): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Sales', 'Customer Service'],
+            'create order request'
+        );
         $validated = $request->validated();
         $user = Auth::user();
 
@@ -255,6 +273,10 @@ class OrderRequestController extends Controller
      */
     public function show(OrderRequest $orderRequest): View
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Checker', 'Sales', 'Customer Service', 'Sales Manager'],
+            ['view any order request', 'view order request']
+        );
         $orderRequest->load([
             'createdBy',
             'currency',
@@ -289,6 +311,10 @@ class OrderRequestController extends Controller
      */
     public function edit(OrderRequest $orderRequest): View|RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Sales', 'Customer Service'],
+            'update order request'
+        );
         if (!in_array($orderRequest->status, ['draft', 'rejected'], true)) {
             return redirect()->route('pembelian.or.show', $orderRequest)
                 ->with('error', 'Hanya permintaan pembelian berstatus Draf atau Ditolak yang dapat diubah.');
@@ -354,6 +380,10 @@ class OrderRequestController extends Controller
      */
     public function update(UpdateOrderRequestRequest $request, OrderRequest $orderRequest): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Sales', 'Customer Service'],
+            'update order request'
+        );
         if (!in_array($orderRequest->status, ['draft', 'rejected'], true)) {
             return redirect()->route('pembelian.or.show', $orderRequest)
                 ->with('error', 'Permintaan pembelian tidak dapat diubah karena statusnya saat ini bukan draf/ditolak.');
@@ -431,6 +461,10 @@ class OrderRequestController extends Controller
      */
     public function destroy(OrderRequest $orderRequest): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager'],
+            ['delete order request', 'update order request']
+        );
         if ($orderRequest->status !== 'draft') {
             return redirect()->back()->with('error', 'Hanya permintaan pembelian berstatus draf yang dapat dihapus.');
         }
@@ -453,6 +487,10 @@ class OrderRequestController extends Controller
      */
     public function requestApprove(OrderRequest $orderRequest): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Sales', 'Customer Service'],
+            ['create order request', 'update order request', 'submit']
+        );
         if (!in_array($orderRequest->status, ['draft', 'rejected'], true)) {
             return redirect()->back()->with('error', 'Hanya permintaan berstatus draf atau ditolak yang dapat diajukan persetujuannya.');
         }
@@ -468,6 +506,10 @@ class OrderRequestController extends Controller
      */
     public function approve(OrderRequest $orderRequest): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing Manager'],
+            'approve'
+        );
         if (!in_array($orderRequest->status, ['draft', 'request_approve'], true)) {
             return redirect()->back()->with('error', 'Permintaan ini tidak dapat disetujui pada status saat ini.');
         }
@@ -497,6 +539,10 @@ class OrderRequestController extends Controller
      */
     public function reject(Request $request, OrderRequest $orderRequest): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing Manager'],
+            'reject'
+        );
         if (!in_array($orderRequest->status, ['draft', 'request_approve'], true)) {
             return redirect()->back()->with('error', 'Permintaan ini tidak dapat ditolak pada status saat ini.');
         }
@@ -535,6 +581,10 @@ class OrderRequestController extends Controller
      */
     public function close(OrderRequest $orderRequest): RedirectResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager'],
+            'update order request'
+        );
         if (in_array($orderRequest->status, ['closed'], true)) {
             return redirect()->back()->with('error', 'Permintaan sudah berstatus ditutup.');
         }
@@ -550,6 +600,10 @@ class OrderRequestController extends Controller
      */
     public function pdf(OrderRequest $orderRequest)
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Checker', 'Sales', 'Customer Service', 'Sales Manager'],
+            ['view any order request', 'view order request']
+        );
         $orderRequest->load([
             'orderRequestItem.product.uom',
             'orderRequestItem.supplier',
@@ -569,6 +623,10 @@ class OrderRequestController extends Controller
      */
     public function searchProducts(Request $request): \Illuminate\Http\JsonResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Checker', 'Sales', 'Customer Service', 'Sales Manager'],
+            ['view any order request', 'create order request']
+        );
         $search = trim((string) $request->query('q', ''));
         $cabangId = $request->query('cabang_id');
         $supplierId = $request->query('supplier_id');
@@ -673,6 +731,10 @@ class OrderRequestController extends Controller
      */
     public function searchSuppliers(Request $request): \Illuminate\Http\JsonResponse
     {
+        $this->authorizeOrderRequest(
+            ['Purchasing', 'Purchasing Manager', 'Admin Inventory', 'Inventory Manager', 'Warehouse Staff', 'Checker', 'Sales', 'Customer Service', 'Sales Manager'],
+            ['view any order request', 'create order request']
+        );
         $productId = $request->query('product_id');
         $search = trim((string) $request->query('q', ''));
         $limit = min(max((int) $request->query('limit', 25), 5), 50);
