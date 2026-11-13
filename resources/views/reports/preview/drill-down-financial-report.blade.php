@@ -50,41 +50,45 @@
             color: #fff;
             text-decoration: none;
         }
-        .btn-print { background: linear-gradient(135deg, #0f766e, #14b8a6); }
-        .btn-close { background: linear-gradient(135deg, #475569, #334155); }
-        .btn-excel { background: linear-gradient(135deg, #166534, #22c55e); }
-        .btn-pdf { background: linear-gradient(135deg, #991b1b, #ef4444); }
+        .btn-print { background: #15803d; color: #fff; }
+        .btn-close { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+        .btn-excel { background: #166534; color: #fff; }
+        .btn-pdf { background: #dc2626; color: #fff; }
         .page {
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
         .hero {
-            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #38bdf8 100%);
-            color: #fff;
-            border-radius: 20px;
-            padding: 28px;
-            box-shadow: 0 16px 36px rgba(29, 78, 216, 0.22);
+            background: #fff;
+            color: #0f172a;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
             margin-bottom: 18px;
+            text-align: center;
         }
         .hero-kicker {
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.18em;
-            opacity: 0.8;
+            letter-spacing: 0.15em;
+            color: #15803d;
+            font-weight: 800;
             margin-bottom: 6px;
         }
         .hero-title {
             margin: 0;
-            font-size: 30px;
+            font-size: 24px;
             font-weight: 900;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.02em;
             text-transform: uppercase;
+            color: #0f172a;
         }
         .hero-subtitle {
             margin-top: 8px;
-            font-size: 14px;
-            opacity: 0.9;
+            font-size: 13px;
+            color: #64748b;
             line-height: 1.6;
         }
         .summary-grid {
@@ -131,7 +135,7 @@
             justify-content: space-between;
             gap: 12px;
             padding: 16px 18px;
-            background: linear-gradient(135deg, #e0f2fe, #f8fafc);
+            background: #f8fafc;
             border-bottom: 1px solid #dbe4f0;
         }
         .section-title,

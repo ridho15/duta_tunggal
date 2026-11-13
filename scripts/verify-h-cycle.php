@@ -10,7 +10,7 @@ use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\PurchaseInvoice;
+use App\Models\PurchaseOrder;
 use App\Models\TaxSetting;
 use App\Models\UnitOfMeasure;
 use App\Services\Dashboard\ExecutiveDashboardService;
@@ -96,7 +96,7 @@ echo "\n[AUDIT 6] Memeriksa Agregasi Metrik Dashboard Eksekutif\n";
 try {
     $dashService = app(ExecutiveDashboardService::class);
     $dashData = $dashService->getDashboardData(null, 'today');
-    $hasKpis = isset($dashData['salesToday']) || isset($dashData['receivables']) || isset($dashData['kpis']);
+    $hasKpis = isset($dashData['kpi']) || isset($dashData['salesToday']) || isset($dashData['receivables']);
     echo "  - Executive Dashboard Service terhubung, payload key count: " . count($dashData) . " -> " . ($hasKpis ? "PASS" : "FAIL") . "\n";
     if (!$hasKpis) $allPassed = false;
 } catch (Throwable $e) {
@@ -109,7 +109,7 @@ try {
 // -------------------------------------------------------------------------
 echo "\n[AUDIT 7] Memeriksa Ketersediaan Data Laporan Manajerial\n";
 $salesCount = Invoice::where('status', '!=', 'cancelled')->count();
-$purchCount = PurchaseInvoice::where('status', '!=', 'cancelled')->count();
+$purchCount = PurchaseOrder::where('status', '!=', 'cancelled')->count();
 $prodCount = Product::count();
 
 echo "  - Total Invoice Penjualan Aktif : {$salesCount} dokumen -> PASS\n";

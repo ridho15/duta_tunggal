@@ -3,24 +3,7 @@
 @section('title', 'Faktur Pembelian (Purchase Invoice) – Duta Tunggal ERP')
 
 @section('content')
-<div class="space-y-6" x-data="{ 
-    deleteModalOpen: false,
-    deleteActionUrl: '',
-    deleteInvoiceNumber: '',
-    cancelModalOpen: false,
-    cancelActionUrl: '',
-    cancelInvoiceNumber: '',
-    confirmDelete(url, number) {
-        this.deleteActionUrl = url;
-        this.deleteInvoiceNumber = number;
-        this.deleteModalOpen = true;
-    },
-    confirmCancel(url, number) {
-        this.cancelActionUrl = url;
-        this.cancelInvoiceNumber = number;
-        this.cancelModalOpen = true;
-    }
-}">
+<div class="space-y-6" x-data>
     {{-- Header Halaman --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -318,8 +301,8 @@
                                         {{-- Hapus (Khusus Draft) --}}
                                         <button
                                             type="button"
-                                            @click="confirmDelete('{{ route('pembelian.invoices.destroy', $inv) }}', '{{ $inv->invoice_number }}')"
-                                            class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                            @click="$dispatch('open-modal-delete-invoice', { action: '{{ route('pembelian.invoices.destroy', $inv) }}', invoiceNumber: '{{ $inv->invoice_number }}' })"
+                                            class="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
                                             title="Hapus Faktur Draft"
                                         >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,18 +343,15 @@
 
     {{-- Modal Konfirmasi Hapus Draft --}}
     <x-confirmation-modal
-        id="delete-invoice-modal"
-        name="deleteModalOpen"
+        name="delete-invoice"
         title="Hapus Faktur Pembelian Draft"
         variant="danger"
         confirm-text="Ya, Hapus Faktur"
         cancel-text="Batal"
-        x-bind:action="deleteActionUrl"
-        method="POST"
+        method="DELETE"
     >
-        @method('DELETE')
         <p class="text-sm text-gray-600">
-            Apakah Anda yakin ingin menghapus Faktur Pembelian draft <strong class="text-gray-900" x-text="deleteInvoiceNumber"></strong>?
+            Apakah Anda yakin ingin menghapus Faktur Pembelian draft <strong class="text-gray-900" x-text="data.invoiceNumber || ''"></strong>?
         </p>
         <p class="text-xs text-red-600 mt-2">
             Penerimaan barang (GRN) yang tertagih pada faktur ini akan kembali dapat ditagihkan. Tindakan ini tidak dapat dibatalkan.

@@ -111,4 +111,17 @@ class SaleOrderPolicy
 
         return $check['allowed'];
     }
+
+    public function reject(User $user, SaleOrder $saleOrder): bool
+    {
+        if (! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+
+        if (! in_array($saleOrder->status, ['draft', 'request_approve'], true)) {
+            return false;
+        }
+
+        return $user->hasAnyPermission(['response sales order', 'update sales order']);
+    }
 }

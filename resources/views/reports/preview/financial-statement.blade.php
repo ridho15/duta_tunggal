@@ -7,29 +7,29 @@
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
-        .print-toolbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1.5rem; background: #0f172a; color: #fff; position: sticky; top: 0; z-index: 100; }
+        .print-toolbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1.5rem; background: #fff; color: #0f172a; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 100; }
         .print-toolbar h1 { flex: 1; margin: 0; font-size: 1rem; font-weight: 700; }
-        .pt-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; border: none; font-size: .85rem; font-weight: 600; cursor: pointer; }
-        .pt-btn-print { background: #0f766e; color: #fff; }
-        .pt-btn-close { background: #475569; color: #fff; }
+        .pt-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; border: none; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+        .pt-btn-print { background: #15803d; color: #fff; }
+        .pt-btn-close { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
         .report-wrap { max-width: 1160px; margin: 0 auto; padding: 1.5rem; }
-        .fs-header { background: linear-gradient(135deg,#0f172a,#0f766e); color: #fff; border-radius: 18px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 16px 36px rgba(15, 118, 110, .22); }
-        .fs-company { font-size: 1.55rem; font-weight: 800; letter-spacing: .02em; }
-        .fs-title { margin-top: .25rem; font-size: 1.15rem; font-weight: 700; opacity: .95; }
-        .fs-period { margin-top: .35rem; font-size: .92rem; opacity: .8; }
+        .fs-header { background: #fff; color: #0f172a; border-radius: 16px; border: 1px solid #e2e8f0; padding: 1.75rem 2rem; margin-bottom: 1.5rem; text-align: center; box-shadow: 0 2px 8px rgba(15, 23, 42, .04); }
+        .fs-company { font-size: .85rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #15803d; }
+        .fs-title { margin-top: .35rem; font-size: 1.4rem; font-weight: 900; }
+        .fs-period { margin-top: .35rem; font-size: .9rem; color: #64748b; }
         .fs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .fs-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.15rem 1.25rem; box-shadow: 0 4px 14px rgba(15, 23, 42, .05); }
+        .fs-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.15rem 1.25rem; box-shadow: 0 2px 8px rgba(15, 23, 42, .04); }
         .fs-card-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: .35rem; }
-        .fs-card-value { font-size: 1.4rem; font-weight: 800; }
+        .fs-card-value { font-size: 1.4rem; font-weight: 800; font-family: monospace; }
         .fs-card-value.green { color: #059669; }
         .fs-card-value.blue { color: #2563eb; }
         .fs-card-value.amber { color: #d97706; }
         .fs-card-value.red { color: #dc2626; }
         .fs-card-value.slate { color: #0f172a; }
-        .fs-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, .06); margin-bottom: 1.5rem; }
+        .fs-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, .04); margin-bottom: 1.5rem; }
         .fs-section-header { padding: 1rem 1.5rem; color: #fff; font-size: 1rem; font-weight: 800; letter-spacing: .03em; }
-        .fs-section-header.pl { background: linear-gradient(135deg,#166534,#16a34a); }
-        .fs-section-header.bs { background: linear-gradient(135deg,#1d4ed8,#0f766e); }
+        .fs-section-header.pl { background: #15803d; }
+        .fs-section-header.bs { background: #0f766e; }
         .fs-subheader { padding: .75rem 1.5rem; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
         .fs-row { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: .65rem 1.5rem; border-bottom: 1px solid #f1f5f9; font-size: .92rem; }
         .fs-row:hover { background: #f8fafc; }
@@ -39,7 +39,7 @@
         .fs-row-amount.negative { color: #dc2626; }
         .fs-total { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: .85rem 1.5rem; font-weight: 800; }
         .fs-total.soft { background: #eff6ff; color: #1e3a8a; border-top: 1px solid #bfdbfe; }
-        .fs-total.strong { background: linear-gradient(135deg,#0f172a,#1e3a8a); color: #fff; }
+        .fs-total.strong { background: #0f172a; color: #fff; }
         .fs-total.success { background: #dcfce7; color: #166534; border-top: 1px solid #86efac; }
         .fs-total.warn { background: #fee2e2; color: #991b1b; border-top: 1px solid #fca5a5; }
         .fs-two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -309,7 +309,7 @@
         @if(!empty($report['cogm']))
             @php $cogm = $report['cogm']; @endphp
             <section class="fs-section">
-                <div class="fs-section-header pl" style="background: linear-gradient(135deg,#92400e,#d97706);">Cost of Goods Manufactured</div>
+                <div class="fs-section-header pl" style="background: #0f766e;">Cost of Goods Manufactured</div>
 
                 <div class="fs-row">
                     <div class="fs-row-label">Persediaan Bahan Baku Awal</div>

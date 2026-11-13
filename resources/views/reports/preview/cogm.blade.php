@@ -3,209 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan HPP / COGM – {{ $startDate->format('d/m/Y') }} s/d {{ $endDate->format('d/m/Y') }}</title>
+    <title>Laporan Harga Pokok Produksi (COGM) – {{ config('app.name', 'PT Duta Tunggal') }}</title>
+
+    {{-- Typography & Tailwind Assets --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    @vite(['resources/css/app.css'])
+
     <style>
-        * { box-sizing: border-box; }
-
         body {
-            margin: 0;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f3f4f6;
-            color: #111827;
+            font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
         }
-
         @media print {
-            body { background: #fff; }
-            .no-print { display: none !important; }
-            @page { size: A4 portrait; margin: 14mm; }
-        }
-
-        /* ── Toolbar ── */
-        .toolbar {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 20px;
-            margin-bottom: 18px;
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            box-shadow: 0 4px 20px rgba(15,23,42,.06);
-        }
-        .toolbar .title-text {
-            font-size: 15px;
-            font-weight: 700;
-            color: #1e293b;
-        }
-        .toolbar .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-        .btn {
-            border: 0;
-            border-radius: 10px;
-            padding: 9px 18px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            color: #fff;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-print { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
-        .btn-close  { background: linear-gradient(135deg, #475569, #334155); }
-
-        /* ── Page wrapper ── */
-        .page {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 20px 40px;
-        }
-
-        /* ── Report header ── */
-        .rh {
-            background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a855f7 100%);
-            color: #fff;
-            border-radius: 20px;
-            padding: 26px 28px;
-            margin-bottom: 20px;
-            box-shadow: 0 12px 36px rgba(109,40,217,.22);
-        }
-        .rh-brand { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; opacity: .82; margin-bottom: 4px; }
-        .rh-title { font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; margin: 0; }
-        .rh-sub   { font-size: 14px; opacity: .85; margin-top: 6px; }
-
-        /* ── Meta cards ── */
-        .meta {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .meta-card {
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.05);
-        }
-        .meta-label {
-            font-size: 11px;
-            font-weight: 700;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: .07em;
-        }
-        .meta-value {
-            margin-top: 5px;
-            font-size: 15px;
-            font-weight: 800;
-            color: #111827;
-        }
-
-        /* ── Summary cards ── */
-        .card-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .sum-card {
-            background: #fff;
-            border-radius: 14px;
-            padding: 14px 18px;
-            box-shadow: 0 2px 10px rgba(0,0,0,.06);
-            border-left: 4px solid #7c3aed;
-        }
-        .sum-card.blue  { border-left-color: #2563eb; }
-        .sum-card.green { border-left-color: #059669; }
-        .sum-card.red   { border-left-color: #dc2626; }
-        .sum-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #6b7280; margin-bottom: 4px; }
-        .sum-value { font-size: 16px; font-weight: 900; color: #1e293b; }
-
-        /* ── COGM Statement table ── */
-        .table-wrap {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(0,0,0,.07);
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
-        .table-head-band {
-            background: linear-gradient(135deg, #4c1d95, #7c3aed);
-            color: #fff;
-            padding: 14px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .table-head-band h3 { margin: 0; font-size: 15px; font-weight: 800; }
-        .table-head-band span { font-size: 13px; opacity: .85; }
-
-        table.cogm-stmt { width: 100%; border-collapse: collapse; font-size: .86rem; }
-        table.cogm-stmt td { padding: 10px 18px; border-bottom: 1px solid #f1f5f9; }
-        table.cogm-stmt tr:last-child td { border-bottom: none; }
-        table.cogm-stmt td:last-child { text-align: right; font-family: monospace; white-space: nowrap; }
-
-        .row-section td { background: #f8fafc; font-weight: 700; color: #374151; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
-        .row-indent td:first-child { padding-left: 36px; color: #4b5563; }
-        .row-sub-total td { background: #ede9fe; font-weight: 700; color: #5b21b6; }
-        .row-total td { background: #ddd6fe; font-weight: 800; color: #4c1d95; border-top: 2px solid #c4b5fd; }
-        .row-grand td {
-            background: linear-gradient(135deg, #4c1d95, #7c3aed);
-            color: #fff;
-            font-weight: 900;
-            font-size: 1rem;
-            padding: 14px 18px;
-        }
-
-        /* ── MO detail table ── */
-        table.mo-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
-        table.mo-table thead tr { background: #4c1d95; color: #fff; }
-        table.mo-table thead th { padding: 9px 14px; text-align: left; font-weight: 700; white-space: nowrap; }
-        table.mo-table thead th:nth-child(3) { text-align: right; }
-        table.mo-table tbody tr { border-bottom: 1px solid #f1f5f9; }
-        table.mo-table tbody tr:hover { background: #faf5ff; }
-        table.mo-table tbody td { padding: 8px 14px; color: #374151; }
-        table.mo-table tbody td:nth-child(3) { text-align: right; font-family: monospace; }
-
-        .badge {
-            display: inline-flex; align-items: center;
-            border-radius: 9999px; padding: 2px 10px;
-            font-size: .75rem; font-weight: 700; white-space: nowrap;
-        }
-        .badge-completed  { background: #d1fae5; color: #065f46; }
-        .badge-in_progress { background: #fef3c7; color: #92400e; }
-        .badge-default    { background: #f3f4f6; color: #374151; }
-
-        /* ── Footer ── */
-        .report-footer {
-            text-align: center;
-            margin-top: 24px;
-            font-size: .72rem;
-            color: #9ca3af;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 10px;
-            font-style: italic;
+            body {
+                background-color: #ffffff !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xs {
+                box-shadow: none !important;
+            }
+            .border {
+                border-color: #e2e8f0 !important;
+            }
         }
     </style>
 </head>
-<body>
-    {{-- Toolbar --}}
-    <div class="toolbar no-print">
-        <span class="title-text">&#128202; Laporan Harga Pokok Produksi (COGM)</span>
-        <div class="actions">
-            <button class="btn btn-print" onclick="window.print()">&#128424; Cetak / PDF</button>
-            <button class="btn btn-close"  onclick="window.close()">&#10005; Tutup</button>
+<body class="min-h-screen antialiased">
+
+    {{-- Top Action Bar --}}
+    <header class="no-print sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 sm:px-6 py-3">
+        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-emerald-50 text-[#15803d] flex items-center justify-center font-bold text-sm border border-emerald-200 shadow-2xs">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-gray-900 leading-tight">Laporan Harga Pokok Produksi (COGM)</h1>
+                    <p class="text-xs text-gray-500">Kalkulasi Biaya Bahan, Tenaga Kerja &amp; WIP Manufaktur</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="window.print()"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#15803d] text-white text-xs font-semibold hover:bg-emerald-800 shadow-2xs transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    <span>Cetak / PDF</span>
+                </button>
+
+                <button onclick="window.close()"
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-100 text-xs font-semibold text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors">
+                    Tutup
+                </button>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <div class="page">
+    {{-- Main Report Shell --}}
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        {{-- Report header --}}
-        <div class="rh">
-            <div class="rh-brand">{{ config('app.name', 'PT Duta Tunggal') }}</div>
-            <h1 class="rh-title">Laporan Harga Pokok Produksi</h1>
-            <div class="rh-sub">
+        {{-- Executive Header Card --}}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
+            <span class="text-xs font-bold uppercase tracking-wider text-[#15803d] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/60 inline-block mb-2">
+                {{ config('app.name', 'PT Duta Tunggal') }}
+            </span>
+            <h2 class="text-2xl font-black text-gray-900 tracking-tight">LAPORAN HARGA POKOK PRODUKSI</h2>
+            <p class="text-xs sm:text-sm text-gray-500 mt-1">
                 Periode: {{ $startDate->isoFormat('D MMMM YYYY') }} s/d {{ $endDate->isoFormat('D MMMM YYYY') }}
                 @if($selectedCabang)
                     &nbsp;&bull;&nbsp; Cabang: <strong>{{ $selectedCabang->nama }}</strong>
@@ -213,156 +84,194 @@
                 @if($selectedProduct)
                     &nbsp;&bull;&nbsp; Produk: <strong>{{ $selectedProduct->name }}</strong>
                 @endif
+            </p>
+        </div>
+
+        {{-- Meta Info Cards --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5 no-print">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Periode Mulai</span>
+                <div class="text-sm font-bold text-gray-900 mt-1">{{ $startDate->format('d/m/Y') }}</div>
+                <span class="text-[10px] text-gray-400 mt-1">Awal rentang laporan</span>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Periode Akhir</span>
+                <div class="text-sm font-bold text-gray-900 mt-1">{{ $endDate->format('d/m/Y') }}</div>
+                <span class="text-[10px] text-gray-400 mt-1">Akhir rentang laporan</span>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Cabang</span>
+                <div class="text-sm font-bold text-gray-900 mt-1 truncate">{{ $selectedCabang ? $selectedCabang->nama : 'Semua Cabang' }}</div>
+                <span class="text-[10px] text-gray-400 mt-1">Filter entitas cabang</span>
+            </div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Jumlah MO</span>
+                <div class="text-lg font-black font-mono text-gray-900 mt-1">{{ $report['mo_count'] }} Order</div>
+                <span class="text-[10px] text-gray-400 mt-1">Total manufacturing order</span>
             </div>
         </div>
 
-        {{-- Meta cards --}}
-        <div class="meta no-print">
-            <div class="meta-card">
-                <div class="meta-label">Periode Mulai</div>
-                <div class="meta-value">{{ $startDate->format('d/m/Y') }}</div>
+        {{-- 4 Summary Metric Cards --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5 no-print">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Bahan Baku Terpakai</span>
+                <div class="text-base sm:text-lg font-black font-mono tracking-tight text-blue-700 mt-1">
+                    Rp {{ number_format($report['raw_material_used'], 0, ',', '.') }}
+                </div>
             </div>
-            <div class="meta-card">
-                <div class="meta-label">Periode Akhir</div>
-                <div class="meta-value">{{ $endDate->format('d/m/Y') }}</div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tenaga Kerja</span>
+                <div class="text-base sm:text-lg font-black font-mono tracking-tight text-gray-900 mt-1">
+                    Rp {{ number_format($report['labor_cost'], 0, ',', '.') }}
+                </div>
             </div>
-            <div class="meta-card">
-                <div class="meta-label">Cabang</div>
-                <div class="meta-value">{{ $selectedCabang ? $selectedCabang->nama : 'Semua Cabang' }}</div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Overhead Pabrik</span>
+                <div class="text-base sm:text-lg font-black font-mono tracking-tight text-amber-700 mt-1">
+                    Rp {{ number_format($report['overhead'], 0, ',', '.') }}
+                </div>
             </div>
-            <div class="meta-card">
-                <div class="meta-label">Jumlah MO</div>
-                <div class="meta-value">{{ $report['mo_count'] }}</div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Nilai Akhir COGM</span>
+                <div class="text-base sm:text-lg font-black font-mono tracking-tight text-[#15803d] mt-1">
+                    Rp {{ number_format($report['cogm'], 0, ',', '.') }}
+                </div>
             </div>
         </div>
 
-        {{-- Summary cards --}}
-        <div class="card-row no-print">
-            <div class="sum-card blue">
-                <div class="sum-label">&#128230; Bahan Baku Terpakai</div>
-                <div class="sum-value">Rp {{ number_format($report['raw_material_used'], 0, ',', '.') }}</div>
+        {{-- COGM Statement Table --}}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden text-xs">
+            <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700">Rincian Perhitungan COGM</h3>
+                <span class="text-[11px] text-gray-400 font-medium">{{ $startDate->isoFormat('D MMM YYYY') }} – {{ $endDate->isoFormat('D MMM YYYY') }}</span>
             </div>
-            <div class="sum-card">
-                <div class="sum-label">&#128104;&#8205;&#127981; Tenaga Kerja</div>
-                <div class="sum-value">Rp {{ number_format($report['labor_cost'], 0, ',', '.') }}</div>
-            </div>
-            <div class="sum-card">
-                <div class="sum-label">&#9881; Overhead Pabrik</div>
-                <div class="sum-value">Rp {{ number_format($report['overhead'], 0, ',', '.') }}</div>
-            </div>
-            <div class="sum-card green">
-                <div class="sum-label">&#127381; COGM</div>
-                <div class="sum-value">Rp {{ number_format($report['cogm'], 0, ',', '.') }}</div>
-            </div>
-        </div>
 
-        {{-- ─── COGM Statement ─── --}}
-        <div class="table-wrap">
-            <div class="table-head-band">
-                <h3>Laporan Harga Pokok Produksi (Cost of Goods Manufactured)</h3>
-                <span>{{ $startDate->isoFormat('D MMM YYYY') }} – {{ $endDate->isoFormat('D MMM YYYY') }}</span>
-            </div>
-            <table class="cogm-stmt">
-                <tbody>
-                    {{-- Opening WIP --}}
-                    <tr class="row-section"><td colspan="2">I. Saldo Awal WIP (Barang Dalam Proses)</td></tr>
-                    <tr>
-                        <td>Persediaan Awal Barang Dalam Proses</td>
-                        <td>Rp {{ number_format($report['opening_wip'], 0, ',', '.') }}</td>
+            <table class="w-full text-left border-collapse">
+                <tbody class="divide-y divide-gray-100">
+                    {{-- I. Saldo Awal WIP --}}
+                    <tr class="bg-gray-50 font-bold text-gray-700 uppercase tracking-wide text-[11px]">
+                        <td colspan="2" class="py-2.5 px-6">I. Saldo Awal WIP (Barang Dalam Proses)</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50/60">
+                        <td class="py-2.5 px-6 pl-8 text-gray-700">Persediaan Awal Barang Dalam Proses</td>
+                        <td class="py-2.5 px-6 text-right font-mono text-gray-900 font-semibold">Rp {{ number_format($report['opening_wip'], 0, ',', '.') }}</td>
                     </tr>
 
-                    {{-- Production Costs --}}
-                    <tr class="row-section"><td colspan="2">II. Biaya Produksi Periode Ini</td></tr>
-                    <tr class="row-indent">
-                        <td>Bahan Baku Terpakai (Raw Material Used)</td>
-                        <td>Rp {{ number_format($report['raw_material_used'], 0, ',', '.') }}</td>
+                    {{-- II. Biaya Produksi Periode Ini --}}
+                    <tr class="bg-gray-50 font-bold text-gray-700 uppercase tracking-wide text-[11px] border-t border-gray-200">
+                        <td colspan="2" class="py-2.5 px-6">II. Biaya Produksi Periode Ini</td>
                     </tr>
-                    <tr class="row-indent">
-                        <td>Biaya Tenaga Kerja Langsung (Direct Labor)</td>
-                        <td>Rp {{ number_format($report['labor_cost'], 0, ',', '.') }}</td>
+                    <tr class="hover:bg-gray-50/60">
+                        <td class="py-2.5 px-6 pl-8 text-gray-700">Bahan Baku Terpakai (Raw Material Used)</td>
+                        <td class="py-2.5 px-6 text-right font-mono text-gray-900">Rp {{ number_format($report['raw_material_used'], 0, ',', '.') }}</td>
                     </tr>
-                    <tr class="row-indent">
-                        <td>Biaya Overhead Pabrik (Manufacturing Overhead)</td>
-                        <td>Rp {{ number_format($report['overhead'], 0, ',', '.') }}</td>
+                    <tr class="hover:bg-gray-50/60">
+                        <td class="py-2.5 px-6 pl-8 text-gray-700">Biaya Tenaga Kerja Langsung (Direct Labor)</td>
+                        <td class="py-2.5 px-6 text-right font-mono text-gray-900">Rp {{ number_format($report['labor_cost'], 0, ',', '.') }}</td>
                     </tr>
-                    <tr class="row-sub-total">
-                        <td>Total Biaya Produksi Ditambahkan</td>
-                        <td>Rp {{ number_format($report['total_cost_added'], 0, ',', '.') }}</td>
+                    <tr class="hover:bg-gray-50/60">
+                        <td class="py-2.5 px-6 pl-8 text-gray-700">Biaya Overhead Pabrik (Manufacturing Overhead)</td>
+                        <td class="py-2.5 px-6 text-right font-mono text-gray-900">Rp {{ number_format($report['overhead'], 0, ',', '.') }}</td>
                     </tr>
-
-                    {{-- Total WIP available --}}
-                    <tr class="row-section"><td colspan="2">III. Total WIP Tersedia</td></tr>
-                    <tr>
-                        <td>Saldo Awal WIP + Total Biaya Produksi</td>
-                        <td>Rp {{ number_format($report['total_wip'], 0, ',', '.') }}</td>
+                    <tr class="bg-blue-50/50 font-bold text-blue-950 border-t border-gray-200">
+                        <td class="py-2.5 px-6">= Total Biaya Produksi Ditambahkan</td>
+                        <td class="py-2.5 px-6 text-right font-mono text-sm text-blue-800">Rp {{ number_format($report['total_cost_added'], 0, ',', '.') }}</td>
                     </tr>
 
-                    {{-- Closing WIP --}}
-                    <tr class="row-section"><td colspan="2">IV. Saldo Akhir WIP</td></tr>
-                    <tr class="row-indent">
-                        <td>Dikurangi: Persediaan Akhir Barang Dalam Proses</td>
-                        <td>(Rp {{ number_format($report['closing_wip'], 0, ',', '.') }})</td>
+                    {{-- III. Total WIP Tersedia --}}
+                    <tr class="bg-gray-50 font-bold text-gray-700 uppercase tracking-wide text-[11px] border-t border-gray-200">
+                        <td colspan="2" class="py-2.5 px-6">III. Total WIP Tersedia</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50/60">
+                        <td class="py-2.5 px-6 pl-8 text-gray-700">Saldo Awal WIP + Total Biaya Produksi</td>
+                        <td class="py-2.5 px-6 text-right font-mono font-bold text-gray-900">Rp {{ number_format($report['total_wip'], 0, ',', '.') }}</td>
                     </tr>
 
-                    {{-- COGM Grand Total --}}
-                    <tr class="row-grand">
-                        <td>&#128200; Harga Pokok Produksi (COGM)</td>
-                        <td>Rp {{ number_format($report['cogm'], 0, ',', '.') }}</td>
+                    {{-- IV. Saldo Akhir WIP --}}
+                    <tr class="bg-gray-50 font-bold text-gray-700 uppercase tracking-wide text-[11px] border-t border-gray-200">
+                        <td colspan="2" class="py-2.5 px-6">IV. Saldo Akhir WIP</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50/60">
+                        <td class="py-2.5 px-6 pl-8 text-gray-700">Dikurangi: Persediaan Akhir Barang Dalam Proses</td>
+                        <td class="py-2.5 px-6 text-right font-mono text-rose-600 font-semibold">(Rp {{ number_format($report['closing_wip'], 0, ',', '.') }})</td>
                     </tr>
                 </tbody>
-            </table>
-        </div>
 
-        {{-- ─── Manufacturing Orders Detail ─── --}}
-        @if($report['mo_count'] > 0)
-        <div class="table-wrap">
-            <div class="table-head-band">
-                <h3>Detail Manufacturing Orders ({{ $report['mo_count'] }} MO)</h3>
-                <span>Periode {{ $startDate->isoFormat('D MMM YYYY') }} – {{ $endDate->isoFormat('D MMM YYYY') }}</span>
-            </div>
-            <table class="mo-table">
-                <thead>
-                    <tr>
-                        <th>No. MO</th>
-                        <th>Produk</th>
-                        <th>Qty</th>
-                        <th>Status</th>
-                        <th>Tanggal Dibuat</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($report['orders'] as $mo)
-                    @php
-                        $productName = optional(optional($mo->productionPlan)->product)->name ?? '-';
-                        $status = $mo->status ?? 'draft';
-                        $badgeClass = match($status) {
-                            'completed'   => 'badge-completed',
-                            'in_progress' => 'badge-in_progress',
-                            default       => 'badge-default',
-                        };
-                    @endphp
-                    <tr>
-                        <td>{{ $mo->mo_number ?? '#' . $mo->id }}</td>
-                        <td>{{ $productName }}</td>
-                        <td>{{ number_format($mo->quantity ?? 0) }}</td>
-                        <td>
-                            <span class="badge {{ $badgeClass }}">
-                                {{ ucfirst(str_replace('_', ' ', $status)) }}
-                            </span>
+                <tfoot>
+                    <tr class="bg-slate-800 text-white font-bold">
+                        <td class="py-4 px-6 uppercase tracking-wider text-xs">
+                            HARGA POKOK PRODUKSI (Cost of Goods Manufactured)
                         </td>
-                        <td>{{ \Carbon\Carbon::parse($mo->created_at)->format('d/m/Y') }}</td>
+                        <td class="py-4 px-6 text-right font-mono text-base sm:text-lg font-black text-emerald-300">
+                            Rp {{ number_format($report['cogm'], 0, ',', '.') }}
+                        </td>
                     </tr>
-                    @endforeach
-                </tbody>
+                </tfoot>
             </table>
         </div>
+
+        {{-- Manufacturing Orders Detail --}}
+        @if($report['mo_count'] > 0)
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden text-xs">
+                <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-700">Detail Manufacturing Orders ({{ $report['mo_count'] }} Order)</h3>
+                    <span class="text-[11px] text-gray-400 font-medium">Rincian Surat Perintah Kerja</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                                <th class="py-3 px-4">No. MO</th>
+                                <th class="py-3 px-4">Produk</th>
+                                <th class="py-3 px-4 text-center">Qty Target</th>
+                                <th class="py-3 px-4 text-center">Status</th>
+                                <th class="py-3 px-4 text-right">Tanggal Dibuat</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($report['orders'] as $mo)
+                                @php
+                                    $productName = optional(optional($mo->productionPlan)->product)->name ?? '-';
+                                    $status = $mo->status ?? 'draft';
+                                    $badgeClass = match($status) {
+                                        'completed'   => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                        'in_progress' => 'bg-blue-50 text-blue-700 border-blue-200',
+                                        default       => 'bg-gray-50 text-gray-700 border-gray-200',
+                                    };
+                                @endphp
+                                <tr class="hover:bg-gray-50/60 transition-colors">
+                                    <td class="py-2.5 px-4 font-mono font-semibold text-gray-900">{{ $mo->mo_number ?? '#' . $mo->id }}</td>
+                                    <td class="py-2.5 px-4 font-medium text-gray-800">{{ $productName }}</td>
+                                    <td class="py-2.5 px-4 text-center font-mono">{{ number_format($mo->quantity ?? 0) }}</td>
+                                    <td class="py-2.5 px-4 text-center">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border {{ $badgeClass }}">
+                                            {{ ucfirst(str_replace('_', ' ', $status)) }}
+                                        </span>
+                                    </td>
+                                    <td class="py-2.5 px-4 text-right text-gray-500">
+                                        {{ \Carbon\Carbon::parse($mo->created_at)->format('d/m/Y') }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         @endif
 
-        <div class="report-footer">
-            Dicetak pada {{ now()->isoFormat('D MMMM YYYY, HH:mm') }} &nbsp;|&nbsp; {{ config('app.name') }}
-            &nbsp;|&nbsp; Laporan Harga Pokok Produksi (Cost of Goods Manufactured)
+        <div class="flex items-center justify-between text-xs text-gray-400 no-print">
+            <span>Dicetak pada {{ now()->isoFormat('D MMMM YYYY, HH:mm') }} &bull; {{ config('app.name', 'PT Duta Tunggal') }}</span>
+            <span>ERP Manufacturing &amp; Costing Module</span>
         </div>
 
-    </div>
+    </main>
+
 </body>
 </html>

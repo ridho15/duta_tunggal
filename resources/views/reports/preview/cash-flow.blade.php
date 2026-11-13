@@ -3,177 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Arus Kas – {{ config('app.name') }}</title>
+    <title>Laporan Arus Kas – {{ config('app.name', 'PT Duta Tunggal') }}</title>
+
+    {{-- Typography & Tailwind Assets --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    @vite(['resources/css/app.css'])
+
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
-        .print-toolbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1.5rem; background: #7c2d12; color: #fff; position: sticky; top: 0; z-index: 100; }
-        .print-toolbar h1 { flex: 1; font-size: 1rem; font-weight: 700; margin: 0; }
-        .pt-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; border: none; font-size: .85rem; font-weight: 600; cursor: pointer; }
-        .pt-btn-print { background: #ea580c; color: #fff; }
-        .pt-btn-close  { background: #475569; color: #fff; }
-        .report-wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
-        .fr-report-header { background:linear-gradient(135deg,#7c2d12,#ea580c); color:#fff; border-radius:16px; padding:2rem; margin-bottom:1.5rem; text-align:center; box-shadow:0 8px 24px rgba(234,88,12,.25); }
-        .fr-company-name { font-size:1.5rem; font-weight:800; letter-spacing:.02em; }
-        .fr-report-type { font-size:1.125rem; font-weight:600; opacity:.9; margin-top:.25rem; }
-        .fr-report-period { font-size:.9rem; opacity:.75; margin-top:.25rem; }
-        .fr-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(185px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-        .fr-card { background:#fff; border-radius:12px; padding:1.1rem 1.5rem; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,.06); }
-        .fr-card-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-bottom:.3rem; }
-        .fr-card-value { font-size:1.35rem; font-weight:800; }
-        .fr-card-value.green  { color:#059669; }
-        .fr-card-value.red    { color:#dc2626; }
-        .fr-card-value.orange { color:#ea580c; }
-        .fr-card-value.blue   { color:#2563eb; }
-        .fr-body { background:#fff; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,.07); overflow:hidden; margin-bottom:1.5rem; }
-        .fr-sec-hdr { display:flex; align-items:center; gap:.75rem; padding:.9rem 1.5rem; font-size:1rem; font-weight:700; color:#fff; letter-spacing:.02em; }
-        .fr-sec-hdr.operating { background:linear-gradient(135deg,#065f46,#059669); }
-        .fr-sec-hdr.investing { background:linear-gradient(135deg,#1e3a8a,#2563eb); }
-        .fr-sec-hdr.financing { background:linear-gradient(135deg,#7c2d12,#ea580c); }
-        .fr-line { display:flex; justify-content:space-between; align-items:flex-start; padding:.55rem 1.5rem .55rem 2.5rem; border-bottom:1px solid #f1f5f9; font-size:.88rem; }
-        .fr-line:hover { background:#f8fafc; }
-        .fr-line-label { flex:1; color:#374151; line-height:1.4; }
-        .fr-line-sub { font-size:.75rem; color:#94a3b8; margin-top:.1rem; }
-        .fr-line-amount { font-weight:600; font-family:monospace; white-space:nowrap; padding-left:.5rem; }
-        .fr-line-amount.pos { color:#059669; }
-        .fr-line-amount.neg { color:#dc2626; }
-        .fr-sec-total { display:flex; justify-content:space-between; align-items:center; padding:.75rem 1.5rem; font-weight:800; border-top:2px solid; }
-        .fr-sec-total.operating { background:#d1fae5; border-color:#34d399; color:#065f46; }
-        .fr-sec-total.investing { background:#dbeafe; border-color:#60a5fa; color:#1e3a8a; }
-        .fr-sec-total.financing { background:#ffedd5; border-color:#fdba74; color:#7c2d12; }
-        .fr-net-change { display:flex; justify-content:space-between; align-items:center; padding:.85rem 1.5rem; background:#fef9c3; border-top:2px solid #fbbf24; font-weight:700; font-size:.95rem; color:#78350f; }
-        .fr-closing { display:flex; justify-content:space-between; align-items:center; padding:1rem 1.5rem; background:linear-gradient(135deg,#7c2d12,#c2410c); color:#fff; font-weight:800; font-size:1.05rem; border-radius:0 0 16px 16px; }
-        .fr-notes { background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:1rem 1.5rem; font-size:.85rem; color:#7c2d12; }
-        .fr-notes-title { font-weight:700; margin-bottom:.4rem; }
-        details { font-size:.78rem; color:#64748b; }
-        details summary { cursor:pointer; color:#0ea5e9; font-size:.75rem; margin-top:.2rem; }
+        body {
+            font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
         @media print {
-            body { background:#fff; }
-            .print-toolbar,.no-print { display:none !important; }
-            .fr-body { box-shadow:none; }
-            details { display:none; }
+            body {
+                background-color: #ffffff !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .shadow-sm, .shadow-md, .shadow-lg, .shadow-2xs {
+                box-shadow: none !important;
+            }
+            .border {
+                border-color: #e2e8f0 !important;
+            }
+            details {
+                display: none !important;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="print-toolbar no-print">
-        <h1>&#9881; Laporan Arus Kas</h1>
-        <button class="pt-btn pt-btn-print" onclick="window.print()">&#128424; Cetak / PDF</button>
-        <button class="pt-btn pt-btn-close" onclick="window.close()">&#10005; Tutup</button>
-    </div>
+<body class="min-h-screen antialiased">
 
-    <div class="report-wrap">
-        @php
-            $sectionClasses = ['operating'=>'operating','investing'=>'investing','financing'=>'financing'];
-            $sectionIcons   = ['operating'=>'&#9881;','investing'=>'&#127970;','financing'=>'&#128181;'];
-        @endphp
+    {{-- Top Action Bar --}}
+    <header class="no-print sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 sm:px-6 py-3">
+        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-emerald-50 text-[#15803d] flex items-center justify-center font-bold text-sm border border-emerald-200 shadow-2xs">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-gray-900 leading-tight">Laporan Arus Kas (Cash Flow Statement)</h1>
+                    <p class="text-xs text-gray-500">Mutasi Kas Operasional, Investasi &amp; Pendanaan</p>
+                </div>
+            </div>
 
-        <div class="fr-report-header">
-            <div class="fr-company-name">{{ config('app.name', 'PT Duta Tunggal') }}</div>
-            <div class="fr-report-type">LAPORAN ARUS KAS</div>
-            <div class="fr-report-period">
+            <div class="flex items-center gap-2">
+                <button onclick="window.print()"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#15803d] text-white text-xs font-semibold hover:bg-emerald-800 shadow-2xs transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    <span>Cetak / PDF</span>
+                </button>
+
+                <button onclick="window.close()"
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-100 text-xs font-semibold text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </header>
+
+    {{-- Report Content Shell --}}
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        {{-- Executive Header Card --}}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
+            <span class="text-xs font-bold uppercase tracking-wider text-[#15803d] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/60 inline-block mb-2">
+                {{ config('app.name', 'PT Duta Tunggal') }}
+            </span>
+            <h2 class="text-2xl font-black text-gray-900 tracking-tight">LAPORAN ARUS KAS</h2>
+            <p class="text-xs sm:text-sm text-gray-500 mt-1">
                 Untuk Periode {{ \Carbon\Carbon::parse($report['period']['start'])->isoFormat('D MMMM GGGG') }}
                 s/d {{ \Carbon\Carbon::parse($report['period']['end'])->isoFormat('D MMMM GGGG') }}
                 &nbsp;&bull;&nbsp; Metode: {{ strtoupper($report['method'] ?? 'Direct') }}
-            </div>
+            </p>
         </div>
 
         {{-- Summary Cards --}}
-        <div class="fr-card-grid no-print">
-            <div class="fr-card">
-                <div class="fr-card-label">&#128178; Saldo Kas Awal</div>
-                <div class="fr-card-value blue">Rp {{ number_format($report['opening_balance'], 0, ',', '.') }}</div>
-            </div>
-            @foreach($report['sections'] ?? [] as $sec)
-            <div class="fr-card">
-                <div class="fr-card-label">{{ $sec['label'] ?? '-' }}</div>
-                @php $tot = $sec['total'] ?? 0; @endphp
-                <div class="fr-card-value {{ $tot >= 0 ? 'green' : 'red' }}">
-                    @if($tot < 0)(Rp {{ number_format(abs($tot), 0, ',', '.') }})
-                    @else Rp {{ number_format($tot, 0, ',', '.') }}@endif
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5 no-print">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Saldo Kas Awal</span>
+                <div class="text-lg sm:text-xl font-black font-mono tracking-tight text-blue-700 mt-1">
+                    Rp {{ number_format($report['opening_balance'], 0, ',', '.') }}
                 </div>
+                <span class="text-[10px] text-gray-400 mt-1">Posisi awal periode</span>
             </div>
+
+            @foreach($report['sections'] ?? [] as $sec)
+                @php $tot = $sec['total'] ?? 0; @endphp
+                <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">{{ $sec['label'] ?? '-' }}</span>
+                    <div class="text-lg sm:text-xl font-black font-mono tracking-tight {{ $tot >= 0 ? 'text-[#15803d]' : 'text-rose-600' }} mt-1">
+                        @if($tot < 0)
+                            (Rp {{ number_format(abs($tot), 0, ',', '.') }})
+                        @else
+                            Rp {{ number_format($tot, 0, ',', '.') }}
+                        @endif
+                    </div>
+                    <span class="text-[10px] text-gray-400 mt-1">Total arus kas bersih</span>
+                </div>
             @endforeach
-            <div class="fr-card">
-                <div class="fr-card-label">&#128178; Saldo Kas Akhir</div>
-                <div class="fr-card-value orange">Rp {{ number_format($report['closing_balance'], 0, ',', '.') }}</div>
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Saldo Kas Akhir</span>
+                <div class="text-lg sm:text-xl font-black font-mono tracking-tight text-amber-700 mt-1">
+                    Rp {{ number_format($report['closing_balance'], 0, ',', '.') }}
+                </div>
+                <span class="text-[10px] text-gray-400 mt-1">Posisi penutupan kas &amp; bank</span>
             </div>
         </div>
 
         @if(!empty($selectedBranches))
-        <div style="margin-bottom:1rem;padding:.6rem 1rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.85rem;color:#1d4ed8;" class="no-print">
-            &#127968; Cabang: <strong>{{ implode(', ', $selectedBranches) }}</strong>
-        </div>
+            <div class="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 no-print flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <span>Cabang: <strong>{{ implode(', ', $selectedBranches) }}</strong></span>
+            </div>
         @endif
 
-        <div class="fr-body">
+        {{-- Cash Flow Statement Body --}}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             @foreach($report['sections'] ?? [] as $section)
                 @php
-                    $sKey  = $section['key'] ?? 'other';
-                    $sCls  = $sectionClasses[$sKey] ?? 'operating';
-                    $sIcon = $sectionIcons[$sKey] ?? '&#128202;';
+                    $sKey = $section['key'] ?? 'other';
+                    $secTotal = $section['total'] ?? 0;
                 @endphp
-                <div class="fr-sec-hdr {{ $sCls }}">{!! $sIcon !!} AKTIVITAS {{ strtoupper($section['label'] ?? '') }}</div>
-                @foreach($section['items'] ?? [] as $item)
-                    @php $amt = $item['amount'] ?? 0; @endphp
-                    <div class="fr-line">
-                        <div class="fr-line-label">
-                            <div>{{ $item['label'] ?? '-' }}</div>
-                            @if(!empty($item['metadata']['sources'] ?? []))
-                                <div class="fr-line-sub">Sumber: {{ implode(', ', $item['metadata']['sources']) }}</div>
-                            @endif
-                            @if(!empty($item['metadata']['detail'] ?? []))
-                            <details>
-                                <summary>Lihat Detail</summary>
-                                @foreach($item['metadata']['detail'] as $det)
-                                    <div>{{ $det['customer'] ?? $det['customer_name'] ?? '-' }}: Rp {{ number_format($det['total'] ?? $det['amount'] ?? 0, 0, ',', '.') }}</div>
-                                @endforeach
-                            </details>
-                            @endif
+                
+                {{-- Section Header --}}
+                <div class="bg-gray-50 border-y border-gray-200 px-6 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                    @if($sKey === 'operating')
+                        <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    @elseif($sKey === 'investing')
+                        <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                    @else
+                        <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+                    @endif
+                    <span>Aktivitas {{ strtoupper($section['label'] ?? '') }}</span>
+                </div>
+
+                {{-- Line Items --}}
+                <div class="divide-y divide-gray-100 text-xs">
+                    @foreach($section['items'] ?? [] as $item)
+                        @php $amt = $item['amount'] ?? 0; @endphp
+                        <div class="flex items-start justify-between px-6 py-3 hover:bg-gray-50/60 transition-colors">
+                            <div class="flex-1 pr-4">
+                                <div class="font-medium text-gray-800">{{ $item['label'] ?? '-' }}</div>
+                                @if(!empty($item['metadata']['sources'] ?? []))
+                                    <div class="text-[11px] text-gray-400 mt-0.5">Sumber: {{ implode(', ', $item['metadata']['sources']) }}</div>
+                                @endif
+                                @if(!empty($item['metadata']['detail'] ?? []))
+                                    <details class="mt-1 text-[11px]">
+                                        <summary class="cursor-pointer text-[#15803d] font-semibold hover:underline">Lihat Rincian</summary>
+                                        <div class="mt-1.5 pl-3 border-l-2 border-emerald-200 space-y-0.5 text-gray-600">
+                                            @foreach($item['metadata']['detail'] as $det)
+                                                <div>{{ $det['customer'] ?? $det['customer_name'] ?? '-' }}: Rp {{ number_format($det['total'] ?? $det['amount'] ?? 0, 0, ',', '.') }}</div>
+                                            @endforeach
+                                        </div>
+                                    </details>
+                                @endif
+                            </div>
+                            <span class="font-mono font-semibold whitespace-nowrap {{ $amt >= 0 ? 'text-gray-900' : 'text-rose-600' }}">
+                                @if($amt < 0)
+                                    (Rp {{ number_format(abs($amt), 0, ',', '.') }})
+                                @else
+                                    Rp {{ number_format($amt, 0, ',', '.') }}
+                                @endif
+                            </span>
                         </div>
-                        <span class="fr-line-amount {{ $amt >= 0 ? 'pos' : 'neg' }}">
-                            @if($amt < 0)(Rp {{ number_format(abs($amt), 0, ',', '.') }})
-                            @else Rp {{ number_format($amt, 0, ',', '.') }}@endif
+                    @endforeach
+
+                    {{-- Section Subtotal --}}
+                    <div class="flex items-center justify-between px-6 py-3 bg-gray-50/70 font-bold border-t border-gray-200">
+                        <span class="uppercase tracking-wider text-[11px] text-gray-700">Arus Kas Bersih — {{ $section['label'] ?? '' }}</span>
+                        <span class="font-mono text-sm {{ $secTotal < 0 ? 'text-rose-600' : 'text-[#15803d]' }}">
+                            @if($secTotal < 0)
+                                (Rp {{ number_format(abs($secTotal), 0, ',', '.') }})
+                            @else
+                                Rp {{ number_format($secTotal, 0, ',', '.') }}
+                            @endif
                         </span>
                     </div>
-                @endforeach
-                @php $secTotal = $section['total'] ?? 0; @endphp
-                <div class="fr-sec-total {{ $sCls }}">
-                    <span>Arus Kas Bersih — {{ $section['label'] ?? '' }}</span>
-                    <span style="font-family:monospace;">
-                        @if($secTotal < 0)(Rp {{ number_format(abs($secTotal), 0, ',', '.') }})
-                        @else Rp {{ number_format($secTotal, 0, ',', '.') }}@endif
-                    </span>
                 </div>
             @endforeach
 
+            {{-- Net Cash Change --}}
             @php $netChange = $report['net_change'] ?? 0; @endphp
-            <div class="fr-net-change">
-                <span>&#128200; KENAIKAN (PENURUNAN) BERSIH KAS</span>
-                <span style="font-family:monospace;{{ $netChange < 0 ? 'color:#dc2626' : '' }}">
-                    @if($netChange < 0)(Rp {{ number_format(abs($netChange), 0, ',', '.') }})
-                    @else Rp {{ number_format($netChange, 0, ',', '.') }}@endif
+            <div class="flex items-center justify-between px-6 py-3.5 bg-amber-50/70 border-t-2 border-amber-200 text-xs font-bold text-amber-950">
+                <span class="uppercase tracking-wider">Kenaikan (Penurunan) Bersih Kas</span>
+                <span class="font-mono text-sm {{ $netChange < 0 ? 'text-rose-600' : 'text-amber-900' }}">
+                    @if($netChange < 0)
+                        (Rp {{ number_format(abs($netChange), 0, ',', '.') }})
+                    @else
+                        Rp {{ number_format($netChange, 0, ',', '.') }}
+                    @endif
                 </span>
             </div>
-            <div style="display:flex;justify-content:space-between;padding:.6rem 1.5rem;background:#fef3c7;font-size:.88rem;color:#78350f;font-weight:600;">
+
+            {{-- Opening Balance Row --}}
+            <div class="flex items-center justify-between px-6 py-3 bg-gray-50 border-t border-gray-200 text-xs font-semibold text-gray-700">
                 <span>Saldo Kas Awal Periode</span>
-                <span style="font-family:monospace;">Rp {{ number_format($report['opening_balance'], 0, ',', '.') }}</span>
+                <span class="font-mono font-bold text-gray-900">Rp {{ number_format($report['opening_balance'], 0, ',', '.') }}</span>
             </div>
-            <div class="fr-closing">
-                <span>&#128178; SALDO KAS AKHIR PERIODE</span>
-                <span style="font-family:monospace;">Rp {{ number_format($report['closing_balance'], 0, ',', '.') }}</span>
+
+            {{-- Closing Balance Row --}}
+            <div class="p-6 bg-emerald-700 text-white flex items-center justify-between">
+                <div>
+                    <span class="text-xs uppercase font-bold tracking-wider opacity-90 block">Posisi Kas Penutupan</span>
+                    <h3 class="text-base sm:text-lg font-black tracking-tight mt-0.5">SALDO KAS AKHIR PERIODE</h3>
+                </div>
+                <div class="text-right">
+                    <span class="font-mono text-xl sm:text-2xl font-black">
+                        Rp {{ number_format($report['closing_balance'], 0, ',', '.') }}
+                    </span>
+                </div>
             </div>
         </div>
 
-        <div class="fr-notes no-print">
-            <div class="fr-notes-title">&#128161; Tips Membaca:</div>
-            <ul style="list-style:disc;padding-left:1.2rem;margin-top:.25rem;line-height:1.8;font-size:.875rem;">
-                <li>Arus Kas Operasional: aktivitas utama bisnis (penerimaan pelanggan, pembayaran pemasok, gaji)</li>
-                <li>Arus Kas Investasi: pembelian/penjualan aset tetap dan investasi</li>
-                <li>Arus Kas Pendanaan: utang &amp; modal (pinjaman, angsuran, dividen)</li>
-                <li>Kenaikan Kas = jumlah ketiga aktivitas di atas</li>
-            </ul>
+        {{-- Notes & Reading Tips --}}
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4.5 text-xs text-gray-600 no-print">
+            <h4 class="font-bold text-gray-900 uppercase tracking-wider text-[11px] mb-1.5">Klasifikasi Aktivitas Arus Kas:</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div class="p-2.5 rounded-lg bg-white border border-gray-200/80">
+                    <span class="font-semibold text-gray-800 block">Arus Kas Operasional</span>
+                    <span class="text-gray-500 text-[11px]">Penerimaan pelanggan, pembayaran supplier, dan biaya gaji</span>
+                </div>
+                <div class="p-2.5 rounded-lg bg-white border border-gray-200/80">
+                    <span class="font-semibold text-gray-800 block">Arus Kas Investasi</span>
+                    <span class="text-gray-500 text-[11px]">Perolehan dan pelepasan aset tetap serta investasi jangka panjang</span>
+                </div>
+                <div class="p-2.5 rounded-lg bg-white border border-gray-200/80">
+                    <span class="font-semibold text-gray-800 block">Arus Kas Pendanaan</span>
+                    <span class="text-gray-500 text-[11px]">Penerimaan/pembayaran hutang bank, setoran modal, dan dividen</span>
+                </div>
+            </div>
         </div>
-    </div>
+
+    </main>
+
 </body>
 </html>

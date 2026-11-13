@@ -1,200 +1,312 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laporan Laba Rugi – {{ config('app.name') }}</title>
+    <title>Laporan Laba Rugi – {{ config('app.name', 'PT Duta Tunggal') }}</title>
+
+    {{-- Typography & Tailwind Assets --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    @vite(['resources/css/app.css'])
+
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
-        .print-toolbar { display: flex; align-items: center; gap: .75rem; padding: .75rem 1.5rem; background: #14532d; color: #fff; position: sticky; top: 0; z-index: 100; }
-        .print-toolbar h1 { flex: 1; font-size: 1rem; font-weight: 700; margin: 0; }
-        .pt-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; border: none; font-size: .85rem; font-weight: 600; cursor: pointer; }
-        .pt-btn-print { background: #16a34a; color: #fff; }
-        .pt-btn-close  { background: #475569; color: #fff; }
-        .report-wrap { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-        .fr-page { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
-        .fr-report-header { background: linear-gradient(135deg,#14532d,#16a34a); color:#fff; border-radius:16px; padding:2rem; margin-bottom:1.5rem; text-align:center; box-shadow:0 8px 24px rgba(22,163,74,.25); }
-        .fr-company-name { font-size:1.5rem; font-weight:800; letter-spacing:.02em; }
-        .fr-report-type { font-size:1.125rem; font-weight:600; opacity:.9; margin-top:.25rem; }
-        .fr-report-period { font-size:.9rem; opacity:.75; margin-top:.25rem; }
-        .fr-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-        .fr-card { background:#fff; border-radius:12px; padding:1.1rem 1.5rem; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,.06); }
-        .fr-card-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-bottom:.3rem; }
-        .fr-card-value { font-size:1.35rem; font-weight:800; }
-        .fr-card-value.green { color:#059669; }
-        .fr-card-value.red   { color:#dc2626; }
-        .fr-card-value.blue  { color:#2563eb; }
-        .fr-card-value.amber { color:#d97706; }
-        .fr-body { background:#fff; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,.07); overflow:hidden; margin-bottom:1.5rem; }
-        .fr-line { display:flex; justify-content:space-between; align-items:center; padding:.55rem 1.5rem; border-bottom:1px solid #f1f5f9; font-size:.9rem; }
-        .fr-line.indent { padding-left:2.5rem; }
-        .fr-line:hover { background:#f8fafc; }
-        .fr-line-label { flex:1; color:#374151; }
-        .fr-line-amount { font-weight:600; font-family:monospace; white-space:nowrap; }
-        .fr-line-amount.neg { color:#dc2626; }
-        .fr-sec { padding:.65rem 1.5rem; font-size:.85rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
-        .fr-sec.income  { background:linear-gradient(135deg,#d1fae5,#a7f3d0); color:#065f46; border-left:4px solid #059669; }
-        .fr-sec.cost    { background:linear-gradient(135deg,#fee2e2,#fecaca); color:#7f1d1d; border-left:4px solid #dc2626; }
-        .fr-sec.expense { background:linear-gradient(135deg,#fef3c7,#fde68a); color:#78350f; border-left:4px solid #d97706; }
-        .fr-sec.other   { background:linear-gradient(135deg,#e0f2fe,#bae6fd); color:#0c4a6e; border-left:4px solid #0ea5e9; }
-        .fr-sec.tax     { background:linear-gradient(135deg,#f3e8ff,#e9d5ff); color:#4c1d95; border-left:4px solid #7c3aed; }
-        .fr-result { display:flex; justify-content:space-between; align-items:center; padding:.75rem 1.5rem; border-top:2px solid; font-weight:800; }
-        .fr-result.gross        { background:#d1fae5; border-color:#34d399; color:#065f46; }
-        .fr-result.operating    { background:#dbeafe; border-color:#60a5fa; color:#1e3a8a; }
-        .fr-result.before-tax   { background:#fef3c7; border-color:#fbbf24; color:#78350f; }
-        .fr-result.net          { background:linear-gradient(135deg,#065f46,#047857); color:#fff; border-color:transparent; font-size:1rem; padding:1rem 1.5rem; }
-        .fr-result.net.loss     { background:linear-gradient(135deg,#7f1d1d,#dc2626); }
-        .fr-result-label  { font-size:.95rem; }
-        .fr-result-amount { font-size:1rem; font-family:monospace; }
-        .fr-notes { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:1rem 1.5rem; font-size:.85rem; color:#92400e; }
-        .fr-notes-title { font-weight:700; margin-bottom:.4rem; }
+        body {
+            font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
         @media print {
-            body { background:#fff; }
-            .print-toolbar,.no-print { display:none !important; }
-            .fr-body { box-shadow:none; }
+            body {
+                background-color: #ffffff !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .shadow-sm,
+            .shadow-md,
+            .shadow-lg,
+            .shadow-2xs {
+                box-shadow: none !important;
+            }
+
+            .border {
+                border-color: #e2e8f0 !important;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="print-toolbar no-print">
-        <h1>&#128200; Laporan Laba Rugi</h1>
-        <button class="pt-btn pt-btn-print" onclick="window.print()">&#128424; Cetak / PDF</button>
-        <button class="pt-btn pt-btn-close" onclick="window.close()">&#10005; Tutup</button>
-    </div>
 
-    <div class="report-wrap fr-page">
-        {{-- Report Header --}}
-        <div class="fr-report-header">
-            <div class="fr-company-name">{{ config('app.name', 'PT Duta Tunggal') }}</div>
-            <div class="fr-report-type">LAPORAN LABA RUGI</div>
-            <div class="fr-report-period">
+<body class="min-h-screen antialiased">
+
+    {{-- Top Action Bar --}}
+    <header class="no-print sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 sm:px-6 py-3">
+        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-9 h-9 rounded-xl bg-emerald-50 text-[#15803d] flex items-center justify-center font-bold text-sm border border-emerald-200 shadow-2xs">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-gray-900 leading-tight">Laporan Laba Rugi (Income Statement)</h1>
+                    <p class="text-xs text-gray-500">Kinerja Pendapatan, Beban &amp; Profitabilitas Bersih</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="window.print()"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#15803d] text-white text-xs font-semibold hover:bg-emerald-800 shadow-2xs transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    <span>Cetak / PDF</span>
+                </button>
+
+                <button onclick="window.close()"
+                    class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-100 text-xs font-semibold text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </header>
+
+    {{-- Report Content Shell --}}
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        {{-- Executive Header Card --}}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
+            <span
+                class="text-xs font-bold uppercase tracking-wider text-[#15803d] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/60 inline-block mb-2">
+                {{ config('app.name', 'PT Duta Tunggal') }}
+            </span>
+            <h2 class="text-2xl font-black text-gray-900 tracking-tight">LAPORAN LABA RUGI</h2>
+            <p class="text-xs sm:text-sm text-gray-500 mt-1">
                 Untuk Periode {{ \Carbon\Carbon::parse($startDate)->isoFormat('D MMMM GGGG') }}
                 s/d {{ \Carbon\Carbon::parse($endDate)->isoFormat('D MMMM GGGG') }}
-            </div>
+            </p>
         </div>
 
         {{-- Summary Cards --}}
-        <div class="fr-card-grid no-print">
-            <div class="fr-card">
-                <div class="fr-card-label">&#128200; Pendapatan Usaha</div>
-                <div class="fr-card-value green">Rp {{ number_format($data['revenue'], 0, ',', '.') }}</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5 no-print">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Pendapatan Usaha</span>
+                <div class="text-lg sm:text-xl font-black font-mono tracking-tight text-[#15803d] mt-1">
+                    Rp {{ number_format($data['revenue'], 0, ',', '.') }}
+                </div>
+                <span class="text-[10px] text-gray-400 mt-1">Total penjualan kotor/bersih</span>
             </div>
-            <div class="fr-card">
-                <div class="fr-card-label">&#128722; Laba Kotor</div>
-                <div class="fr-card-value {{ $data['gross_profit'] >= 0 ? 'blue' : 'red' }}">
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Laba Kotor</span>
+                <div
+                    class="text-lg sm:text-xl font-black font-mono tracking-tight {{ $data['gross_profit'] >= 0 ? 'text-blue-700' : 'text-rose-600' }} mt-1">
                     Rp {{ number_format($data['gross_profit'], 0, ',', '.') }}
                 </div>
+                <span class="text-[10px] text-gray-400 mt-1">Penjualan dikurangi HPP</span>
             </div>
-            <div class="fr-card">
-                <div class="fr-card-label">&#128201; Laba Usaha (EBIT)</div>
-                <div class="fr-card-value {{ $data['operating_profit'] >= 0 ? 'blue' : 'red' }}">
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Laba Usaha (EBIT)</span>
+                <div
+                    class="text-lg sm:text-xl font-black font-mono tracking-tight {{ $data['operating_profit'] >= 0 ? 'text-blue-700' : 'text-rose-600' }} mt-1">
                     Rp {{ number_format($data['operating_profit'], 0, ',', '.') }}
                 </div>
+                <span class="text-[10px] text-gray-400 mt-1">Laba kotor dikurangi biaya operasional</span>
             </div>
-            <div class="fr-card">
-                <div class="fr-card-label">&#127381; Laba Bersih</div>
-                <div class="fr-card-value {{ $data['net_profit'] >= 0 ? 'green' : 'red' }}">
+
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Laba Bersih</span>
+                <div
+                    class="text-lg sm:text-xl font-black font-mono tracking-tight {{ $data['net_profit'] >= 0 ? 'text-[#15803d]' : 'text-rose-600' }} mt-1">
                     Rp {{ number_format($data['net_profit'], 0, ',', '.') }}
                 </div>
+                <span class="text-[10px] text-gray-400 mt-1">Hasil akhir setelah pajak</span>
             </div>
         </div>
 
-        <div class="fr-body">
+        {{-- Financial Statement Breakdown Body --}}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+
             {{-- 1. Pendapatan Usaha --}}
-            <div class="fr-sec income">&#127808; PENDAPATAN USAHA (PENJUALAN)</div>
-            <div class="fr-line">
-                <span class="fr-line-label">Penjualan Bersih</span>
-                <span class="fr-line-amount">Rp {{ number_format($data['revenue'], 0, ',', '.') }}</span>
+            <div
+                class="bg-gray-50 border-b border-gray-200 px-6 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                <span>1. Pendapatan Usaha (Penjualan)</span>
             </div>
-            <div class="fr-result gross">
-                <span class="fr-result-label">&#128176; PENDAPATAN USAHA</span>
-                <span class="fr-result-amount">Rp {{ number_format($data['revenue'], 0, ',', '.') }}</span>
+            <div class="divide-y divide-gray-100 text-xs">
+                <div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50/60 transition-colors">
+                    <span class="text-gray-700 font-medium">Penjualan Bersih</span>
+                    <span class="font-mono font-semibold text-gray-900">Rp
+                        {{ number_format($data['revenue'], 0, ',', '.') }}</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3 bg-emerald-50/50 font-bold">
+                    <span class="text-emerald-950 uppercase tracking-wider text-[11px]">Subtotal Pendapatan Usaha</span>
+                    <span class="font-mono text-emerald-800 text-sm">Rp
+                        {{ number_format($data['revenue'], 0, ',', '.') }}</span>
+                </div>
             </div>
 
             {{-- 2. HPP --}}
-            <div class="fr-sec cost">&#128722; HARGA POKOK PENJUALAN (HPP)</div>
-            @php $cogs = $data['revenue'] - $data['gross_profit']; @endphp
-            <div class="fr-line">
-                <span class="fr-line-label">Beban Pokok Penjualan</span>
-                <span class="fr-line-amount neg">(Rp {{ number_format($cogs, 0, ',', '.') }})</span>
+            <div
+                class="bg-gray-50 border-y border-gray-200 px-6 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+                <span>2. Harga Pokok Penjualan (HPP)</span>
             </div>
-            <div class="fr-result gross">
-                <span class="fr-result-label">&#127800; LABA KOTOR</span>
-                <span class="fr-result-amount" style="{{ $data['gross_profit'] < 0 ? 'color:#dc2626' : '' }}">
-                    @if($data['gross_profit'] < 0)(Rp {{ number_format(abs($data['gross_profit']), 0, ',', '.') }})
-                    @else Rp {{ number_format($data['gross_profit'], 0, ',', '.') }}@endif
-                </span>
+            @php $cogs = $data['revenue'] - $data['gross_profit']; @endphp
+            <div class="divide-y divide-gray-100 text-xs">
+                <div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50/60 transition-colors">
+                    <span class="text-gray-700 font-medium">Beban Pokok Penjualan</span>
+                    <span class="font-mono font-semibold text-rose-600">(Rp
+                        {{ number_format($cogs, 0, ',', '.') }})</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3 bg-blue-50/60 font-bold">
+                    <span class="text-blue-950 uppercase tracking-wider text-[11px]">Laba Kotor (Gross Profit)</span>
+                    <span
+                        class="font-mono text-sm {{ $data['gross_profit'] < 0 ? 'text-rose-600' : 'text-blue-800' }}">
+                        @if ($data['gross_profit'] < 0)
+                            (Rp {{ number_format(abs($data['gross_profit']), 0, ',', '.') }})
+                        @else
+                            Rp {{ number_format($data['gross_profit'], 0, ',', '.') }}
+                        @endif
+                    </span>
+                </div>
             </div>
 
             {{-- 3. Beban Operasional --}}
-            <div class="fr-sec expense">&#128203; BEBAN OPERASIONAL</div>
+            <div
+                class="bg-gray-50 border-y border-gray-200 px-6 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                <span>3. Beban Operasional</span>
+            </div>
             @php $totalOpEx = max(0, $data['gross_profit'] - $data['operating_profit']); @endphp
-            <div class="fr-line">
-                <span class="fr-line-label">Total Beban Operasional</span>
-                <span class="fr-line-amount neg">(Rp {{ number_format($totalOpEx, 0, ',', '.') }})</span>
-            </div>
-            <div class="fr-result operating">
-                <span class="fr-result-label">&#128201; LABA USAHA (EBIT)</span>
-                <span class="fr-result-amount" style="{{ $data['operating_profit'] < 0 ? 'color:#dc2626' : '' }}">
-                    @if($data['operating_profit'] < 0)(Rp {{ number_format(abs($data['operating_profit']), 0, ',', '.') }})
-                    @else Rp {{ number_format($data['operating_profit'], 0, ',', '.') }}@endif
-                </span>
-            </div>
-
-            {{-- 4. Pendapatan/Beban Lain --}}
-            <div class="fr-sec other">&#128257; PENDAPATAN / BEBAN LAIN-LAIN</div>
-            @if($data['other_net'] > 0)
-            <div class="fr-line indent">
-                <span class="fr-line-label">&#43; Pendapatan Lain-lain</span>
-                <span class="fr-line-amount">Rp {{ number_format($data['other_net'], 0, ',', '.') }}</span>
-            </div>
-            @elseif($data['other_net'] < 0)
-            <div class="fr-line indent">
-                <span class="fr-line-label">&#8722; Beban Bunga &amp; Lain-lain</span>
-                <span class="fr-line-amount neg">(Rp {{ number_format(abs($data['other_net']), 0, ',', '.') }})</span>
-            </div>
-            @else
-            <div class="fr-line indent">
-                <span class="fr-line-label">Pendapatan / Beban Lain-lain</span>
-                <span class="fr-line-amount">Rp 0</span>
-            </div>
-            @endif
-            <div class="fr-result before-tax">
-                <span class="fr-result-label">&#128178; LABA SEBELUM PAJAK</span>
-                <span class="fr-result-amount" style="{{ $data['profit_before_tax'] < 0 ? 'color:#dc2626' : '' }}">
-                    @if($data['profit_before_tax'] < 0)(Rp {{ number_format(abs($data['profit_before_tax']), 0, ',', '.') }})
-                    @else Rp {{ number_format($data['profit_before_tax'], 0, ',', '.') }}@endif
-                </span>
+            <div class="divide-y divide-gray-100 text-xs">
+                <div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50/60 transition-colors">
+                    <span class="text-gray-700 font-medium">Total Beban Operasional</span>
+                    <span class="font-mono font-semibold text-rose-600">(Rp
+                        {{ number_format($totalOpEx, 0, ',', '.') }})</span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3 bg-blue-50/60 font-bold">
+                    <span class="text-blue-950 uppercase tracking-wider text-[11px]">Laba Usaha (Operating Profit /
+                        EBIT)</span>
+                    <span
+                        class="font-mono text-sm {{ $data['operating_profit'] < 0 ? 'text-rose-600' : 'text-blue-800' }}">
+                        @if ($data['operating_profit'] < 0)
+                            (Rp {{ number_format(abs($data['operating_profit']), 0, ',', '.') }})
+                        @else
+                            Rp {{ number_format($data['operating_profit'], 0, ',', '.') }}
+                        @endif
+                    </span>
+                </div>
             </div>
 
-            {{-- 5. Pajak --}}
-            <div class="fr-sec tax">&#128196; BEBAN PAJAK PENGHASILAN</div>
-            <div class="fr-line indent">
-                <span class="fr-line-label">&#8722; Pajak Penghasilan (PPh)</span>
-                <span class="fr-line-amount neg">(Rp {{ number_format($data['tax'], 0, ',', '.') }})</span>
+            {{-- 4. Pendapatan / Beban Lain-lain --}}
+            <div
+                class="bg-gray-50 border-y border-gray-200 px-6 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
+                <span>4. Pendapatan / (Beban) Lain-lain</span>
+            </div>
+            <div class="divide-y divide-gray-100 text-xs">
+                <div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50/60 transition-colors">
+                    <span class="text-gray-700 font-medium">
+                        @if ($data['other_net'] > 0)
+                            + Pendapatan Lain-lain
+                        @elseif($data['other_net'] < 0)
+                            - Beban Bunga &amp; Lain-lain
+                        @else
+                            Pendapatan / Beban Lain-lain
+                        @endif
+                    </span>
+                    <span
+                        class="font-mono font-semibold {{ $data['other_net'] < 0 ? 'text-rose-600' : 'text-gray-900' }}">
+                        @if ($data['other_net'] < 0)
+                            (Rp {{ number_format(abs($data['other_net']), 0, ',', '.') }})
+                        @else
+                            Rp {{ number_format($data['other_net'], 0, ',', '.') }}
+                        @endif
+                    </span>
+                </div>
+                <div class="flex items-center justify-between px-6 py-3 bg-amber-50/60 font-bold">
+                    <span class="text-amber-950 uppercase tracking-wider text-[11px]">Laba Sebelum Pajak (EBT)</span>
+                    <span
+                        class="font-mono text-sm {{ $data['profit_before_tax'] < 0 ? 'text-rose-600' : 'text-amber-800' }}">
+                        @if ($data['profit_before_tax'] < 0)
+                            (Rp {{ number_format(abs($data['profit_before_tax']), 0, ',', '.') }})
+                        @else
+                            Rp {{ number_format($data['profit_before_tax'], 0, ',', '.') }}
+                        @endif
+                    </span>
+                </div>
             </div>
 
-            {{-- Laba Bersih --}}
-            <div class="fr-result net {{ $data['net_profit'] < 0 ? 'loss' : '' }}">
-                <span class="fr-result-label" style="font-size:1.1rem;">
-                    {!! $data['net_profit'] >= 0 ? '&#127881; LABA BERSIH (Net Income)' : '&#128577; RUGI BERSIH (Net Loss)' !!}
-                </span>
-                <span class="fr-result-amount" style="font-size:1.1rem;">
-                    @if($data['net_profit'] < 0)(Rp {{ number_format(abs($data['net_profit']), 0, ',', '.') }})
-                    @else Rp {{ number_format($data['net_profit'], 0, ',', '.') }}@endif
-                </span>
+            {{-- 5. Beban Pajak Penghasilan --}}
+            <div
+                class="bg-gray-50 border-y border-gray-200 px-6 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-purple-600"></span>
+                <span>5. Beban Pajak Penghasilan</span>
+            </div>
+            <div class="divide-y divide-gray-100 text-xs">
+                <div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50/60 transition-colors">
+                    <span class="text-gray-700 font-medium">- Pajak Penghasilan (PPh)</span>
+                    <span class="font-mono font-semibold text-rose-600">(Rp
+                        {{ number_format($data['tax'], 0, ',', '.') }})</span>
+                </div>
+            </div>
+
+            {{-- Hasil Akhir: Laba / Rugi Bersih --}}
+            <div
+                class="p-6 {{ $data['net_profit'] >= 0 ? 'bg-emerald-700 text-white' : 'bg-rose-700 text-white' }} flex items-center justify-between">
+                <div>
+                    <span class="text-xs uppercase font-bold tracking-wider opacity-90 block">Hasil Akhir
+                        Periode</span>
+                    <h3 class="text-base sm:text-lg font-black tracking-tight mt-0.5">
+                        {{ $data['net_profit'] >= 0 ? 'LABA BERSIH (Net Income)' : 'RUGI BERSIH (Net Loss)' }}
+                    </h3>
+                </div>
+                <div class="text-right">
+                    <span class="font-mono text-xl sm:text-2xl font-black">
+                        @if ($data['net_profit'] < 0)
+                            (Rp {{ number_format(abs($data['net_profit']), 0, ',', '.') }})
+                        @else
+                            Rp {{ number_format($data['net_profit'], 0, ',', '.') }}
+                        @endif
+                    </span>
+                </div>
             </div>
         </div>
 
-        <div class="fr-notes no-print">
-            <div class="fr-notes-title">&#128161; Rumus Penting:</div>
-            <ul style="list-style:disc;padding-left:1.2rem;margin-top:.25rem;line-height:1.8;font-size:.875rem;">
-                <li>Laba Kotor = Penjualan &minus; HPP</li>
-                <li>Laba Usaha = Laba Kotor &minus; Beban Operasional</li>
-                <li>Laba Bersih = Laba Sebelum Pajak &minus; Pajak</li>
-            </ul>
+        {{-- Notes & Formula Footnote --}}
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4.5 text-xs text-gray-600 no-print">
+            <h4 class="font-bold text-gray-900 uppercase tracking-wider text-[11px] mb-1.5">Standar Akuntansi
+                Perhitungan:</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div class="p-2.5 rounded-lg bg-white border border-gray-200/80">
+                    <span class="font-semibold text-gray-800 block">Laba Kotor</span>
+                    <span class="text-gray-500 font-mono text-[11px]">Penjualan Bersih - HPP</span>
+                </div>
+                <div class="p-2.5 rounded-lg bg-white border border-gray-200/80">
+                    <span class="font-semibold text-gray-800 block">Laba Usaha (EBIT)</span>
+                    <span class="text-gray-500 font-mono text-[11px]">Laba Kotor - Beban Operasional</span>
+                </div>
+                <div class="p-2.5 rounded-lg bg-white border border-gray-200/80">
+                    <span class="font-semibold text-gray-800 block">Laba Bersih</span>
+                    <span class="text-gray-500 font-mono text-[11px]">Laba Sebelum Pajak - Pajak PPh</span>
+                </div>
+            </div>
         </div>
-    </div>
+
+    </main>
+
 </body>
+
 </html>

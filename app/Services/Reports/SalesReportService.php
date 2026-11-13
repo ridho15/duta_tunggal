@@ -668,11 +668,19 @@ class SalesReportService
 
         if ($mode === self::MODE_ORDER) {
             $orders = $this->orders($filters, $user);
+            $summary = $this->summary($orders);
 
             return [
                 'mode' => $mode,
                 'rows' => $this->pdfRowsFromOrders($orders),
-                'summary' => $this->summary($orders),
+                'summary' => $summary,
+                'summary_lines' => [
+                    'Total Pesanan' => (string) $summary['total_orders'] . ' SO',
+                    'Total Kuantitas' => $this->number($summary['total_quantity']) . ' pcs',
+                    'Total DPP' => MoneyHelper::rupiah($summary['total_dpp']),
+                    'Total Nilai Order' => MoneyHelper::rupiah($summary['total_amount']),
+                    'Produk Dipesan' => (string) $summary['unique_products'] . ' SKU',
+                ],
             ];
         }
 

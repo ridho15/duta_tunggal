@@ -56,9 +56,11 @@
             @endif
 
             @if(in_array($saleOrder->status, ['draft', 'request_approve']))
-                <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors">
+                @can('reject', $saleOrder)
+                <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer">
                     Tolak SO
                 </button>
+                @endcan
             @endif
         </div>
     </div>

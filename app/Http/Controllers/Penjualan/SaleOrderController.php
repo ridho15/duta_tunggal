@@ -8,7 +8,6 @@ use App\Http\Controllers\HelperController;
 use App\Models\Cabang;
 use App\Models\Currency;
 use App\Models\Customer;
-use App\Support\CustomerPicker;
 use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -22,23 +21,26 @@ use App\Services\SaleOrderCashierVerification;
 use App\Services\SaleOrderDeliveryProgress;
 use App\Services\SalesOrderService;
 use App\Support\CurrencyConversionResolver;
+use App\Support\CustomerPicker;
 use App\Support\ProductPriceLimitation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class SaleOrderController extends Controller
 {
     protected SalesOrderService $salesOrderService;
+
     protected CreditValidationService $creditValidationService;
+
     protected ApprovalControlService $approvalControlService;
+
     protected SaleOrderDeliveryProgress $deliveryProgressService;
+
     protected SaleOrderCashierVerification $cashierVerificationService;
 
     public function __construct(
@@ -71,7 +73,7 @@ class SaleOrderController extends Controller
 
         // Base query with cabang scoping
         $baseQuery = SaleOrder::query();
-        if (!$canAccessAll && $cabangId) {
+        if (! $canAccessAll && $cabangId) {
             $baseQuery->where('cabang_id', $cabangId);
         }
 
@@ -82,7 +84,7 @@ class SaleOrderController extends Controller
                     ->orWhere(function ($sub) {
                         $sub->whereIn('status', ['approved', 'confirmed', 'partially_delivered'])
                             ->whereHas('saleOrderItem', function ($items) {
-                                $items->whereRaw(SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items') . ' > 0');
+                                $items->whereRaw(SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items').' > 0');
                             });
                     });
             })->count(),
@@ -106,7 +108,7 @@ class SaleOrderController extends Controller
                     ->orWhere(function ($sub) {
                         $sub->whereIn('status', ['approved', 'confirmed', 'partially_delivered'])
                             ->whereHas('saleOrderItem', function ($items) {
-                                $items->whereRaw(SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items') . ' > 0');
+                                $items->whereRaw(SaleOrderDeliveryProgress::availableQuantitySql('sale_order_items').' > 0');
                             });
                     });
             }),
@@ -175,7 +177,7 @@ class SaleOrderController extends Controller
         $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
 
         $cabangs = Cabang::query()
-            ->when(!$canAccessAll && $user?->cabang_id, fn ($q) => $q->where('id', $user->cabang_id))
+            ->when(! $canAccessAll && $user?->cabang_id, fn ($q) => $q->where('id', $user->cabang_id))
             ->orderBy('kode')
             ->get(['id', 'kode', 'nama']);
 
@@ -194,7 +196,6 @@ class SaleOrderController extends Controller
         $prefillCustomerId = old('customer_id')
             ?: ($selectedQuotationId ? Quotation::whereKey($selectedQuotationId)->value('customer_id') : $copyFrom?->customer_id);
         $customers = \App\Support\CustomerPicker::prefill([$prefillCustomerId]);
-
 
         $prefillIds = collect(old('items', []))->pluck('product_id')
             ->merge($selectedQuotationId ? QuotationItem::where('quotation_id', $selectedQuotationId)->pluck('product_id') : [])
@@ -425,7 +426,7 @@ class SaleOrderController extends Controller
         // Validasi Limit Kredit jika Customer bertipe Kredit
         if ($customer->tipe_pembayaran === 'Kredit') {
             $creditCheck = $this->creditValidationService->canCustomerMakePurchase($customer, (float) $grandTotalIdr);
-            if (!$creditCheck['can_purchase']) {
+            if (! $creditCheck['can_purchase']) {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['customer_id' => implode(' ', $creditCheck['messages'])]);
@@ -551,25 +552,25 @@ class SaleOrderController extends Controller
                 'done' => true,
                 'active' => false,
                 'title' => 'SO dibuat',
-                'info' => $saleOrder->order_date ? $saleOrder->order_date->format('d M') . ' · ' . ($saleOrder->createdBy->name ?? 'Sales') : '-',
+                'info' => $saleOrder->order_date ? $saleOrder->order_date->format('d M').' · '.($saleOrder->createdBy->name ?? 'Sales') : '-',
             ],
             'approved' => [
                 'done' => $isSoApproved,
                 'active' => $saleOrder->status === 'request_approve',
-                'title' => 'Diapprove ' . ($saleOrder->cashier_approved_at ? 'kasir' : 'atasan'),
+                'title' => 'Diapprove '.($saleOrder->cashier_approved_at ? 'kasir' : 'atasan'),
                 'info' => $isSoApproved
-                    ? ($saleOrder->approve_at ? $saleOrder->approve_at->format('d M') . ' · ' . ($saleOrder->approveBy->name ?? 'Approver') : 'Disetujui')
+                    ? ($saleOrder->approve_at ? $saleOrder->approve_at->format('d M').' · '.($saleOrder->approveBy->name ?? 'Approver') : 'Disetujui')
                     : ($saleOrder->status === 'request_approve' ? 'Menunggu persetujuan' : 'Belum diapprove'),
             ],
             'do' => [
                 'done' => $isDoAllDone,
-                'active' => $isSoApproved && !$isDoAllDone,
+                'active' => $isSoApproved && ! $isDoAllDone,
                 'title' => 'DO',
-                'info' => round($totals['ordered'] - $totals['available']) . ' dari ' . round($totals['ordered']) . ' pcs',
+                'info' => round($totals['ordered'] - $totals['available']).' dari '.round($totals['ordered']).' pcs',
             ],
             'sent' => [
                 'done' => $isDoAllSent,
-                'active' => $hasDoSent && !$isDoAllSent,
+                'active' => $hasDoSent && ! $isDoAllSent,
                 'title' => 'Dikirim gudang',
                 'info' => $hasDoSent ? 'Dalam proses kirim' : 'Menunggu DO siap',
             ],
@@ -615,7 +616,7 @@ class SaleOrderController extends Controller
                 'action_url' => route('penjualan.do.create', ['so_id' => $saleOrder->id]),
                 'can_action' => true,
             ];
-        } elseif ($dos->isNotEmpty() && !$hasSj) {
+        } elseif ($dos->isNotEmpty() && ! $hasSj) {
             $nextStep = [
                 'title' => 'Terbitkan Surat Jalan',
                 'description' => 'DO sedang diproses oleh gudang. Buat Surat Jalan setelah pengiriman siap.',
@@ -643,16 +644,23 @@ class SaleOrderController extends Controller
     {
         $user = Auth::user();
 
+        // Guard status: hanya SO draft atau request_approve yang dapat disetujui
+        if (! in_array($saleOrder->status, ['draft', 'request_approve'], true)) {
+            $statusLabel = $saleOrder->status_label ?? $saleOrder->status;
+
+            return redirect()->back()->with('error', "Sales Order {$saleOrder->so_number} berstatus \"{$statusLabel}\" sehingga tidak dapat disetujui kembali.");
+        }
+
         // Validasi wewenang via ApprovalControlService
         $check = $this->approvalControlService->canApproveSaleOrder($user, $saleOrder);
-        if (!$check['allowed']) {
+        if (! $check['allowed']) {
             return redirect()->back()->with('error', $check['reason'] ?? 'Anda tidak berwenang menyetujui SO ini.');
         }
 
         try {
             DB::transaction(function () use ($saleOrder, $user, $request) {
                 // Jika tipe COD, verifikasi Kasir dengan Saldo Titip Customer
-                if ($saleOrder->isCod() && !$saleOrder->isCashierApproved()) {
+                if ($saleOrder->isCod() && ! $saleOrder->isCashierApproved()) {
                     $this->cashierVerificationService->verify(
                         $saleOrder,
                         $request->input('notes'),
@@ -680,9 +688,10 @@ class SaleOrderController extends Controller
             return redirect()->back()->with('success', "Sales Order {$saleOrder->so_number} berhasil disetujui.");
         } catch (ValidationException $e) {
             $errMsg = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+
             return redirect()->back()->with('error', $errMsg);
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', 'Gagal menyetujui Sales Order: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal menyetujui Sales Order: '.$e->getMessage());
         }
     }
 
@@ -691,20 +700,48 @@ class SaleOrderController extends Controller
      */
     public function reject(Request $request, SaleOrder $saleOrder): RedirectResponse
     {
+        $user = Auth::user();
+
+        // 1. Otorisasi Cabang & Wewenang
+        if (! $user || ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return redirect()->back()->with('error', 'Anda tidak memiliki hak akses untuk cabang Sales Order ini.');
+        }
+
+        if (! $user->hasAnyPermission(['response sales order', 'update sales order'])) {
+            return redirect()->back()->with('error', 'Anda tidak memiliki wewenang untuk menolak Sales Order ini.');
+        }
+
+        // 2. Guard Status Transaksi: Hanya Draf atau Menunggu Approve yang boleh ditolak
+        if (! in_array($saleOrder->status, ['draft', 'request_approve'], true)) {
+            $statusLabel = $saleOrder->status_label ?? $saleOrder->status;
+
+            return redirect()->back()->with('error', "Sales Order {$saleOrder->so_number} berstatus \"{$statusLabel}\" dan tidak dapat ditolak.");
+        }
+
         $request->validate([
             'reason' => 'required|string|min:5|max:500',
         ], [
             'reason.required' => 'Alasan penolakan wajib diisi.',
             'reason.min' => 'Alasan penolakan minimal 5 karakter.',
+            'reason.max' => 'Alasan penolakan maksimal 500 karakter.',
         ]);
 
-        $saleOrder->update([
-            'status' => 'reject',
-            'reject_at' => now(),
-            'reject_by' => Auth::id(),
-            'notes' => ($saleOrder->notes ? $saleOrder->notes . "\n" : '') . "[Ditolak]: " . $request->input('reason'),
-        ]);
+        try {
+            DB::transaction(function () use ($saleOrder, $request, $user) {
+                $reason = trim((string) $request->input('reason'));
+                $notePrefix = '[Ditolak: '.now()->format('d/m/Y H:i')." oleh {$user->name}]: ";
 
-        return redirect()->back()->with('warning', "Sales Order {$saleOrder->so_number} telah ditolak dengan alasan: " . $request->input('reason'));
+                $saleOrder->update([
+                    'status' => 'reject',
+                    'reject_at' => now(),
+                    'reject_by' => $user->id,
+                    'notes' => ($saleOrder->notes ? $saleOrder->notes."\n" : '').$notePrefix.$reason,
+                ]);
+            });
+
+            return redirect()->back()->with('warning', "Sales Order {$saleOrder->so_number} telah ditolak dengan alasan: ".$request->input('reason'));
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Gagal menolak Sales Order: '.$e->getMessage());
+        }
     }
 }

@@ -154,14 +154,40 @@ class DeliveryOrderController extends Controller
     /**
      * Tampilan Form Buat DO Multi-Gudang (Mockup E4_DO-Gudang.html).
      */
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
         $soId = $request->query('so_id');
+        if (! $soId) {
+            return redirect()->route('penjualan.so.index')
+                ->with('error', 'Silakan pilih Sales Order terlebih dahulu untuk membuat Delivery Order.');
+        }
+
         $saleOrder = SaleOrder::with(['customer', 'cabang', 'saleOrderItem.product.uom'])
             ->findOrFail($soId);
 
+        $user = Auth::user();
+        if ($user && ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return redirect()->route('penjualan.so.index')
+                ->with('error', 'Anda tidak memiliki akses ke cabang Sales Order ini.');
+        }
+
+        if (! in_array($saleOrder->status, SaleOrder::DELIVERABLE_STATUSES, true)) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', 'Delivery Order hanya dapat dibuat untuk Sales Order yang telah disetujui (Approved). Status SO saat ini: ' . SaleOrder::statusLabel($saleOrder->status) . '.');
+        }
+
+        if ($saleOrder->isCod() && ! $saleOrder->isCashierApproved()) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', "Sales Order {$saleOrder->so_number} memiliki tipe pembayaran COD dan belum disetujui/diverifikasi oleh Kasir.");
+        }
+
         // Ambil data progres pengiriman per item SO
         $progress = $this->deliveryProgressService->forSaleOrder($saleOrder);
+        if (($progress['totals']['available'] ?? 0) <= 0) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', "Sales Order {$saleOrder->so_number} tidak memiliki sisa kuantitas yang dapat dikirim (seluruhnya sudah terkirim atau sudah dialokasikan ke Delivery Order lain).");
+        }
+
         $itemProgress = $progress['items'];
 
         $pendingItems = [];
@@ -246,13 +272,48 @@ class DeliveryOrderController extends Controller
 
         $saleOrder = SaleOrder::findOrFail($request->input('sale_order_id'));
 
-        // Hitung total kuantitas yang dialokasikan ke gudang
+        $user = Auth::user();
+        if ($user && ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return redirect()->route('penjualan.so.index')
+                ->with('error', 'Anda tidak memiliki akses ke cabang Sales Order ini.');
+        }
+
+        if (! in_array($saleOrder->status, SaleOrder::DELIVERABLE_STATUSES, true)) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', 'Delivery Order hanya dapat dibuat untuk Sales Order yang telah disetujui (Approved). Status SO saat ini: ' . SaleOrder::statusLabel($saleOrder->status) . '.');
+        }
+
+        if ($saleOrder->isCod() && ! $saleOrder->isCashierApproved()) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', "Sales Order {$saleOrder->so_number} memiliki tipe pembayaran COD dan belum disetujui/diverifikasi oleh Kasir.");
+        }
+
+        $progress = $this->deliveryProgressService->forSaleOrder($saleOrder);
+        if (($progress['totals']['available'] ?? 0) <= 0) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', "Sales Order {$saleOrder->so_number} tidak memiliki sisa kuantitas yang dapat dikirim (seluruhnya sudah terkirim atau sudah dialokasikan ke Delivery Order lain).");
+        }
+
+        // Hitung total kuantitas yang dialokasikan ke gudang dan validasi batas kuantitas per item
         $totalAllocatedQty = 0;
         $itemsPayload = $request->input('items');
+        $itemProgress = $progress['items'] ?? [];
 
         foreach ($itemsPayload as $itemData) {
+            $itemId = (int) $itemData['item_id'];
+            $itemAllocated = 0;
             foreach ($itemData['warehouses'] as $whId => $qty) {
+                $itemAllocated += (float) $qty;
                 $totalAllocatedQty += (float) $qty;
+            }
+
+            if ($itemAllocated > 0) {
+                $maxAvailable = isset($itemProgress[$itemId]) ? (float) $itemProgress[$itemId]['available'] : 0.0;
+                if ($itemAllocated > ($maxAvailable + 0.0001)) {
+                    return redirect()->back()
+                        ->withInput()
+                        ->with('error', "Kuantitas alokasi untuk item SO #{$itemId} ({$itemAllocated}) melebihi sisa kuantitas yang tersedia ({$maxAvailable}).");
+                }
             }
         }
 

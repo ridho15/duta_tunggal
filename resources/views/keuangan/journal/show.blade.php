@@ -143,24 +143,151 @@
                 <div>
                     <span class="text-gray-400 block mb-0.5">Asal Dokumen Transaksi</span>
                     @if ($header->source_type)
-                        <div class="font-medium text-gray-900 flex items-center gap-1.5">
-                            <span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
-                            {{ class_basename($header->source_type) }} #{{ $header->source_id }}
-                        </div>
-                        {{-- Link langsung ke modul terkait jika sesuai --}}
                         @php
                             $sourceUrl = null;
+                            $sourceLabel = null;
                             $sourceName = class_basename($header->source_type);
-                            if (str_contains($sourceName, 'PurchaseInvoice') && Route::has('pembelian.invoice.show')) {
-                                $sourceUrl = route('pembelian.invoice.show', $header->source_id);
-                            } elseif (str_contains($sourceName, 'PurchaseOrder') && Route::has('pembelian.po.show')) {
-                                $sourceUrl = route('pembelian.po.show', $header->source_id);
-                            } elseif (str_contains($sourceName, 'CashBank') && Route::has('keuangan.cashbank.show')) {
-                                $sourceUrl = route('keuangan.cashbank.show', $header->source_id);
-                            } elseif (str_contains($sourceName, 'PurchaseReturn') && Route::has('pembelian.retur.show')) {
-                                $sourceUrl = route('pembelian.retur.show', $header->source_id);
+                            $src = $header->source ?? null;
+
+                            // Ambil kode / nomor dokumen representatif jika tersedia di model sumber
+                            $docNumber = $src?->invoice_number 
+                                ?? $src?->po_number 
+                                ?? $src?->so_number 
+                                ?? $src?->do_number 
+                                ?? $src?->sj_number 
+                                ?? $src?->receipt_number 
+                                ?? $src?->return_number 
+                                ?? $src?->credit_note_number 
+                                ?? $src?->transaction_number 
+                                ?? $src?->transfer_number 
+                                ?? $src?->opname_number 
+                                ?? $src?->adjustment_number 
+                                ?? $src?->asset_code 
+                                ?? null;
+
+                            // 1. Modul Pembelian
+                            if (str_contains($sourceName, 'PurchaseInvoice') || ($sourceName === 'Invoice' && ($src?->supplier_id || !empty($src?->purchase_receipts) || !empty($src?->purchase_order_ids) || ($src?->from_model_type ?? '') === \App\Models\PurchaseOrder::class))) {
+                                if (Route::has('pembelian.invoices.show')) {
+                                    $sourceUrl = route('pembelian.invoices.show', $header->source_id);
+                                    $sourceLabel = 'Faktur Pembelian';
+                                }
+                            } elseif ($sourceName === 'PurchaseOrder') {
+                                if (Route::has('pembelian.po.show')) {
+                                    $sourceUrl = route('pembelian.po.show', $header->source_id);
+                                    $sourceLabel = 'Pesanan Pembelian (PO)';
+                                }
+                            } elseif ($sourceName === 'PurchaseReceipt' || $sourceName === 'PurchaseReceiptItem') {
+                                $receiptId = $sourceName === 'PurchaseReceiptItem' ? ($src?->purchase_receipt_id ?? $header->source_id) : $header->source_id;
+                                if (Route::has('pembelian.receipts.show')) {
+                                    $sourceUrl = route('pembelian.receipts.show', $receiptId);
+                                    $sourceLabel = 'Penerimaan Pembelian (GRN)';
+                                }
+                            } elseif ($sourceName === 'PurchaseReturn') {
+                                if (Route::has('pembelian.returns.show')) {
+                                    $sourceUrl = route('pembelian.returns.show', $header->source_id);
+                                    $sourceLabel = 'Retur Pembelian';
+                                }
+                            } elseif ($sourceName === 'VendorPayment') {
+                                if (Route::has('pembelian.payments.show')) {
+                                    $sourceUrl = route('pembelian.payments.show', $header->source_id);
+                                    $sourceLabel = 'Pembayaran Vendor';
+                                }
+                            } elseif ($sourceName === 'OrderRequest') {
+                                if (Route::has('pembelian.or.show')) {
+                                    $sourceUrl = route('pembelian.or.show', $header->source_id);
+                                    $sourceLabel = 'Permintaan Pembelian (OR)';
+                                }
+
+                            // 2. Modul Penjualan
+                            } elseif (str_contains($sourceName, 'SalesInvoice') || ($sourceName === 'Invoice' && (!$src || $src->customer_name || !empty($src->delivery_orders) || !empty($src->surat_jalan_ids) || ($src->from_model_type ?? '') === \App\Models\SaleOrder::class || ($src->from_model_type ?? '') === \App\Models\SuratJalan::class || ($src->from_model_type ?? '') === \App\Models\DeliveryOrder::class))) {
+                                if (Route::has('penjualan.invoices.show')) {
+                                    $sourceUrl = route('penjualan.invoices.show', $header->source_id);
+                                    $sourceLabel = 'Faktur Penjualan';
+                                }
+                            } elseif ($sourceName === 'SaleOrder') {
+                                if (Route::has('penjualan.so.show')) {
+                                    $sourceUrl = route('penjualan.so.show', $header->source_id);
+                                    $sourceLabel = 'Pesanan Penjualan (SO)';
+                                }
+                            } elseif ($sourceName === 'DeliveryOrder') {
+                                if (Route::has('penjualan.do.show')) {
+                                    $sourceUrl = route('penjualan.do.show', $header->source_id);
+                                    $sourceLabel = 'Delivery Order (DO)';
+                                }
+                            } elseif ($sourceName === 'SuratJalan') {
+                                if (Route::has('penjualan.sj.show')) {
+                                    $sourceUrl = route('penjualan.sj.show', $header->source_id);
+                                    $sourceLabel = 'Surat Jalan';
+                                }
+                            } elseif ($sourceName === 'CustomerReceipt') {
+                                if (Route::has('penjualan.receipts.show')) {
+                                    $sourceUrl = route('penjualan.receipts.show', $header->source_id);
+                                    $sourceLabel = 'Penerimaan Piutang';
+                                }
+                            } elseif ($sourceName === 'CreditNote') {
+                                if (Route::has('penjualan.credit-notes.show')) {
+                                    $sourceUrl = route('penjualan.credit-notes.show', $header->source_id);
+                                    $sourceLabel = 'Nota Kredit Penjualan';
+                                }
+                            } elseif ($sourceName === 'ReturnProduct' || $sourceName === 'CustomerReturn') {
+                                if (Route::has('penjualan.returns.show')) {
+                                    $sourceUrl = route('penjualan.returns.show', $header->source_id);
+                                    $sourceLabel = 'Retur Penjualan';
+                                }
+
+                            // 3. Modul Keuangan & Kas Bank
+                            } elseif ($sourceName === 'CashBankTransfer') {
+                                if (Route::has('keuangan.cashbank.transfer.show')) {
+                                    $sourceUrl = route('keuangan.cashbank.transfer.show', $header->source_id);
+                                    $sourceLabel = 'Transfer Kas & Bank';
+                                } elseif (Route::has('keuangan.cashbank.show')) {
+                                    $sourceUrl = route('keuangan.cashbank.show', $header->source_id);
+                                    $sourceLabel = 'Kas & Bank';
+                                }
+                            } elseif ($sourceName === 'CashBank' || str_contains($sourceName, 'CashBank')) {
+                                if (Route::has('keuangan.cashbank.show')) {
+                                    $sourceUrl = route('keuangan.cashbank.show', $header->source_id);
+                                    $sourceLabel = 'Transaksi Kas & Bank';
+                                }
+                            } elseif ($sourceName === 'Asset') {
+                                if (Route::has('keuangan.asset.show')) {
+                                    $sourceUrl = route('keuangan.asset.show', $header->source_id);
+                                    $sourceLabel = 'Aset Tetap';
+                                }
+                            } elseif ($sourceName === 'AssetDisposal') {
+                                if (Route::has('keuangan.asset.disposal.show')) {
+                                    $sourceUrl = route('keuangan.asset.disposal.show', $header->source_id);
+                                    $sourceLabel = 'Disposal Aset';
+                                }
+                            } elseif ($sourceName === 'AssetTransfer') {
+                                if (Route::has('keuangan.asset.transfer.show')) {
+                                    $sourceUrl = route('keuangan.asset.transfer.show', $header->source_id);
+                                    $sourceLabel = 'Transfer Aset';
+                                }
+
+                            // 4. Modul Gudang & Manufaktur
+                            } elseif ($sourceName === 'StockOpname') {
+                                if (Route::has('gudang.opname.show')) {
+                                    $sourceUrl = route('gudang.opname.show', $header->source_id);
+                                    $sourceLabel = 'Stock Opname';
+                                }
+                            } elseif ($sourceName === 'StockAdjustment') {
+                                if (Route::has('gudang.adjustment.show')) {
+                                    $sourceUrl = route('gudang.adjustment.show', $header->source_id);
+                                    $sourceLabel = 'Penyesuaian Stok';
+                                }
+                            } elseif ($sourceName === 'Production') {
+                                if (Route::has('manufaktur.production.show')) {
+                                    $sourceUrl = route('manufaktur.production.show', $header->source_id);
+                                    $sourceLabel = 'Produksi Manufaktur';
+                                }
                             }
                         @endphp
+                        <div class="font-medium text-gray-900 flex items-center gap-1.5">
+                            <span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span>{{ $sourceLabel ?? $sourceName }}</span>
+                            <span class="text-gray-500 font-normal">({{ $docNumber ?: '#' . $header->source_id }})</span>
+                        </div>
                         @if ($sourceUrl)
                             <a href="{{ $sourceUrl }}" class="inline-flex items-center gap-1 text-[#15803d] hover:underline font-semibold mt-1">
                                 Buka Dokumen Sumber &rarr;
