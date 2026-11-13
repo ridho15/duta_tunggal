@@ -357,6 +357,9 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/kiriman/{deliveryOrder}/edit-qty', [\App\Http\Controllers\Gudang\KirimanController::class, 'editQty'])->name('kiriman.editQty');
         Route::get('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'retur'])->name('kiriman.retur');
         Route::post('/kiriman/{deliveryOrder}/retur', [\App\Http\Controllers\Gudang\KirimanController::class, 'submitRetur'])->name('kiriman.submitRetur');
+        Route::get('/retur-do', [\App\Http\Controllers\Gudang\DoReturnApprovalController::class, 'index'])->name('retur-do.index');
+        Route::post('/retur-do/{returnProduct}/approve', [\App\Http\Controllers\Gudang\DoReturnApprovalController::class, 'approve'])->name('retur-do.approve');
+        Route::post('/retur-do/{returnProduct}/reject', [\App\Http\Controllers\Gudang\DoReturnApprovalController::class, 'reject'])->name('retur-do.reject');
         // Penerimaan Barang (Goods Receipt / Surat Jalan Masuk)
         Route::get('/penerimaan', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'index'])->name('penerimaan.index');
         Route::get('/penerimaan/create', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'create'])->name('penerimaan.create');
