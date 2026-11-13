@@ -28,7 +28,9 @@ class DeliveryOrderShortageReturn
 
         $existing = $this->existing($deliveryOrder);
         if ($existing) {
-            return "Retur {$existing->return_number} untuk DO ini sudah ada (status ".($existing->status === 'draft' ? 'menunggu persetujuan' : 'sudah diproses').').';
+            return "Retur {$existing->return_number} untuk DO ini sudah ada (status ".($existing->status === 'draft'
+                ? 'menunggu persetujuan). Minta kepala gudang menyetujui atau menolaknya di menu Gudang → Persetujuan Retur DO.'
+                : 'sudah diproses).');
         }
 
         return null;
@@ -38,6 +40,7 @@ class DeliveryOrderShortageReturn
     {
         return ReturnProduct::where('from_model_type', DeliveryOrder::class)
             ->where('from_model_id', $deliveryOrder->getKey())
+            ->where('status', '!=', 'rejected')   // retur yang ditolak tidak menghalangi pencatatan ulang
             ->first();
     }
 
