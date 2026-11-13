@@ -205,6 +205,23 @@
                     </a>
                 @endif
 
+                @if ($canSee(['OWN', 'GDG']))
+                    @php
+                        $pendingDoReturns = \App\Models\ReturnProduct::query()
+                            ->where('from_model_type', \App\Models\DeliveryOrder::class)->where('status', 'draft')->count();
+                    @endphp
+                    <a href="{{ route('gudang.retur-do.index') }}" class="{{ $itemClass(request()->is('gudang/retur-do*')) }}">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 14 4 9l5-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <path d="M4 9h11a5 5 0 0 1 0 10h-3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                        <span class="flex-1">Persetujuan Retur DO</span>
+                        @if ($pendingDoReturns > 0)
+                            <span class="min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">{{ $pendingDoReturns }}</span>
+                        @endif
+                    </a>
+                @endif
+
                 @if ($canSee(['OWN', 'GDG', 'PUR']))
                     <a href="{{ route('gudang.penerimaan.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/penerimaan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

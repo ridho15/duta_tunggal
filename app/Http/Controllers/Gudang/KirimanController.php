@@ -217,7 +217,7 @@ class KirimanController extends Controller
         $return = $service->create($deliveryOrder, $lines, $request->input('notes'));
 
         return redirect()->route('gudang.kiriman.index')
-            ->with('success', "Retur {$return->return_number} berhasil dicatat. Menunggu persetujuan kepala gudang.");
+            ->with('success', "Retur {$return->return_number} berhasil dicatat. Menunggu persetujuan kepala gudang di menu Gudang → Persetujuan Retur DO.");
     }
 
     /**
