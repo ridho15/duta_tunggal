@@ -70,16 +70,18 @@
                     Ubah Draf
                 </a>
 
-                <button
-                    type="button"
-                    @click="approveModalOpen = true"
-                    class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Setujui PO
-                </button>
+                @if (!empty($canApprove))
+                    <button
+                        type="button"
+                        @click="approveModalOpen = true"
+                        class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Setujui PO
+                    </button>
+                @endif
 
                 <button
                     type="button"
@@ -91,16 +93,25 @@
             @endif
 
             @if ($purchaseOrder->status === 'request_approve')
-                <button
-                    type="button"
-                    @click="approveModalOpen = true"
-                    class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                    </svg>
-                    Setujui PO
-                </button>
+                @if (!empty($canApprove))
+                    <button
+                        type="button"
+                        @click="approveModalOpen = true"
+                        class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Setujui PO
+                    </button>
+                @else
+                    <div class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-medium" title="{{ $approveDenyReason ?? 'Menunggu persetujuan atasan' }}">
+                        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Menunggu Approval Manajer</span>
+                    </div>
+                @endif
             @endif
 
             @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
@@ -678,6 +689,7 @@
         </div>
     @endif
 
+    @if (!empty($canApprove))
     {{-- Modal Konfirmasi Setujui PO --}}
     <div
         x-show="approveModalOpen"
@@ -711,6 +723,7 @@
             </form>
         </div>
     </div>
+    @endif
 
     {{-- Modal Ajukan Penutupan (Request Close) --}}
     <div

@@ -3,7 +3,7 @@
 @section('title', 'Persetujuan Retur DO – ERP Duta Tunggal')
 
 @section('content')
-<div class="space-y-5">
+<div class="space-y-5" x-data>
     <div>
         <nav class="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
             <span>Gudang & Stok</span>

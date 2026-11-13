@@ -19,6 +19,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Throwable;
 
@@ -454,7 +455,11 @@ class CashBankController extends Controller
             'to_coa_id' => ['required', 'exists:chart_of_accounts,id', 'different:from_coa_id'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'other_costs' => ['nullable', 'numeric', 'min:0'],
-            'other_costs_coa_id' => ['nullable', 'required_if:other_costs,>0', 'exists:chart_of_accounts,id'],
+            'other_costs_coa_id' => [
+                'nullable',
+                Rule::requiredIf(fn () => (float) $request->input('other_costs', 0) > 0),
+                'exists:chart_of_accounts,id',
+            ],
             'reference' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'cabang_id' => ['nullable', 'exists:cabangs,id'],
@@ -468,7 +473,9 @@ class CashBankController extends Controller
             'to_coa_id.different' => 'Akun tujuan tidak boleh sama dengan akun sumber dana.',
             'amount.required' => 'Nominal transfer wajib diisi.',
             'amount.min' => 'Nominal transfer minimal Rp 0,01.',
+            'other_costs_coa_id.required' => 'Akun COA Biaya Admin wajib dipilih jika ada biaya admin transfer.',
             'other_costs_coa_id.required_if' => 'Akun COA Biaya Admin wajib dipilih jika ada biaya admin transfer.',
+            'other_costs_coa_id.exists' => 'Akun COA Biaya Admin yang dipilih tidak valid.',
         ]);
 
         $attachmentPath = null;

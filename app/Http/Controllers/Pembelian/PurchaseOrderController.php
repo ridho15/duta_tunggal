@@ -16,6 +16,7 @@ use App\Models\PurchaseOrderCurrency;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
 use App\Models\Warehouse;
+use App\Services\ApprovalControlService;
 use App\Services\PurchaseOrderService;
 use App\Support\TaxTypeHelper;
 use App\Support\CurrencyConversionResolver;
@@ -33,10 +34,14 @@ use Throwable;
 class PurchaseOrderController extends Controller
 {
     protected PurchaseOrderService $purchaseOrderService;
+    protected ApprovalControlService $approvalControlService;
 
-    public function __construct(PurchaseOrderService $purchaseOrderService)
-    {
+    public function __construct(
+        PurchaseOrderService $purchaseOrderService,
+        ApprovalControlService $approvalControlService
+    ) {
         $this->purchaseOrderService = $purchaseOrderService;
+        $this->approvalControlService = $approvalControlService;
     }
 
     /**
@@ -142,6 +147,7 @@ class PurchaseOrderController extends Controller
         // Data master untuk dropdown filter
         $suppliers = Supplier::orderBy('perusahaan')->get(['id', 'perusahaan', 'code']);
         $cabangs = Cabang::orderBy('nama')->get(['id', 'nama']);
+        $approvalControlService = $this->approvalControlService;
 
         return view('pembelian.po.index', compact(
             'purchaseOrders',
@@ -154,7 +160,8 @@ class PurchaseOrderController extends Controller
             'supplierFilter',
             'cabangFilter',
             'dateFrom',
-            'dateTo'
+            'dateTo',
+            'approvalControlService'
         ));
     }
 
@@ -425,7 +432,19 @@ class PurchaseOrderController extends Controller
         $fulfillment = $purchaseOrder->receiptFulfillmentSummary();
         $totalSummary = $this->purchaseOrderService->calculateTotalSummary($purchaseOrder);
 
-        return view('pembelian.po.show', compact('purchaseOrder', 'fulfillment', 'totalSummary'));
+        $user = Auth::user();
+        $canApprove = false;
+        $approveDenyReason = null;
+        if (in_array($purchaseOrder->status, ['draft', 'request_approve'])) {
+            $check = $this->approvalControlService->canApprovePurchaseOrder($user, $purchaseOrder);
+            $hasCabangAccess = $user?->canAccessCabang($purchaseOrder->cabang_id) ?? false;
+            $canApprove = $check['allowed'] && $hasCabangAccess;
+            $approveDenyReason = ! $hasCabangAccess
+                ? 'Anda tidak memiliki hak akses untuk cabang dokumen ini.'
+                : $check['reason'];
+        }
+
+        return view('pembelian.po.show', compact('purchaseOrder', 'fulfillment', 'totalSummary', 'canApprove', 'approveDenyReason'));
     }
 
     /**
@@ -648,11 +667,16 @@ class PurchaseOrderController extends Controller
      */
     public function approve(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
     {
+        $user = Auth::user();
+        if ($user && ! $user->canAccessCabang($purchaseOrder->cabang_id)) {
+            return back()->with('error', 'Anda tidak memiliki hak akses untuk cabang dokumen ini.');
+        }
+
         if (!in_array($purchaseOrder->status, ['draft', 'request_approve'])) {
             return back()->with('error', 'Hanya PO berstatus Draf atau Menunggu Persetujuan yang dapat disetujui.');
         }
 
-        $approvalCheck = app(\App\Services\ApprovalControlService::class)->canApprovePurchaseOrder(Auth::user(), $purchaseOrder);
+        $approvalCheck = $this->approvalControlService->canApprovePurchaseOrder($user, $purchaseOrder);
         if (! $approvalCheck['allowed']) {
             return back()->with('error', $approvalCheck['reason']);
         }

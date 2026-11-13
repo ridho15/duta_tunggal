@@ -358,16 +358,23 @@
                                             </svg>
                                         </a>
 
-                                        <button
-                                            type="button"
-                                            @click="confirmApprove('{{ route('pembelian.po.approve', $po) }}', '{{ $po->po_number }}')"
-                                            class="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
-                                            title="Setujui PO (Approve)"
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </button>
+                                        @php
+                                            $canApproveThisPo = isset($approvalControlService)
+                                                ? ($approvalControlService->canApprovePurchaseOrder(Auth::user(), $po)['allowed'] && (Auth::user()?->canAccessCabang($po->cabang_id) ?? false))
+                                                : false;
+                                        @endphp
+                                        @if ($canApproveThisPo)
+                                            <button
+                                                type="button"
+                                                @click="confirmApprove('{{ route('pembelian.po.approve', $po) }}', '{{ $po->po_number }}')"
+                                                class="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                                                title="Setujui PO (Approve)"
+                                            >
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </button>
+                                        @endif
 
                                         <button
                                             type="button"

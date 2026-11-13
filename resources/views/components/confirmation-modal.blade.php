@@ -2,6 +2,7 @@
     'name',
     'title' => 'Konfirmasi Aksi',
     'variant' => 'danger',
+    'type' => null,
     'confirmText' => 'Ya, Lanjutkan',
     'cancelText' => 'Batal',
     'action' => null,
@@ -10,8 +11,9 @@
 ])
 
 @php
+    $effectiveVariant = $type ?? $variant;
     $isJsVar = preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$/', $name);
-    $iconConfig = match ($variant) {
+    $iconConfig = match ($effectiveVariant) {
         'success' => [
             'bg' => 'bg-[#dcfce7]',
             'text' => 'text-[#15803d]',
@@ -23,6 +25,12 @@
             'text' => 'text-amber-600',
             'button' => 'bg-amber-600 hover:bg-amber-700 text-white focus:ring-amber-500/30',
             'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>',
+        ],
+        'info' => [
+            'bg' => 'bg-blue-100',
+            'text' => 'text-blue-600',
+            'button' => 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500/30',
+            'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>',
         ],
         default => [
             'bg' => 'bg-red-100',

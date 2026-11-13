@@ -234,6 +234,9 @@
                             :value="otherCosts"
                         >
                     </div>
+                    @error('other_costs')
+                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 {{-- Akun Beban Admin Bank --}}
@@ -241,18 +244,30 @@
                     <label for="other_costs_coa_id" class="block text-xs font-semibold text-gray-700 mb-1">
                         Pos Akun Biaya Admin Bank
                     </label>
+                    @php
+                        $oldOtherCostsCoaId = old('other_costs_coa_id');
+                        $hasOldInput = old('_token') !== null;
+                    @endphp
                     <select data-searchable
                         name="other_costs_coa_id"
                         id="other_costs_coa_id"
-                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 bg-white"
+                        class="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-gray-900 bg-white @error('other_costs_coa_id') border-rose-300 bg-rose-50/50 @enderror"
                     >
                         <option value="">-- Pilih Akun Biaya Admin --</option>
                         @foreach ($expenseCoas as $exp)
-                            <option value="{{ $exp->id }}" {{ (old('other_costs_coa_id') == $exp->id || str_contains(strtolower($exp->name), 'admin')) ? 'selected' : '' }}>
+                            @php
+                                $isSelected = $hasOldInput
+                                    ? ((string)$oldOtherCostsCoaId === (string)$exp->id)
+                                    : (str_contains(strtolower($exp->name), 'admin'));
+                            @endphp
+                            <option value="{{ $exp->id }}" {{ $isSelected ? 'selected' : '' }}>
                                 {{ $exp->code }} - {{ $exp->name }}
                             </option>
                         @endforeach
                     </select>
+                    @error('other_costs_coa_id')
+                        <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                    @enderror
                 </div>
             </div>
 

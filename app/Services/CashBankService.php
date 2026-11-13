@@ -140,16 +140,17 @@ class CashBankService
             
             // Jika ada biaya lain-lain, posting debit ke COA biaya yang ditentukan
             if ($otherCosts > 0) {
-                $biayaAdminCoaId = $trf->other_costs_coa_id ?? \App\Models\ChartOfAccount::where('code', '8000.01')->first()->id ?? null;
-                if ($biayaAdminCoaId) {
-                    $this->createEntry(
-                        $biayaAdminCoaId, 
-                        $trf, 
-                        debit: $otherCosts, 
-                        credit: 0, 
-                        type: 'transfer'
-                    );
+                $biayaAdminCoaId = $trf->other_costs_coa_id ?? \App\Models\ChartOfAccount::where('code', '8000.01')->first()?->id;
+                if (! $biayaAdminCoaId) {
+                    throw new \InvalidArgumentException('Akun biaya admin transfer wajib ditentukan untuk membukukan biaya transfer.');
                 }
+                $this->createEntry(
+                    $biayaAdminCoaId, 
+                    $trf, 
+                    debit: $otherCosts, 
+                    credit: 0, 
+                    type: 'transfer'
+                );
             }
             
             $trf->status = 'posted';
