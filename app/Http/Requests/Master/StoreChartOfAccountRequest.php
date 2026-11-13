@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Master;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreChartOfAccountRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class StoreChartOfAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => 'required|string|max:50|unique:chart_of_accounts,code',
+            'code' => ['required', 'string', 'max:50', Rule::unique('chart_of_accounts', 'code')->withoutTrashed()],
             'name' => 'required|string|max:255',
             'type' => 'required|string|in:Asset,Liability,Equity,Revenue,Expense,Contra Asset',
             'parent_id' => 'nullable|exists:chart_of_accounts,id',

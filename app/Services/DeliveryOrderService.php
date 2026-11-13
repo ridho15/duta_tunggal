@@ -64,10 +64,13 @@ class DeliveryOrderService
 
     public function createLog($delivery_order_id, $status, $comments = null, $action = null)
     {
+        // Gunakan user terotentikasi, atau ambil user admin/system pertama dari DB jika dijalankan via background job
+        $userId = Auth::id() ?? auth()->id() ?? \App\Models\User::whereHas('roles', fn ($q) => $q->where('name', 'Super Admin'))->value('id') ?? \App\Models\User::value('id');
+
         DeliveryOrderLog::create([
             'delivery_order_id' => $delivery_order_id,
             'status' => $status,
-            'confirmed_by' => Auth::user()?->id ?? 13, // Fallback to user ID 13 if not authenticated
+            'confirmed_by' => $userId,
             'action' => $action,
             'comments' => $comments,
         ]);

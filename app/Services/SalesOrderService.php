@@ -278,16 +278,27 @@ class SalesOrderService
     /** Perilaku lama (flag block_short_approval mati): hanya alokasi gudang yang diperiksa, item tanpa alokasi lolos. */
     private function assertAllocationStock($saleOrder): void
     {
-        // Validate warehouse free stock for all allocations
-        $saleOrder->loadMissing(['saleOrderItem.warehouseAllocations.warehouse', 'saleOrderItem.product']);
+        // Validate warehouse free stock for all allocations or direct warehouse items
+        $saleOrder->loadMissing(['saleOrderItem.warehouseAllocations.warehouse', 'saleOrderItem.warehouse', 'saleOrderItem.product']);
         $insufficientItems = [];
         foreach ($saleOrder->saleOrderItem as $item) {
-            foreach ($item->warehouseAllocations as $allocation) {
-                $whId = $allocation->warehouse_id;
-                $whQty = (float) $allocation->quantity;
-                $freeStock = app(\App\Services\StockAvailability::class)->freeForSaleOrders((int) $item->product_id, (int) $whId, [(int) $saleOrder->id]);
+            if ($item->warehouseAllocations->isNotEmpty()) {
+                foreach ($item->warehouseAllocations as $allocation) {
+                    $whId = $allocation->warehouse_id;
+                    $whQty = (float) $allocation->quantity;
+                    $freeStock = app(\App\Services\StockAvailability::class)->freeForSaleOrders((int) $item->product_id, (int) $whId, [(int) $saleOrder->id]);
+                    if ($whQty > $freeStock) {
+                        $whName = $allocation->warehouse?->name ?? "Gudang #{$whId}";
+                        $prodName = $item->product?->name ?? "Produk #{$item->product_id}";
+                        $insufficientItems[] = "{$prodName} di {$whName} (Dibutuhkan: {$whQty}, Stok bebas: {$freeStock})";
+                    }
+                }
+            } elseif ($item->warehouse_id) {
+                $whId = (int) $item->warehouse_id;
+                $whQty = (float) $item->quantity;
+                $freeStock = app(\App\Services\StockAvailability::class)->freeForSaleOrders((int) $item->product_id, $whId, [(int) $saleOrder->id]);
                 if ($whQty > $freeStock) {
-                    $whName = $allocation->warehouse?->name ?? "Gudang #{$whId}";
+                    $whName = $item->warehouse?->name ?? "Gudang #{$whId}";
                     $prodName = $item->product?->name ?? "Produk #{$item->product_id}";
                     $insufficientItems[] = "{$prodName} di {$whName} (Dibutuhkan: {$whQty}, Stok bebas: {$freeStock})";
                 }

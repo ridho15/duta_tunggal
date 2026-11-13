@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Master;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSupplierRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class StoreSupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => 'required|string|max:255|unique:suppliers,code',
+            'code' => ['required', 'string', 'max:255', Rule::unique('suppliers', 'code')->withoutTrashed()],
             'perusahaan' => 'required|string|max:255',
             'kontak_person' => 'nullable|string|max:255',
             'npwp' => 'required|string|max:255',

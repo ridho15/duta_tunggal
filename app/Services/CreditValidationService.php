@@ -126,9 +126,10 @@ class CreditValidationService
 
     public function getCurrentCreditUsage(Customer $customer): float
     {
-        return AccountReceivable::where('customer_id', $customer->id)
-            ->where('status', PaymentStatus::UNPAID->value)
-            ->sum('remaining') ?? 0;
+        // Hitung seluruh sisa piutang aktif yang masih memiliki outstanding balance (Unpaid maupun Partial)
+        return (float) (AccountReceivable::where('customer_id', $customer->id)
+            ->where('remaining', '>', 0)
+            ->sum('remaining') ?? 0);
     }
 
     public function getCreditUsagePercentage(Customer $customer): float
@@ -143,14 +144,14 @@ class CreditValidationService
 
     public function getOverdueInvoices(Customer $customer)
     {
+        // Cari faktur jatuh tempo yang masih memiliki sisa piutang aktif (mendukung model SuratJalan maupun SaleOrder)
         return Invoice::withoutGlobalScope('App\Models\Scopes\CabangScope')
-            ->join('sale_orders', function ($join) use ($customer) {
-                $join->on('invoices.from_model_id', '=', 'sale_orders.id')
-                     ->where('sale_orders.customer_id', '=', $customer->id);
-            })
-            ->where('invoices.from_model_type', 'App\Models\SaleOrder')
+            ->join('account_receivables', 'invoices.id', '=', 'account_receivables.invoice_id')
+            ->where('account_receivables.customer_id', $customer->id)
+            ->where('account_receivables.remaining', '>', 0)
+            ->whereNull('account_receivables.deleted_at')
             ->where('invoices.due_date', '<', Carbon::now())
-            ->whereIn('invoices.status', ['sent', 'partially_paid'])
+            ->whereNotIn('invoices.status', [Invoice::STATUS_CANCELLED, 'canceled', 'paid'])
             ->select('invoices.*')
             ->orderBy('invoices.due_date', 'asc')
             ->get();

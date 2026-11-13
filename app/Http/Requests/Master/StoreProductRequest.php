@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Master;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreProductRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class StoreProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sku' => 'required|string|max:255|unique:products,sku',
+            'sku' => ['required', 'string', 'max:255', Rule::unique('products', 'sku')->withoutTrashed()],
             'name' => 'required|string|max:255',
             'product_category_id' => 'required|exists:product_categories,id',
             'cabang_id' => 'nullable|exists:cabangs,id',

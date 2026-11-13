@@ -168,8 +168,15 @@ class ProductController extends Controller
             $productData['jumlah_kelipatan_gudang_besar'] = $request->input('jumlah_kelipatan_gudang_besar', 0);
             $productData['jumlah_jual_kategori_banyak'] = $request->input('jumlah_jual_kategori_banyak', 0);
 
-            // Simpan Produk
-            $product = Product::create($productData);
+            // Simpan Produk (pulihkan dan perbarui jika SKU sebelumnya berstatus soft-deleted)
+            $existingTrashed = Product::onlyTrashed()->where('sku', $productData['sku'])->first();
+            if ($existingTrashed) {
+                $existingTrashed->restore();
+                $existingTrashed->update($productData);
+                $product = $existingTrashed;
+            } else {
+                $product = Product::create($productData);
+            }
 
             // Simpan Konversi Satuan jika ada
             if (! empty($validated['unit_conversions']) && is_array($validated['unit_conversions'])) {

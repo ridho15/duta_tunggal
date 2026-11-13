@@ -362,22 +362,23 @@ class CashBankController extends Controller
 
         try {
             DB::transaction(function () use ($transaction) {
-                // Hapus jurnal terkait
-                $transaction->journalEntries()->delete();
-
-                // Hapus detail rincian
-                $transaction->transactionDetails()->delete();
-
-                // Hapus file lampiran jika ada
-                if ($transaction->attachment_path && Storage::disk('public')->exists($transaction->attachment_path)) {
-                    Storage::disk('public')->delete($transaction->attachment_path);
+                // Lepaskan voucher jika transaksi memakai voucher agar tidak menggantung
+                if ($transaction->voucher_request_id && $transaction->voucherRequest) {
+                    $transaction->voucherRequest->update(['status' => 'approved']);
                 }
 
+                // Hapus detail rincian transaksi
+                $transaction->transactionDetails()->delete();
+
+                // Hapus jurnal terkait (soft delete via trait / CascadesJournalEntries)
+                $transaction->journalEntries()->delete();
+
+                // Hapus transaksi (soft delete)
                 $transaction->delete();
             });
 
             return redirect()->route('keuangan.cashbank.index')
-                ->with('success', "Transaksi {$transaction->number} dan jurnal akuntansinya berhasil dihapus.");
+                ->with('success', "Transaksi {$transaction->number} dan jurnal akuntansinya berhasil dibatalkan.");
         } catch (Throwable $e) {
             return back()->with('error', 'Gagal membatalkan transaksi: '.$e->getMessage());
         }

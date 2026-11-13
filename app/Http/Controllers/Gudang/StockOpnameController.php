@@ -3,9 +3,6 @@
 namespace App\Http\Controllers\Gudang;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryStock;
-use App\Models\Product;
-use App\Models\Rak;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
 use App\Models\Warehouse;
@@ -137,6 +134,7 @@ class StockOpnameController extends Controller
 
         if ($request->input('action') === 'start_immediately') {
             $this->stockOpnameService->startPhysicalCount($opname);
+
             return redirect()->route('gudang.opname.show', $opname)
                 ->with('success', "Sesi opname {$opname->opname_number} berhasil dibuka dan proses hitung fisik telah dimulai.");
         }
@@ -187,6 +185,7 @@ class StockOpnameController extends Controller
 
         try {
             $count = $this->stockOpnameService->startPhysicalCount($opname);
+
             return redirect()->route('gudang.opname.show', $opname)
                 ->with('success', "Hitung fisik dimulai! Sebanyak {$count} item produk berhasil dimuat ke lembar kerja opname.");
         } catch (ValidationException $e) {
@@ -243,6 +242,7 @@ class StockOpnameController extends Controller
 
         try {
             $this->stockOpnameService->completePhysicalCount($opname);
+
             return redirect()->route('gudang.opname.show', $opname)
                 ->with('success', 'Penghitungan fisik telah selesai! Seluruh selisih siap direview dan disetujui.');
         } catch (ValidationException $e) {
@@ -278,6 +278,7 @@ class StockOpnameController extends Controller
 
         try {
             $this->stockOpnameService->approveStockOpname($opname, Auth::id());
+
             return redirect()->route('gudang.opname.show', $opname)
                 ->with('success', 'Stock opname berhasil disetujui! Penyesuaian saldo stok fisik dan Jurnal Umum persediaan telah dibukukan otomatis.');
         } catch (ValidationException $e) {
@@ -293,9 +294,9 @@ class StockOpnameController extends Controller
     {
         $this->authorizeAccess('delete inventory stock');
 
-        if ($opname->status === 'approved' && !MenuAccess::isSuper(Auth::user())) {
+        if ($opname->status !== 'draft') {
             return redirect()->route('gudang.opname.show', $opname)
-                ->with('error', 'Stock opname yang telah disetujui tidak dapat dihapus.');
+                ->with('error', 'Hanya sesi stock opname berstatus draft yang dapat dihapus. Sesi yang telah disetujui tidak dapat dihapus untuk menjaga integritas kartu stok dan jurnal akuntansi.');
         }
 
         $number = $opname->opname_number;
@@ -303,7 +304,7 @@ class StockOpnameController extends Controller
         $opname->delete();
 
         return redirect()->route('gudang.opname.index')
-            ->with('success', "Stock opname {$number} berhasil dihapus.");
+            ->with('success', "Stock opname draft {$number} berhasil dihapus.");
     }
 
     /**
@@ -340,7 +341,7 @@ class StockOpnameController extends Controller
 
         $opname->load(['warehouse', 'items.product.uom', 'items.rak']);
 
-        $filename = "Rekap-Opname-{$opname->opname_number}-" . now()->format('Ymd') . ".csv";
+        $filename = "Rekap-Opname-{$opname->opname_number}-".now()->format('Ymd').'.csv';
 
         return response()->streamDownload(function () use ($opname) {
             $handle = fopen('php://output', 'w');

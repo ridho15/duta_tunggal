@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Master;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreWarehouseRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class StoreWarehouseRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kode' => ['required', 'string', 'max:50', 'unique:warehouses,kode'],
+            'kode' => ['required', 'string', 'max:50', Rule::unique('warehouses', 'kode')->withoutTrashed()],
             'name' => ['required', 'string', 'max:255'],
             'cabang_id' => ['required', 'exists:cabangs,id'],
             'location' => ['required', 'string', 'max:500'],

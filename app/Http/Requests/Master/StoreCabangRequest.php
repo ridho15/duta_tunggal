@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Master;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCabangRequest extends FormRequest
 {
@@ -14,7 +15,7 @@ class StoreCabangRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kode' => 'required|string|max:50|unique:cabangs,kode',
+            'kode' => ['required', 'string', 'max:50', Rule::unique('cabangs', 'kode')->withoutTrashed()],
             'nama' => 'required|string|max:255',
             'alamat' => 'nullable|string|max:500',
             'telepon' => 'nullable|string|max:50',

@@ -178,52 +178,60 @@ class SalesInvoiceController extends Controller
         ]);
 
         $selectedSjIds = $validated['surat_jalan_ids'];
-        $sjs = SuratJalan::with([
-            'deliveryOrder.salesOrders.customer',
-            'deliveryOrder.deliveryOrderItem.product',
-            'cabang',
-        ])->whereIn('id', $selectedSjIds)->get();
 
-        // 1. Validasi status Surat Jalan wajib Terbit
-        foreach ($sjs as $sj) {
-            if ($sj->status !== SuratJalan::STATUS_ISSUED) {
+        $invoice = DB::transaction(function () use ($validated, $selectedSjIds) {
+            // Lock Surat Jalan rows atomically with lockForUpdate to prevent concurrent double-billing
+            $sjs = SuratJalan::with([
+                'deliveryOrder.salesOrders.customer',
+                'deliveryOrder.deliveryOrderItem.product',
+                'cabang',
+            ])->whereIn('id', $selectedSjIds)->lockForUpdate()->get();
+
+            if ($sjs->count() !== count($selectedSjIds)) {
                 throw ValidationException::withMessages([
-                    'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} berstatus {$sj->status_label}. Hanya Surat Jalan berstatus Terbit yang dapat dibuatkan faktur.",
+                    'surat_jalan_ids' => 'Satu atau lebih Surat Jalan tidak ditemukan.',
                 ]);
             }
-            if ($sj->isInvoiced()) {
+
+            // 1. Validasi status Surat Jalan wajib Terbit & belum difakturkan
+            foreach ($sjs as $sj) {
+                if ($sj->status !== SuratJalan::STATUS_ISSUED) {
+                    throw ValidationException::withMessages([
+                        'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} berstatus {$sj->status_label}. Hanya Surat Jalan berstatus Terbit yang dapat dibuatkan faktur.",
+                    ]);
+                }
+                if ($sj->isInvoiced()) {
+                    throw ValidationException::withMessages([
+                        'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} sudah pernah difakturkan pada invoice aktif lain.",
+                    ]);
+                }
+                if (! $sj->isDeliveryDue()) {
+                    throw ValidationException::withMessages([
+                        'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} dijadwalkan kirim {$sj->effectiveDeliveryDate()->format('d/m/Y')}. "
+                            .'Faktur baru dapat dibuat setelah barang berangkat pada tanggal kirim.',
+                    ]);
+                }
+            }
+
+            // 2. Validasi keseragaman Cabang & Customer
+            $cabangIds = $sjs->pluck('cabang_id')->unique()->values();
+            if ($cabangIds->count() > 1) {
                 throw ValidationException::withMessages([
-                    'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} sudah pernah difakturkan pada invoice aktif lain.",
+                    'surat_jalan_ids' => 'Penggabungan Surat Jalan hanya diizinkan untuk cabang yang sama.',
                 ]);
             }
-            if (! $sj->isDeliveryDue()) {
+
+            $allSos = $sjs->flatMap(fn ($sj) => $sj->deliveryOrder)->flatMap(fn ($do) => $do->salesOrders)->unique('id')->values();
+            if ($allSos->count() > 1) {
                 throw ValidationException::withMessages([
-                    'surat_jalan_ids' => "Surat Jalan {$sj->sj_number} dijadwalkan kirim {$sj->effectiveDeliveryDate()->format('d/m/Y')}. "
-                        .'Faktur baru dapat dibuat setelah barang berangkat pada tanggal kirim.',
+                    'surat_jalan_ids' => 'Surat Jalan dalam satu faktur harus berasal dari Sales Order yang sama.',
                 ]);
             }
-        }
 
-        // 2. Validasi keseragaman Cabang & Customer
-        $cabangIds = $sjs->pluck('cabang_id')->unique()->values();
-        if ($cabangIds->count() > 1) {
-            throw ValidationException::withMessages([
-                'surat_jalan_ids' => 'Penggabungan Surat Jalan hanya diizinkan untuk cabang yang sama.',
-            ]);
-        }
+            $primarySo = $allSos->first();
+            $customer = $primarySo?->customer;
+            $cabangId = $validated['cabang_id'] ?? $sjs->first()->cabang_id ?? 1;
 
-        $allSos = $sjs->flatMap(fn ($sj) => $sj->deliveryOrder)->flatMap(fn ($do) => $do->salesOrders)->unique('id')->values();
-        if ($allSos->count() > 1) {
-            throw ValidationException::withMessages([
-                'surat_jalan_ids' => 'Surat Jalan dalam satu faktur harus berasal dari Sales Order yang sama.',
-            ]);
-        }
-
-        $primarySo = $allSos->first();
-        $customer = $primarySo?->customer;
-        $cabangId = $validated['cabang_id'] ?? $sjs->first()->cabang_id ?? 1;
-
-        $invoice = DB::transaction(function () use ($validated, $sjs, $primarySo, $customer, $cabangId) {
             $taxData = app(SalesInvoiceTaxResolver::class)->resolveFromSaleOrder($primarySo);
             $taxable = ($taxData['ppn_rate'] ?? 0) > 0;
 

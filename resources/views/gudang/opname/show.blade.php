@@ -470,7 +470,8 @@
         }
     }
 </script>
-    {{-- Modal Konfirmasi Hapus Draft Opname --}}
+    @if ($opname->status === 'draft')
+    {{-- Modal Konfirmasi Hapus Draft Opname (Hanya untuk status Draft) --}}
     <x-confirmation-modal
         name="delete-opname"
         title="Hapus Sesi Stock Opname"
@@ -487,6 +488,7 @@
             Tindakan ini tidak dapat dibatalkan dan seluruh draf perhitungan fisik akan dihapus.
         </p>
     </x-confirmation-modal>
+    @endif
 
     {{-- Modal Konfirmasi Hitung Ulang --}}
     <x-confirmation-modal
