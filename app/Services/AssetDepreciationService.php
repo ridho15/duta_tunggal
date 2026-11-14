@@ -30,7 +30,11 @@ class AssetDepreciationService
                 throw new \Exception('Penyusutan untuk periode ini sudah ada');
             }
             
-            // Check if asset is active or posted
+            // Check if asset is already fully depreciated or inactive
+            if ($asset->status === 'fully_depreciated') {
+                throw new \Exception('Aset sudah disusutkan penuh');
+            }
+
             if (!in_array($asset->status, ['active', 'posted'], true)) {
                 throw new \Exception('Aset tidak aktif');
             }
@@ -41,17 +45,22 @@ class AssetDepreciationService
             }
             
             // Calculate accumulated depreciation
-            $previousTotal = $asset->depreciationEntries()
+            $previousTotal = (float) $asset->depreciationEntries()
                 ->where('status', 'recorded')
                 ->sum('amount');
             
-            $newTotal = $previousTotal + $asset->monthly_depreciation;
-            $newBookValue = $asset->purchase_cost - $newTotal;
+            $remainingDepreciable = max(0.0, (float) ($asset->purchase_cost - $previousTotal - $asset->salvage_value));
             
-            // Check if fully depreciated
-            if ($newBookValue < $asset->salvage_value) {
+            if ($remainingDepreciable <= 0.001) {
+                if ($asset->status !== 'fully_depreciated') {
+                    $asset->updateAccumulatedDepreciation();
+                }
                 throw new \Exception('Aset sudah disusutkan penuh');
             }
+
+            $amount = min((float) $asset->monthly_depreciation, $remainingDepreciable);
+            $newTotal = $previousTotal + $amount;
+            $newBookValue = max((float) $asset->salvage_value, (float) ($asset->purchase_cost - $newTotal));
             
             // Create depreciation entry
             $depreciation = AssetDepreciation::create([
@@ -59,7 +68,7 @@ class AssetDepreciationService
                 'depreciation_date' => $date,
                 'period_month' => $date->month,
                 'period_year' => $date->year,
-                'amount' => $asset->monthly_depreciation,
+                'amount' => $amount,
                 'accumulated_total' => $newTotal,
                 'book_value' => $newBookValue,
                 'status' => 'recorded',

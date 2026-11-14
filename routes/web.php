@@ -316,17 +316,9 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         });
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Modul Kasir / Point of Sale (POS Ritel) [SOFT DISABLED]
-    |--------------------------------------------------------------------------
-    | Modul Kasir POS ritel saat ini dinonaktifkan / disembunyikan karena seluruh
-    | transaksi dan operasional perusahaan terpusat pada Modul Penjualan B2B
-    | (Penawaran, SO, DO, Faktur Penjualan, dan Kwitansi Piutang).
-    |
-    | Jika di masa depan dibutuhkan aktivasi toko/outlet ritel fisik, silakan
-    | buka kembali blok route di bawah ini dan tautan menu di sidebar.blade.php.
-    |
+    // --------------------------------------------------------------------------
+    // Modul Kasir / Point of Sale (POS Ritel)
+    // --------------------------------------------------------------------------
     Route::prefix('kasir')->name('kasir.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Kasir\PosController::class, 'index'])->name('pos.index');
         Route::get('/cari-produk', [\App\Http\Controllers\Kasir\PosController::class, 'searchProduct'])->name('pos.search');
@@ -346,7 +338,6 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     });
 
     Route::get('/pos', function () { return redirect()->route('kasir.pos.index'); });
-    */
 
     // Modul Gudang & Stok
     Route::prefix('gudang')->name('gudang.')->group(function () {

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Gudang;
 
 use App\Support\OrderRequestQuantityLock;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePurchaseReceiptRequest extends FormRequest
 {
@@ -25,7 +26,10 @@ class StorePurchaseReceiptRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'purchase_order_id' => 'required|exists:purchase_orders,id',
+            'purchase_order_id' => [
+                'required',
+                Rule::exists('purchase_orders', 'id')->whereIn('status', ['approved', 'partially_received']),
+            ],
             'receipt_date' => 'required|date',
             'received_by' => 'nullable|exists:users,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
@@ -140,6 +144,7 @@ class StorePurchaseReceiptRequest extends FormRequest
     {
         return [
             'purchase_order_id.required' => 'Silakan pilih Pesanan Pembelian (PO) yang akan diterima barangnya.',
+            'purchase_order_id.exists' => 'Purchase Order tidak ditemukan atau belum berstatus disetujui (Approved / Partially Received).',
             'receipt_date.required' => 'Tanggal penerimaan barang wajib diisi.',
             'items.required' => 'Minimal harus ada 1 barang yang dicatat penerimaannya.',
             'items.min' => 'Minimal harus ada 1 barang yang dicatat penerimaannya.',

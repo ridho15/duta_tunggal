@@ -56,13 +56,22 @@ class AccountingPeriodService
 
     public function reopenPeriod(AccountingPeriod $period): AccountingPeriod
     {
-        $period->update([
-            'status' => 'open',
-            'closed_by' => null,
-            'closed_at' => null,
-        ]);
+        return DB::transaction(function () use ($period) {
+            $lockedPeriod = AccountingPeriod::query()->lockForUpdate()->findOrFail($period->id);
+            $lockedPeriod->update([
+                'status' => 'open',
+                'closed_by' => null,
+                'closed_at' => null,
+            ]);
 
-        return $period->fresh();
+            JournalEntry::withoutGlobalScopes()
+                ->where('source_type', AccountingPeriod::class)
+                ->where('source_id', $period->id)
+                ->where('journal_type', 'closing')
+                ->delete();
+
+            return $lockedPeriod->fresh();
+        });
     }
 
     public function postClosingEntries(AccountingPeriod $period): int
@@ -70,6 +79,13 @@ class AccountingPeriodService
         if ($period->status === 'closed') {
             throw new ClosedPeriodException('Periode sudah ditutup. Tidak dapat membuat closing entries lagi.');
         }
+
+        // Hapus closing entries lama untuk periode ini jika ada (idempotency)
+        JournalEntry::withoutGlobalScopes()
+            ->where('source_type', AccountingPeriod::class)
+            ->where('source_id', $period->id)
+            ->where('journal_type', 'closing')
+            ->delete();
 
         $retainedEarningsAccount = $this->resolveRetainedEarningsAccount();
         $journalDate = Carbon::parse($period->period_end)->toDateString();
@@ -162,6 +178,7 @@ class AccountingPeriodService
         $query = JournalEntry::query()
             ->withoutGlobalScope(CabangScope::class)
             ->where('coa_id', $coaId)
+            ->where('journal_type', '!=', 'closing')
             ->whereBetween('date', [
                 Carbon::parse($period->period_start)->toDateString(),
                 Carbon::parse($period->period_end)->toDateString(),

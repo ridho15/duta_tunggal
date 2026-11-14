@@ -10,7 +10,6 @@ use App\Models\AccountPayable;
 use App\Models\Cabang;
 use App\Models\ChartOfAccount;
 use App\Models\Invoice;
-use App\Models\JournalEntry;
 use App\Models\Supplier;
 use App\Models\VendorPayment;
 use App\Models\VendorPaymentDetail;
@@ -54,7 +53,7 @@ class VendorPaymentController extends Controller
 
         $baseQuery = VendorPayment::with(['supplier', 'cabang', 'coa', 'vendorPaymentDetail.invoice']);
 
-        if (!$canManageAll && $user?->cabang_id) {
+        if (! $canManageAll && $user?->cabang_id) {
             $baseQuery->where('cabang_id', $user->cabang_id);
         }
 
@@ -116,12 +115,12 @@ class VendorPaymentController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('payment_number', 'LIKE', "%{$search}%")
-                  ->orWhere('transfer_reference_number', 'LIKE', "%{$search}%")
-                  ->orWhere('target_bank_account', 'LIKE', "%{$search}%")
-                  ->orWhereHas('supplier', function ($sq) use ($search) {
-                      $sq->where('perusahaan', 'LIKE', "%{$search}%")
-                         ->orWhere('code', 'LIKE', "%{$search}%");
-                  });
+                    ->orWhere('transfer_reference_number', 'LIKE', "%{$search}%")
+                    ->orWhere('target_bank_account', 'LIKE', "%{$search}%")
+                    ->orWhereHas('supplier', function ($sq) use ($search) {
+                        $sq->where('perusahaan', 'LIKE', "%{$search}%")
+                            ->orWhere('code', 'LIKE', "%{$search}%");
+                    });
             });
         }
 
@@ -175,16 +174,17 @@ class VendorPaymentController extends Controller
         $invoices = Invoice::with(['accountPayable'])
             ->where(function ($q) use ($supplier) {
                 $q->where('supplier_id', $supplier->id)
-                  ->orWhere(function ($sub) use ($supplier) {
-                      $sub->where('from_model_type', Supplier::class)
-                          ->where('from_model_id', $supplier->id);
-                  });
+                    ->orWhere(function ($sub) use ($supplier) {
+                        $sub->where('from_model_type', Supplier::class)
+                            ->where('from_model_id', $supplier->id);
+                    });
             })
             ->whereNotIn('status', [Invoice::STATUS_DRAFT, Invoice::STATUS_CANCELLED])
             ->orderBy('due_date', 'asc')
             ->get()
             ->filter(function (Invoice $inv) {
                 $rem = (float) ($inv->accountPayable?->remaining ?? $inv->total);
+
                 return $rem > 0;
             })
             ->values();
@@ -259,9 +259,31 @@ class VendorPaymentController extends Controller
                     }
                 }
 
-                // Kalkulasi sisa hutang total dari invoice yang dipilih
-                $invoices = Invoice::with('accountPayable')->whereIn('id', $selectedInvoices)->get();
-                $totalOutstanding = $invoices->sum(fn ($inv) => (float) ($inv->accountPayable?->remaining ?? $inv->total));
+                // Ambil dan kunci baris Invoice & AccountPayable secara atomik untuk mencegah race condition double payment
+                $invoices = Invoice::whereIn('id', $selectedInvoices)->lockForUpdate()->get()->keyBy('id');
+                $payables = AccountPayable::whereIn('invoice_id', $selectedInvoices)->lockForUpdate()->get()->keyBy('invoice_id');
+
+                foreach ($invoiceReceipts as $invId => $amount) {
+                    $invoice = $invoices->get($invId);
+                    $ap = $payables->get($invId);
+                    $remaining = (float) ($ap?->remaining ?? $invoice?->total ?? 0);
+                    $invNum = $invoice?->invoice_number ?? "#{$invId}";
+
+                    if ($remaining <= 0.01) {
+                        throw new \Exception("Tagihan invoice {$invNum} sudah lunas atau tidak memiliki sisa hutang. Transaksi lain mungkin telah melunasinya.");
+                    }
+
+                    if ($amount > ($remaining + 1.00)) {
+                        throw new \Exception("Alokasi pembayaran untuk invoice {$invNum} (".MoneyHelper::rupiah($amount).') melebihi sisa hutang yang tersisa ('.MoneyHelper::rupiah($remaining).').');
+                    }
+                }
+
+                $totalOutstanding = collect($invoiceReceipts)->sum(function ($amt, $invId) use ($payables, $invoices) {
+                    $ap = $payables->get($invId);
+                    $invoice = $invoices->get($invId);
+
+                    return (float) ($ap?->remaining ?? $invoice?->total ?? 0);
+                });
 
                 $isDraft = ($action === 'save_draft');
                 $status = $isDraft
@@ -318,8 +340,8 @@ class VendorPaymentController extends Controller
                 }
 
                 // Jika langsung diposting, sinkronisasikan AP, status Invoice, dan buat jurnal GL
-                if (!$isDraft) {
-                    $observer = new VendorPaymentObserver();
+                if (! $isDraft) {
+                    $observer = new VendorPaymentObserver;
                     $observer->updateAccountPayableAndInvoiceStatus($payment);
 
                     // Buat Jurnal Buku Besar (GL)
@@ -331,11 +353,11 @@ class VendorPaymentController extends Controller
 
             $msg = ($action === 'save_draft')
                 ? "Draft Pembayaran {$payment->payment_number} berhasil disimpan."
-                : "Pembayaran {$payment->payment_number} senilai " . MoneyHelper::rupiah($payment->total_payment) . " berhasil diposting dan dialokasikan ke hutang dagang.";
+                : "Pembayaran {$payment->payment_number} senilai ".MoneyHelper::rupiah($payment->total_payment).' berhasil diposting dan dialokasikan ke hutang dagang.';
 
             return redirect()->route('pembelian.payments.show', $payment->id)->with('success', $msg);
         } catch (Throwable $e) {
-            return back()->withInput()->with('error', 'Gagal memproses pembayaran vendor: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal memproses pembayaran vendor: '.$e->getMessage());
         }
     }
 
@@ -467,8 +489,8 @@ class VendorPaymentController extends Controller
                     ]);
                 }
 
-                if (!$isDraft) {
-                    $observer = new VendorPaymentObserver();
+                if (! $isDraft) {
+                    $observer = new VendorPaymentObserver;
                     $observer->updateAccountPayableAndInvoiceStatus($payment);
                     $this->ledgerService->postVendorPayment($payment);
                 }
@@ -480,7 +502,7 @@ class VendorPaymentController extends Controller
 
             return redirect()->route('pembelian.payments.show', $payment->id)->with('success', $msg);
         } catch (Throwable $e) {
-            return back()->withInput()->with('error', 'Gagal memperbarui pembayaran: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal memperbarui pembayaran: '.$e->getMessage());
         }
     }
 
@@ -505,7 +527,7 @@ class VendorPaymentController extends Controller
             return redirect()->route('pembelian.payments.index')
                 ->with('success', "Draft pembayaran {$payment->payment_number} berhasil dihapus.");
         } catch (Throwable $e) {
-            return back()->with('error', 'Gagal menghapus pembayaran: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menghapus pembayaran: '.$e->getMessage());
         }
     }
 
@@ -536,7 +558,7 @@ class VendorPaymentController extends Controller
                 $payment->status = $newStatus;
                 $payment->saveQuietly();
 
-                $observer = new VendorPaymentObserver();
+                $observer = new VendorPaymentObserver;
                 $observer->updateAccountPayableAndInvoiceStatus($payment);
                 $this->ledgerService->postVendorPayment($payment);
             });
@@ -544,7 +566,7 @@ class VendorPaymentController extends Controller
             return redirect()->route('pembelian.payments.show', $payment->id)
                 ->with('success', "Pembayaran {$payment->payment_number} berhasil diposting ke Buku Besar.");
         } catch (Throwable $e) {
-            return back()->with('error', 'Gagal memposting pembayaran: ' . $e->getMessage());
+            return back()->with('error', 'Gagal memposting pembayaran: '.$e->getMessage());
         }
     }
 
@@ -567,7 +589,7 @@ class VendorPaymentController extends Controller
 
         try {
             DB::transaction(function () use ($request, $payment) {
-                $observer = new VendorPaymentObserver();
+                $observer = new VendorPaymentObserver;
 
                 // 1. Reversalkan efek Account Payable dan status Invoice
                 $observer->reverseAccountPayableAndInvoiceStatus($payment);
@@ -577,14 +599,14 @@ class VendorPaymentController extends Controller
 
                 // 3. Update status pembayaran menjadi Cancelled
                 $payment->status = VendorPayment::STATUS_CANCELLED;
-                $payment->notes = trim(($payment->notes ? $payment->notes . "\n" : '') . '[DIBATALKAN] Alasan: ' . $request->input('cancel_reason'));
+                $payment->notes = trim(($payment->notes ? $payment->notes."\n" : '').'[DIBATALKAN] Alasan: '.$request->input('cancel_reason'));
                 $payment->saveQuietly();
             });
 
             return redirect()->route('pembelian.payments.show', $payment->id)
                 ->with('success', "Pembayaran {$payment->payment_number} berhasil dibatalkan. Saldo Hutang Dagang dan Jurnal Buku Besar telah dipulihkan.");
         } catch (Throwable $e) {
-            return back()->with('error', 'Gagal membatalkan pembayaran: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan pembayaran: '.$e->getMessage());
         }
     }
 

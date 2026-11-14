@@ -386,9 +386,9 @@ class StockTransferController extends Controller
     {
         $this->authorizeAccess('delete stock transfer');
 
-        if ($transfer->status !== 'Draft' && !MenuAccess::isSuper(Auth::user())) {
+        if (strtolower((string) $transfer->status) !== 'draft') {
             return redirect()->route('gudang.transfer.show', $transfer)
-                ->with('error', 'Hanya transfer berstatus Draft yang dapat dihapus.');
+                ->with('error', 'Hanya transfer stok berstatus Draft yang dapat dihapus. Transfer yang telah diajukan, disetujui, atau diproses mutasi fisik tidak dapat dihapus demi integritas persediaan.');
         }
 
         $transferNumber = $transfer->transfer_number;

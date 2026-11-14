@@ -49,7 +49,7 @@ class StoreProductionRequest extends FormRequest
             'manufacturing_order_id' => [
                 'required',
                 'integer',
-                Rule::exists('manufacturing_orders', 'id'),
+                Rule::exists('manufacturing_orders', 'id')->whereIn('status', ['in_progress', 'draft']),
             ],
             'quantity_produced' => [
                 'required',
@@ -66,6 +66,44 @@ class StoreProductionRequest extends FormRequest
                 Rule::in(['draft', 'finished']),
             ],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $spkId = $this->input('manufacturing_order_id');
+            $qtyProduced = (float) $this->input('quantity_produced', 0);
+
+            if ($spkId && $qtyProduced > 0) {
+                $spk = ManufacturingOrder::with('productionPlan')->find($spkId);
+                if (! $spk) {
+                    return;
+                }
+
+                if (! in_array($spk->status, ['in_progress', 'draft'], true)) {
+                    $validator->errors()->add(
+                        'manufacturing_order_id',
+                        "Bukti produksi hanya dapat dicatat untuk SPK yang aktif (Draft atau In Progress). Status SPK saat ini: '{$spk->status}'."
+                    );
+                    return;
+                }
+
+                $plannedQty = (float) ($spk->productionPlan?->quantity ?? 0);
+                if ($plannedQty > 0) {
+                    $alreadyProduced = (float) Production::where('manufacturing_order_id', $spk->id)
+                        ->whereNull('deleted_at')
+                        ->sum('quantity_produced');
+                    $remainingAllowed = max(0.0, round($plannedQty - $alreadyProduced, 4));
+
+                    if ($qtyProduced > ($remainingAllowed + 0.001)) {
+                        $validator->errors()->add(
+                            'quantity_produced',
+                            "Kuantitas hasil produksi ({$qtyProduced} pcs) melebihi batas sisa rencana produksi SPK ({$remainingAllowed} pcs dari total rencana {$plannedQty} pcs)."
+                        );
+                    }
+                }
+            }
+        });
     }
 
     public function messages(): array

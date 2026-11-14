@@ -300,7 +300,8 @@
         </p>
     </x-confirmation-modal>
 
-    {{-- Modal Konfirmasi Hapus Transfer --}}
+    {{-- Modal Konfirmasi Hapus Transfer (Hanya untuk Draft) --}}
+    @if (strtolower((string) $transfer->status) === 'draft')
     <x-confirmation-modal
         name="delete-transfer"
         title="Hapus Dokumen Transfer Stok"
@@ -314,6 +315,7 @@
             Apakah Anda yakin ingin menghapus draft transfer stok <strong>{{ $transfer->transfer_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endif
 
     {{-- Modal Konfirmasi Setujui Transfer --}}
     <x-confirmation-modal

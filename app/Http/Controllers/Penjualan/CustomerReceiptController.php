@@ -347,8 +347,31 @@ class CustomerReceiptController extends Controller
 
             $appliedInvoiceIds = array_map('intval', array_keys($plan['applied']));
 
+            // Ambil dan kunci baris Invoice & AccountReceivable secara atomik untuk mencegah race condition pelunasan dobel
+            $lockedInvoices = Invoice::withoutGlobalScopes()->whereIn('id', $appliedInvoiceIds)->lockForUpdate()->get()->keyBy('id');
+            $lockedArs = AccountReceivable::whereIn('invoice_id', $appliedInvoiceIds)->lockForUpdate()->get()->keyBy('invoice_id');
+
+            foreach ($plan['applied'] as $invId => $allocAmount) {
+                $inv = $lockedInvoices->get($invId);
+                $ar = $lockedArs->get($invId);
+                $remaining = (float) ($ar?->remaining ?? $inv?->total ?? 0);
+                $invNum = $inv?->invoice_number ?? "#{$invId}";
+
+                if ($remaining <= 0.01) {
+                    throw ValidationException::withMessages([
+                        'invoice_receipts' => "Invoice {$invNum} sudah lunas atau tidak memiliki sisa piutang. Transaksi kasir lain mungkin telah memprosesnya.",
+                    ]);
+                }
+
+                if ($allocAmount > ($remaining + 1.00)) {
+                    throw ValidationException::withMessages([
+                        'invoice_receipts' => "Nominal alokasi untuk invoice {$invNum} melebihi sisa piutang terkini (tersisa: " . MoneyHelper::rupiah($remaining) . "). Segera muat ulang halaman kasir.",
+                    ]);
+                }
+            }
+
             // Ambil konteks mata uang dari invoice pertama (bila ada)
-            $firstInvoice = Invoice::withoutGlobalScopes()->find($firstInvoiceId);
+            $firstInvoice = $lockedInvoices->get($firstInvoiceId);
             $currencyId = is_numeric($firstInvoice?->currency_id ?? null) ? (int) $firstInvoice->currency_id : null;
             $exchangeRate = (float) ($firstInvoice?->exchange_rate ?? 1.0);
             $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;

@@ -9,6 +9,7 @@ use App\Models\BillOfMaterial;
 use App\Models\Cabang;
 use App\Models\InventoryStock;
 use App\Models\ManufacturingOrder;
+use App\Models\MaterialIssue;
 use App\Models\Product;
 use App\Models\ProductionPlan;
 use App\Models\Warehouse;
@@ -435,21 +436,49 @@ class ManufacturingOrderController extends Controller
      */
     public function cancel(Request $request, ManufacturingOrder $manufacturingOrder): RedirectResponse
     {
-        if ($manufacturingOrder->status === 'completed') {
+        if (in_array($manufacturingOrder->status, ['completed', 'cancelled'], true)) {
             return redirect()
                 ->back()
-                ->with('error', 'SPK yang sudah selesai tidak dapat dibatalkan.');
+                ->with('error', 'SPK yang sudah selesai atau sudah dibatalkan tidak dapat diubah.');
+        }
+
+        // Cek jika ada bahan baku yang sudah dikeluarkan dan belum diretur
+        $hasActiveMaterialIssues = MaterialIssue::query()
+            ->where(function ($q) use ($manufacturingOrder) {
+                $q->where('manufacturing_order_id', $manufacturingOrder->id);
+                if ($manufacturingOrder->production_plan_id) {
+                    $q->orWhere('production_plan_id', $manufacturingOrder->production_plan_id);
+                }
+            })
+            ->whereIn('status', ['approved', 'completed'])
+            ->exists();
+
+        if ($hasActiveMaterialIssues) {
+            return redirect()
+                ->back()
+                ->with('error', 'SPK tidak dapat dibatalkan karena bahan baku sudah dikeluarkan dari gudang. Lakukan Retur Bahan Baku terlebih dahulu sebelum membatalkan SPK.');
+        }
+
+        // Cek jika ada produksi yang sudah lulus QC
+        $hasApprovedQc = $manufacturingOrder->productions()
+            ->whereHas('qualityControl', fn ($q) => $q->where('status', 1))
+            ->exists();
+
+        if ($hasApprovedQc) {
+            return redirect()
+                ->back()
+                ->with('error', 'SPK tidak dapat dibatalkan karena hasil produksi sudah lulus QC dan masuk stok barang jadi gudang.');
         }
 
         DB::beginTransaction();
         try {
             $moNumber = $manufacturingOrder->mo_number;
 
+            $manufacturingOrder->update(['status' => 'cancelled']);
+
             if ($manufacturingOrder->productionPlan) {
                 $manufacturingOrder->productionPlan->update(['status' => 'cancelled']);
             }
-
-            $manufacturingOrder->delete();
 
             DB::commit();
 
@@ -465,7 +494,7 @@ class ManufacturingOrderController extends Controller
     }
 
     /**
-     * Menghapus SPK (hanya jika draft atau cancelled).
+     * Menghapus SPK (hanya jika draft atau cancelled tanpa mutasi).
      */
     public function destroy(ManufacturingOrder $manufacturingOrder): RedirectResponse
     {
@@ -473,6 +502,12 @@ class ManufacturingOrderController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'SPK yang sedang berjalan atau sudah selesai tidak dapat dihapus.');
+        }
+
+        if ($manufacturingOrder->materialIssues()->where('status', '!=', 'rejected')->exists() || $manufacturingOrder->productions()->exists()) {
+            return redirect()
+                ->back()
+                ->with('error', 'SPK tidak dapat dihapus karena memiliki riwayat pengeluaran bahan atau catatan produksi.');
         }
 
         try {

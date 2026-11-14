@@ -15,8 +15,18 @@ class AssetTransferService
     public function createTransferRequest(Asset $asset, int $toCabangId, array $data): AssetTransfer
     {
         return DB::transaction(function () use ($asset, $toCabangId, $data) {
+            /** @var Asset $lockedAsset */
+            $lockedAsset = Asset::query()
+                ->whereKey($asset->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedAsset->status !== 'active') {
+                throw new \Exception('Hanya aset berstatus aktif yang dapat dimutasi');
+            }
+
             // Validate that asset is not already being transferred
-            $pendingTransfer = AssetTransfer::where('asset_id', $asset->id)
+            $pendingTransfer = AssetTransfer::where('asset_id', $lockedAsset->id)
                 ->whereIn('status', ['pending', 'approved'])
                 ->exists();
 
@@ -26,8 +36,8 @@ class AssetTransferService
 
             // Create transfer request
             $transfer = AssetTransfer::create([
-                'asset_id' => $asset->id,
-                'from_cabang_id' => $asset->cabang_id,
+                'asset_id' => $lockedAsset->id,
+                'from_cabang_id' => $lockedAsset->cabang_id,
                 'to_cabang_id' => $toCabangId,
                 'transfer_date' => $data['transfer_date'] ?? now()->toDateString(),
                 'reason' => $data['reason'] ?? null,
@@ -46,17 +56,23 @@ class AssetTransferService
     public function approveTransfer(AssetTransfer $transfer): AssetTransfer
     {
         return DB::transaction(function () use ($transfer) {
-            if ($transfer->status !== 'pending') {
+            /** @var AssetTransfer $lockedTransfer */
+            $lockedTransfer = AssetTransfer::query()
+                ->whereKey($transfer->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedTransfer->status !== 'pending') {
                 throw new \Exception('Transfer request tidak dalam status pending');
             }
 
-            $transfer->update([
+            $lockedTransfer->update([
                 'status' => 'approved',
                 'approved_by' => Auth::id(),
                 'approved_at' => now(),
             ]);
 
-            return $transfer;
+            return $lockedTransfer;
         });
     }
 
@@ -66,23 +82,35 @@ class AssetTransferService
     public function completeTransfer(AssetTransfer $transfer): AssetTransfer
     {
         return DB::transaction(function () use ($transfer) {
-            if ($transfer->status !== 'approved') {
+            /** @var AssetTransfer $lockedTransfer */
+            $lockedTransfer = AssetTransfer::query()
+                ->whereKey($transfer->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedTransfer->status !== 'approved') {
                 throw new \Exception('Transfer harus disetujui terlebih dahulu');
             }
 
-            // Update asset cabang
-            $transfer->asset->update([
-                'cabang_id' => $transfer->to_cabang_id,
+            // Update asset cabang with row lock
+            /** @var Asset $lockedAsset */
+            $lockedAsset = Asset::query()
+                ->whereKey($lockedTransfer->asset_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedAsset->update([
+                'cabang_id' => $lockedTransfer->to_cabang_id,
             ]);
 
             // Update transfer status
-            $transfer->update([
+            $lockedTransfer->update([
                 'status' => 'completed',
                 'completed_by' => Auth::id(),
                 'completed_at' => now(),
             ]);
 
-            return $transfer;
+            return $lockedTransfer;
         });
     }
 
@@ -92,11 +120,17 @@ class AssetTransferService
     public function cancelTransfer(AssetTransfer $transfer, string $reason = null): AssetTransfer
     {
         return DB::transaction(function () use ($transfer, $reason) {
-            if (in_array($transfer->status, ['completed', 'cancelled'])) {
+            /** @var AssetTransfer $lockedTransfer */
+            $lockedTransfer = AssetTransfer::query()
+                ->whereKey($transfer->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (in_array($lockedTransfer->status, ['completed', 'cancelled'])) {
                 throw new \Exception('Transfer tidak dapat dibatalkan');
             }
 
-            $transfer->update([
+            $lockedTransfer->update([
                 'status' => 'cancelled',
                 'reason' => $transfer->reason . ($reason ? "\n\nDibatalkan: " . $reason : ''),
             ]);

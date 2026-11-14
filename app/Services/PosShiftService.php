@@ -40,38 +40,46 @@ class PosShiftService
         ?int $cabangId = null,
         ?string $notes = null
     ): PosShift {
-        $activeShift = $this->getActiveShift($user, $cabangId);
-        if ($activeShift) {
-            throw ValidationException::withMessages([
-                'starting_cash' => "Anda masih memiliki shift aktif ({$activeShift->shift_number}). Harap tutup shift tersebut sebelum membuka shift baru.",
-            ]);
-        }
+        return DB::transaction(function () use ($user, $startingCash, $warehouseId, $cabangId, $notes) {
+            $resolvedCabangId = $cabangId ?? $user->cabang_id;
 
-        $resolvedCabangId = $cabangId ?? $user->cabang_id;
-
-        if (!$warehouseId) {
-            $resolvedWarehouse = Warehouse::withoutGlobalScopes()
-                ->when($resolvedCabangId, fn($q) => $q->where('cabang_id', $resolvedCabangId))
+            $existingActive = PosShift::query()
+                ->where('user_id', $user->id)
+                ->where('status', 'open')
+                ->when($resolvedCabangId, fn ($q) => $q->where('cabang_id', $resolvedCabangId))
+                ->lockForUpdate()
                 ->first();
-            $warehouseId = $resolvedWarehouse?->id;
-        }
 
-        $shiftNumber = SequentialNumberGenerator::generate('pos_shifts', 'shift_number', 'SHF-');
+            if ($existingActive) {
+                throw ValidationException::withMessages([
+                    'starting_cash' => "Anda masih memiliki shift aktif ({$existingActive->shift_number}). Harap tutup shift tersebut sebelum membuka shift baru.",
+                ]);
+            }
 
-        return PosShift::create([
-            'shift_number' => $shiftNumber,
-            'user_id' => $user->id,
-            'cabang_id' => $resolvedCabangId,
-            'warehouse_id' => $warehouseId,
-            'opened_at' => Carbon::now(),
-            'starting_cash' => max(0, $startingCash),
-            'cash_sales_total' => 0,
-            'non_cash_sales_total' => 0,
-            'total_sales' => 0,
-            'total_transactions' => 0,
-            'status' => 'open',
-            'notes' => $notes,
-        ]);
+            if (! $warehouseId) {
+                $resolvedWarehouse = Warehouse::withoutGlobalScopes()
+                    ->when($resolvedCabangId, fn ($q) => $q->where('cabang_id', $resolvedCabangId))
+                    ->first();
+                $warehouseId = $resolvedWarehouse?->id;
+            }
+
+            $shiftNumber = SequentialNumberGenerator::generate('pos_shifts', 'shift_number', 'SHF-');
+
+            return PosShift::create([
+                'shift_number' => $shiftNumber,
+                'user_id' => $user->id,
+                'cabang_id' => $resolvedCabangId,
+                'warehouse_id' => $warehouseId,
+                'opened_at' => Carbon::now(),
+                'starting_cash' => max(0, $startingCash),
+                'cash_sales_total' => 0,
+                'non_cash_sales_total' => 0,
+                'total_sales' => 0,
+                'total_transactions' => 0,
+                'status' => 'open',
+                'notes' => $notes,
+            ]);
+        });
     }
 
     /**

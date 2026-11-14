@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PenerimaanBarangController extends Controller
@@ -204,6 +205,12 @@ class PenerimaanBarangController extends Controller
         try {
             return DB::transaction(function () use ($request, $validated, $action) {
                 $purchaseOrder = PurchaseOrder::findOrFail($validated['purchase_order_id']);
+
+                if (! in_array($purchaseOrder->status, ['approved', 'partially_received'], true)) {
+                    throw ValidationException::withMessages([
+                        'purchase_order_id' => "Penerimaan barang hanya dapat diproses untuk Purchase Order yang telah disetujui (Approved) atau diterima sebagian. Status PO {$purchaseOrder->po_number} saat ini: '{$purchaseOrder->status}'.",
+                    ]);
+                }
 
                 // Generate Nomor Penerimaan Resmi (GRN-YYYYMMDD-XXXX)
                 $receiptNumber = $this->receiptService->generateReceiptNumber();
@@ -499,6 +506,11 @@ class PenerimaanBarangController extends Controller
         if ($penerimaan->status === 'completed') {
             return redirect()->route('gudang.penerimaan.show', $penerimaan)
                 ->with('info', "Penerimaan barang ini sudah berstatus selesai/terkonfirmasi.");
+        }
+
+        if ($penerimaan->purchaseOrder && ! in_array($penerimaan->purchaseOrder->status, ['approved', 'partially_received'], true)) {
+            return redirect()->route('gudang.penerimaan.show', $penerimaan)
+                ->with('error', "Penerimaan barang tidak dapat dikonfirmasi karena Purchase Order {$penerimaan->purchaseOrder->po_number} berstatus '{$penerimaan->purchaseOrder->status}'.");
         }
 
         try {

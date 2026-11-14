@@ -17,8 +17,22 @@ class AssetDisposalService
     public function createDisposal(Asset $asset, array $data): AssetDisposal
     {
         return DB::transaction(function () use ($asset, $data) {
+            /** @var Asset $lockedAsset */
+            $lockedAsset = Asset::query()
+                ->whereKey($asset->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedAsset->status === 'disposed') {
+                throw new \RuntimeException('Aset ini sudah pernah dihapusbukukan (disposed).');
+            }
+
+            if ($lockedAsset->disposals()->whereIn('status', ['pending', 'completed'])->exists()) {
+                throw new \RuntimeException('Aset ini sudah memiliki catatan pelepasan (disposal).');
+            }
+
             // Calculate book value at disposal
-            $bookValueAtDisposal = $asset->book_value;
+            $bookValueAtDisposal = $lockedAsset->book_value;
 
             // Calculate gain/loss
             $gainLossAmount = null;
@@ -31,7 +45,7 @@ class AssetDisposalService
 
             // Create disposal record
             $disposal = AssetDisposal::create([
-                'asset_id' => $asset->id,
+                'asset_id' => $lockedAsset->id,
                 'disposal_date' => $data['disposal_date'],
                 'disposal_type' => $data['disposal_type'],
                 'sale_price' => $data['sale_price'] ?? null,
@@ -45,10 +59,10 @@ class AssetDisposalService
             ]);
 
             // Update asset status
-            $asset->update(['status' => 'disposed']);
+            $lockedAsset->update(['status' => 'disposed']);
 
             // Post journal entries
-            $this->postDisposalJournalEntries($asset, $disposal);
+            $this->postDisposalJournalEntries($lockedAsset, $disposal);
 
             return $disposal;
         });

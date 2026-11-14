@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class PosController extends Controller
@@ -135,6 +136,12 @@ class PosController extends Controller
 
         $user = Auth::user();
         $activeShift = $this->posShiftService->getActiveShift($user, $user->cabang_id);
+
+        if (!$activeShift) {
+            throw ValidationException::withMessages([
+                'shift' => 'Shift kasir belum dibuka. Harap buka shift kasir terlebih dahulu dengan memasukkan modal awal.',
+            ]);
+        }
 
         $order = $this->posOrderService->processOrder($validated, $user, $activeShift);
 

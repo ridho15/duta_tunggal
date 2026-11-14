@@ -61,6 +61,16 @@ class CustomerReturnService
             'warehouse' => $warehouseId ? \App\Models\Warehouse::withoutGlobalScopes()->whereKey($warehouseId)->value('name') : null];
 
         DB::transaction(function () use ($customerReturn, $warehouseId, &$summary) {
+            /** @var CustomerReturn $lockedReturn */
+            $lockedReturn = CustomerReturn::query()
+                ->whereKey($customerReturn->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedReturn->stock_restored_at !== null || $lockedReturn->status === CustomerReturn::STATUS_COMPLETED) {
+                throw new \Exception("Customer return #{$lockedReturn->return_number} has already been processed.");
+            }
+
             $totalRestoredCost = 0.0;
             $repairCost = 0.0;
             $replaceCost = 0.0;
@@ -68,13 +78,13 @@ class CustomerReturnService
             $totalDpp = 0.0;
             $totalPpn = 0.0;
 
-            $customerReturn->loadMissing([
+            $lockedReturn->loadMissing([
                 'customerReturnItems.invoiceItem.product',
                 'customerReturnItems.product',
                 'invoice',
             ]);
 
-            foreach ($customerReturn->customerReturnItems as $item) {
+            foreach ($lockedReturn->customerReturnItems as $item) {
                 // ── 0. Validate returnable quantity ───────────────────────────────
                 if ($item->invoiceItem) {
                     $alreadyReturned = CustomerReturnItem::where('invoice_item_id', $item->invoice_item_id)
@@ -221,25 +231,25 @@ class CustomerReturnService
 
             // ── 2. Create inventory journal entries ───────────────────────────────
             if ($totalRestoredCost > 0) {
-                $this->createInventoryJournalEntries($customerReturn, $totalRestoredCost, $replaceCost, $repairCost);
+                $this->createInventoryJournalEntries($lockedReturn, $totalRestoredCost, $replaceCost, $repairCost);
             }
 
             // ── 3. Create financial journal entries & adjust AR / Customer Deposit ──
             $totalReturnFin = round($totalDpp + $totalPpn, 2);
             if ($totalReturnFin > 0) {
-                $this->createFinancialJournalEntriesAndAdjustAr($customerReturn, $totalDpp, $totalPpn, $totalReturnFin);
+                $this->createFinancialJournalEntriesAndAdjustAr($lockedReturn, $totalDpp, $totalPpn, $totalReturnFin);
             }
 
             // ── 4. Mark as processed ──────────────────────────────────────────────
-            $customerReturn->update([
+            $lockedReturn->update([
                 'status'             => CustomerReturn::STATUS_COMPLETED,
                 'stock_restored_at'  => now(),
                 'completed_at'       => now(),
             ]);
 
             Log::info('CustomerReturn processed successfully', [
-                'return_id'          => $customerReturn->id,
-                'return_number'      => $customerReturn->return_number,
+                'return_id'          => $lockedReturn->id,
+                'return_number'      => $lockedReturn->return_number,
                 'warehouse_id'       => $warehouseId,
                 'total_restored_cost'=> $totalRestoredCost,
                 'total_financial'    => $totalReturnFin,
