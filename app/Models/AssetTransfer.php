@@ -22,12 +22,16 @@ class AssetTransfer extends Model
         'status',
         'completed_at',
         'completed_by',
+        'void_reason',
+        'voided_by',
+        'voided_at',
     ];
 
     protected $casts = [
         'transfer_date' => 'date',
         'approved_at' => 'datetime',
         'completed_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     // Relationships
@@ -59,6 +63,21 @@ class AssetTransfer extends Model
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
+    public function isCancelled(): bool
+    {
+        return in_array($this->status, ['cancelled', 'voided']);
+    }
+
+    public function isVoided(): bool
+    {
+        return in_array($this->status, ['cancelled', 'voided']);
     }
 
     // Accessors

@@ -427,9 +427,9 @@ class SaleOrderController extends Controller
         if ($customer->tipe_pembayaran === 'Kredit') {
             $creditCheck = $this->creditValidationService->canCustomerMakePurchase($customer, (float) $grandTotalIdr);
             if (! $creditCheck['can_purchase']) {
-                return redirect()->back()
-                    ->withInput()
-                    ->withErrors(['customer_id' => implode(' ', $creditCheck['messages'])]);
+                $creditWarning = 'Peringatan Plafon Kredit: ' . implode('; ', $creditCheck['messages']);
+                session()->flash('warning', $creditWarning . ' — Pesanan ini disimpan dan memerlukan persetujuan khusus (Credit Override) dari Super Admin / Owner / Finance Manager sebelum dapat disetujui.');
+                $validated['notes'] = trim(($validated['notes'] ?? '') . "\n[PERINGATAN PLAFON KREDIT]: " . implode('; ', $creditCheck['messages']));
             }
         }
 
@@ -659,6 +659,30 @@ class SaleOrderController extends Controller
 
         try {
             DB::transaction(function () use ($saleOrder, $user, $request) {
+                // Verifikasi Plafon Kredit untuk Customer bertipe Kredit
+                $saleOrder->loadMissing('customer');
+                if ($saleOrder->customer && $saleOrder->customer->tipe_pembayaran === 'Kredit') {
+                    $creditService = app(\App\Services\CreditValidationService::class);
+                    $creditCheck = $creditService->canCustomerMakePurchase($saleOrder->customer, (float) $saleOrder->grandTotal());
+                    if (! $creditCheck['can_purchase']) {
+                        $reason = trim((string) ($request->input('credit_override_reason') ?? $request->input('override_reason') ?? ''));
+                        if (! $user->hasRole(['Super Admin', 'Owner', 'Finance Manager']) || mb_strlen($reason) < 10) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'customer_id' => 'Plafon kredit pelanggan terlampaui (' . implode('; ', $creditCheck['messages']) . '). Persetujuan memerlukan wewenang Super Admin / Owner / Finance Manager dengan alasan resmi (minimal 10 karakter).',
+                            ]);
+                        }
+
+                        \App\Models\ApprovalOverride::create([
+                            'document_type' => 'sale_order',
+                            'document_id' => $saleOrder->getKey(),
+                            'user_id' => $user->getKey(),
+                            'amount' => (float) $saleOrder->total_amount,
+                            'reason' => $reason,
+                            'context' => ['kind' => 'credit_limit', 'document_number' => $saleOrder->so_number, 'blocked_by' => $creditCheck['messages']],
+                        ]);
+                    }
+                }
+
                 // Jika tipe COD, verifikasi Kasir dengan Saldo Titip Customer
                 if ($saleOrder->isCod() && ! $saleOrder->isCashierApproved()) {
                     $this->cashierVerificationService->verify(

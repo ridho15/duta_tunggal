@@ -104,15 +104,8 @@ class OrderRequestQuantityLock
                 $orQuantity = (float) ($orderRequestItem->quantity ?? 0);
                 $orReceivedQuantity = self::receiptQuantityForOrderRequestItem((int) $orderRequestItem->id, 'qty_received', $excludeReceiptItemId);
                 $orAcceptedQuantity = self::receiptQuantityForOrderRequestItem((int) $orderRequestItem->id, 'qty_accepted', $excludeReceiptItemId);
-                $fulfilledQuantity = (float) ($orderRequestItem->fulfilled_quantity ?? 0);
-                if ($excludeReceiptItemId) {
-                    $excludedItem = PurchaseReceiptItem::withoutGlobalScopes()->find($excludeReceiptItemId);
-                    if ($excludedItem) {
-                        $fulfilledQuantity = max(0, $fulfilledQuantity - (float) $excludedItem->qty_accepted);
-                    }
-                }
-                $orRemainingReceived = max(0, $orQuantity - max($orAcceptedQuantity, $fulfilledQuantity));
-                $orRemainingAccepted = max(0, $orQuantity - max($orAcceptedQuantity, $fulfilledQuantity));
+                $orRemainingReceived = max(0, $orQuantity - $orReceivedQuantity);
+                $orRemainingAccepted = max(0, $orQuantity - $orAcceptedQuantity);
                 $remainingReceived = min($remainingReceived, $orRemainingReceived);
                 $remainingAccepted = min($remainingAccepted, $orRemainingAccepted);
             }
@@ -233,17 +226,17 @@ class OrderRequestQuantityLock
         }
     }
 
-    protected static function receiptQuantityForPurchaseOrderItem(int $purchaseOrderItemId, string $column, ?int $excludeReceiptItemId = null): float
+    public static function receiptQuantityForPurchaseOrderItem(int $purchaseOrderItemId, string $column, ?int $excludeReceiptItemId = null): float
     {
         return (float) PurchaseReceiptItem::withoutGlobalScopes()
             ->whereNull('deleted_at')
-            ->whereHas('purchaseReceipt', fn ($query) => $query->whereNull('deleted_at'))
+            ->whereHas('purchaseReceipt', fn ($query) => $query->whereNull('deleted_at')->where('status', '!=', 'cancelled'))
             ->where('purchase_order_item_id', $purchaseOrderItemId)
             ->when($excludeReceiptItemId, fn ($query) => $query->whereKeyNot($excludeReceiptItemId))
             ->sum($column);
     }
 
-    protected static function receiptQuantityForOrderRequestItem(int $orderRequestItemId, string $column, ?int $excludeReceiptItemId = null): float
+    public static function receiptQuantityForOrderRequestItem(int $orderRequestItemId, string $column, ?int $excludeReceiptItemId = null): float
     {
         $poItemIds = PurchaseOrderItem::withoutGlobalScopes()
             ->whereNull('deleted_at')
@@ -257,7 +250,7 @@ class OrderRequestQuantityLock
 
         return (float) PurchaseReceiptItem::withoutGlobalScopes()
             ->whereNull('deleted_at')
-            ->whereHas('purchaseReceipt', fn ($query) => $query->whereNull('deleted_at'))
+            ->whereHas('purchaseReceipt', fn ($query) => $query->whereNull('deleted_at')->where('status', '!=', 'cancelled'))
             ->whereIn('purchase_order_item_id', $poItemIds)
             ->when($excludeReceiptItemId, fn ($query) => $query->whereKeyNot($excludeReceiptItemId))
             ->sum($column);

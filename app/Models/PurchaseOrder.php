@@ -320,11 +320,12 @@ class PurchaseOrder extends Model
             return;
         }
 
+        $this->unsetRelation('purchaseOrderItem');
         $summary = $this->receiptFulfillmentSummary();
         $newStatus = match ($summary['status_label']) {
             'Semua Diterima' => 'completed',
             'Sebagian Diterima' => 'partially_received',
-            default => $this->status === 'completed' ? 'approved' : $this->status,
+            default => in_array($this->status, ['completed', 'partially_received']) ? 'approved' : $this->status,
         };
 
         if ($newStatus === $this->status) {

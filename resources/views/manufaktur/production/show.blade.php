@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Bukti Hasil Produksi ' . $production->production_number . ' – Duta Tunggal ERP')
 
@@ -66,6 +66,23 @@
             @php
                 $qc = $production->qualityControl;
             @endphp
+
+            @if ($production->status === 'finished' && (!$qc || (int)$qc->status === 0))
+                <form action="{{ route('manufaktur.production.revert-draft', $production) }}" method="POST" class="inline">
+                    @csrf
+                    <button
+                        type="submit"
+                        onclick="return confirm('Kembalikan dokumen produksi ini ke status Draft untuk mengoreksi kuantitas? Dokumen QC yang belum diproses akan dibersihkan.')"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-amber-200 hover:bg-amber-50 text-amber-800 text-xs font-semibold rounded-xl transition shadow-sm"
+                    >
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                        Kembalikan ke Draft
+                    </button>
+                </form>
+            @endif
+
             @if ($qc && $qc->exists)
                 @if ($qc->status == 0)
                     <a

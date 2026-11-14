@@ -138,4 +138,46 @@ class AssetTransferService
             return $transfer;
         });
     }
+
+    /**
+     * Membatalkan / Void Transfer Aset yang sudah Disetujui atau Selesai (Completed).
+     * Jika status sudah completed, kepemilikan cabang aset dikembalikan ke cabang asal (from_cabang_id).
+     */
+    public function voidTransfer(AssetTransfer $transfer, string $reason, ?int $userId = null): AssetTransfer
+    {
+        return DB::transaction(function () use ($transfer, $reason, $userId) {
+            /** @var AssetTransfer $lockedTransfer */
+            $lockedTransfer = AssetTransfer::query()
+                ->whereKey($transfer->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedTransfer->isCancelled()) {
+                throw new \RuntimeException('Transfer aset ini sudah dibatalkan sebelumnya.');
+            }
+
+            /** @var Asset $lockedAsset */
+            $lockedAsset = Asset::query()
+                ->whereKey($lockedTransfer->asset_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Jika transfer sudah selesai (completed), kembalikan aset ke cabang asal
+            if ($lockedTransfer->status === 'completed') {
+                $lockedAsset->update([
+                    'cabang_id' => $lockedTransfer->from_cabang_id,
+                ]);
+            }
+
+            $lockedTransfer->update([
+                'status' => 'cancelled',
+                'void_reason' => $reason,
+                'voided_by' => $userId ?? Auth::id(),
+                'voided_at' => now(),
+                'reason' => $lockedTransfer->reason . ($reason ? "\n\n[VOID oleh Super Admin]: " . $reason : ''),
+            ]);
+
+            return $lockedTransfer;
+        });
+    }
 }

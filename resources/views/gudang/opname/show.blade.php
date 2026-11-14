@@ -68,6 +68,20 @@
                 </form>
             @endif
 
+            @if (in_array($opname->status, ['in_progress', 'completed']))
+                <button type="button"
+                        @click="$dispatch('open-modal-cancel-opname')"
+                        class="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm">
+                    Batalkan Sesi Opname
+                </button>
+            @endif
+
+            @if ($opname->status === 'cancelled')
+                <button type="button" @click="$dispatch('open-modal-delete-opname')" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
+                    Hapus Sesi
+                </button>
+            @endif
+
             @if ($opname->status === 'completed')
                 <button type="button" @click="$dispatch('open-modal-recount-opname')" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Hitung Ulang
@@ -470,8 +484,8 @@
         }
     }
 </script>
-    @if ($opname->status === 'draft')
-    {{-- Modal Konfirmasi Hapus Draft Opname (Hanya untuk status Draft) --}}
+    @if (in_array($opname->status, ['draft', 'cancelled']))
+    {{-- Modal Konfirmasi Hapus Sesi Opname (Draft atau Cancelled) --}}
     <x-confirmation-modal
         name="delete-opname"
         title="Hapus Sesi Stock Opname"
@@ -482,13 +496,35 @@
         method="DELETE"
     >
         <p class="text-sm text-gray-600">
-            Apakah Anda yakin ingin menghapus sesi stock opname draft <strong>{{ $opname->opname_number }}</strong>?
+            Apakah Anda yakin ingin menghapus sesi stock opname <strong>{{ $opname->opname_number }}</strong>?
         </p>
         <p class="text-xs text-rose-600 mt-2 font-medium">
             Tindakan ini tidak dapat dibatalkan dan seluruh draf perhitungan fisik akan dihapus.
         </p>
     </x-confirmation-modal>
     @endif
+
+    {{-- Modal Konfirmasi Batalkan Sesi Opname --}}
+    <x-confirmation-modal
+        name="cancel-opname"
+        title="Batalkan Sesi Stock Opname"
+        variant="danger"
+        confirm-text="Ya, Batalkan Sesi"
+        cancel-text="Kembali"
+        action="{{ route('gudang.opname.cancel', $opname) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin membatalkan sesi stock opname <strong>{{ $opname->opname_number }}</strong>?
+        </p>
+        <p class="text-xs text-rose-600 mt-2 font-medium">
+            Sesi ini akan ditandai Dibatalkan tanpa memutasi saldo kartu stok maupun jurnal akuntansi.
+        </p>
+        <div class="mt-3 text-left">
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Pembatalan Opname:</label>
+            <input type="text" name="cancel_reason" required placeholder="Contoh: Jadwal audit fisik diundur / salah pilih gudang" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
+        </div>
+    </x-confirmation-modal>
 
     {{-- Modal Konfirmasi Hitung Ulang --}}
     <x-confirmation-modal

@@ -25,7 +25,7 @@ class CustomerReceiptCancellation
     public function __construct(private readonly LedgerPostingService $ledger) {}
 
     /** Alasan mengapa penerimaan ini tidak boleh dibatalkan otomatis; null = boleh. */
-    public function blocker(CustomerReceipt $receipt): ?string
+    public function blocker(CustomerReceipt $receipt, ?User $actor = null): ?string
     {
         $status = strtolower((string) $receipt->status);
         if ($status === 'cancelled') {
@@ -39,32 +39,86 @@ class CustomerReceiptCancellation
         if ($items->isEmpty()) {
             return 'Penerimaan tanpa rincian item tidak dapat dibatalkan otomatis; hubungi akuntansi.';
         }
-        if ($items->contains(fn ($item) => strtolower((string) $item->method) === 'deposit')
+
+        $hasDeposit = $items->contains(fn ($item) => strtolower((string) $item->method) === 'deposit')
             || strtolower((string) $receipt->payment_method) === 'deposit'
             || (float) $receipt->overpayment_amount > 0
-            || $receipt->deposit_id) {
-            return 'Penerimaan yang memakai atau menghasilkan deposit tidak dapat dibatalkan otomatis; koreksi lewat akuntansi.';
+            || $receipt->deposit_id;
+
+        if ($hasDeposit) {
+            $isSuperAdmin = $actor && (
+                (method_exists($actor, 'canManageAllCabang') && $actor->canManageAllCabang())
+                || (method_exists($actor, 'hasRole') && $actor->hasRole(['Super Admin', 'Finance Manager', 'Director']))
+            );
+
+            if (! $isSuperAdmin) {
+                return 'Penerimaan yang memakai atau menghasilkan deposit tidak dapat dibatalkan otomatis; koreksi memerlukan otorisasi Super Admin / Finance Manager.';
+            }
+
+            // Super Admin safety check: jika menghasilkan deposit, pastikan belum dibelanjakan pada transaksi lain
+            $deposit = $receipt->deposit_id ? \App\Models\Deposit::find($receipt->deposit_id) : null;
+            if (! $deposit && (float) $receipt->overpayment_amount > 0) {
+                $deposit = \App\Models\Deposit::where('from_model_type', \App\Models\Customer::class)
+                    ->where('from_model_id', $receipt->customer_id)
+                    ->where('note', 'like', "%#{$receipt->id}%")
+                    ->first();
+            }
+
+            if ($deposit && (float) $deposit->used_amount > 0.01) {
+                return "Deposit kelebihan bayar hasil kwitansi ini (Rp " . number_format($deposit->amount, 0, ',', '.') . ") sudah terpakai sebagian (Rp " . number_format($deposit->used_amount, 0, ',', '.') . ") oleh transaksi lain; batalkan transaksi pemakaian deposit terlebih dahulu.";
+            }
         }
 
         return null;
     }
 
+    public function isSuperAdminCancellable(CustomerReceipt $receipt): bool
+    {
+        $status = strtolower((string) $receipt->status);
+        if ($status === 'cancelled' || ! in_array($status, ['partial', 'paid'], true)) {
+            return false;
+        }
+
+        $items = $receipt->customerReceiptItem()->get();
+        if ($items->isEmpty()) {
+            return false;
+        }
+
+        $deposit = $receipt->deposit_id ? \App\Models\Deposit::find($receipt->deposit_id) : null;
+        if (! $deposit && (float) $receipt->overpayment_amount > 0) {
+            $deposit = \App\Models\Deposit::where('from_model_type', \App\Models\Customer::class)
+                ->where('from_model_id', $receipt->customer_id)
+                ->where('note', 'like', "%#{$receipt->id}%")
+                ->first();
+        }
+
+        if ($deposit && (float) $deposit->used_amount > 0.01) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * @throws ValidationException
      */
-    public function cancel(CustomerReceipt $receipt, string $reason, ?User $actor = null): CustomerReceipt
+    public function cancel(CustomerReceipt $receipt, string $reason, ?User $actor = null, bool $force = false): CustomerReceipt
     {
         $reason = trim($reason);
         if (mb_strlen($reason) < 10) {
             throw ValidationException::withMessages(['reason' => 'Alasan pembatalan wajib diisi (minimal 10 karakter).']);
         }
 
-        DB::transaction(function () use ($receipt, $reason, $actor) {
+        return DB::transaction(function () use ($receipt, $reason, $actor, $force) {
             $locked = CustomerReceipt::withoutGlobalScopes()->lockForUpdate()->findOrFail($receipt->getKey());
 
-            if ($message = $this->blocker($locked)) {
+            $effectiveActor = $force ? ($actor ?? Auth::user()) : $actor;
+            if ($message = $this->blocker($locked, $effectiveActor)) {
                 throw ValidationException::withMessages(['receipt' => $message]);
             }
+
+            // 0. Balikkan efek deposit jika kwitansi memakai / menghasilkan deposit
+            $this->reverseDeposits($locked);
 
             // 1. Jurnal dibalik (entri cermin; asli ditandai)
             $this->reverseJournals($locked);
@@ -77,9 +131,76 @@ class CustomerReceiptCancellation
             $locked->forceFill([
                 'status' => 'Cancelled', 'cancelled_at' => now(), 'cancelled_by' => $actorId, 'cancel_reason' => $reason,
             ])->save();
-        });
 
-        return $receipt->refresh();
+            return $locked->refresh();
+        });
+    }
+
+    /**
+     * Membalikkan mutasi saldo deposit pelanggan saat kwitansi dibatalkan.
+     */
+    private function reverseDeposits(CustomerReceipt $receipt): void
+    {
+        // 1. Tarik kembali overpayment deposit jika dihasilkan dari kwitansi ini
+        $deposit = $receipt->deposit_id ? \App\Models\Deposit::find($receipt->deposit_id) : null;
+        if (! $deposit && (float) $receipt->overpayment_amount > 0) {
+            $deposit = \App\Models\Deposit::where('from_model_type', \App\Models\Customer::class)
+                ->where('from_model_id', $receipt->customer_id)
+                ->where('note', 'like', "%#{$receipt->id}%")
+                ->first();
+        }
+
+        if ($deposit) {
+            JournalEntry::withoutGlobalScopes()
+                ->where('source_type', \App\Models\Deposit::class)
+                ->where('source_id', $deposit->id)
+                ->delete();
+            $deposit->delete();
+        }
+
+        // 2. Kembalikan saldo deposit yang digunakan jika metode bayar adalah deposit
+        $hasDepositMethod = strtolower((string) $receipt->payment_method) === 'deposit'
+            || $receipt->customerReceiptItem()->where('method', 'Deposit')->exists();
+
+        if ($hasDepositMethod) {
+            $itemIds = $receipt->customerReceiptItem()->pluck('id');
+            $logs = \App\Models\DepositLog::where('type', 'use')
+                ->whereIn('deposit_loggable_id', $itemIds)
+                ->get();
+
+            if ($logs->isNotEmpty()) {
+                foreach ($logs as $log) {
+                    $dep = $log->deposit;
+                    if ($dep) {
+                        $dep->remaining_amount += (float) $log->amount;
+                        $dep->used_amount = max(0.0, (float) $dep->used_amount - (float) $log->amount);
+                        if ($dep->status === 'closed') {
+                            $dep->status = 'active';
+                        }
+                        $dep->saveQuietly();
+                    }
+                    $log->delete();
+                }
+            } else {
+                $totalUsed = (float) $receipt->customerReceiptItem()->where('method', 'Deposit')->sum('amount');
+                if ($totalUsed <= 0 && strtolower((string) $receipt->payment_method) === 'deposit') {
+                    $totalUsed = (float) $receipt->total_payment;
+                }
+                if ($totalUsed > 0) {
+                    $dep = \App\Models\Deposit::where('from_model_type', \App\Models\Customer::class)
+                        ->where('from_model_id', $receipt->customer_id)
+                        ->first();
+                    if ($dep) {
+                        $dep->remaining_amount += $totalUsed;
+                        $dep->used_amount = max(0.0, (float) $dep->used_amount - $totalUsed);
+                        if ($dep->status === 'closed') {
+                            $dep->status = 'active';
+                        }
+                        $dep->saveQuietly();
+                    }
+                }
+            }
+        }
     }
 
     /** Jurnal penerimaan yang akan dibalik (dipakai eksekusi DAN pratinjau dampak). */

@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\ProductionPlan;
 use App\Models\Warehouse;
 use App\Services\ManufacturingService;
+use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -432,7 +433,7 @@ class ManufacturingOrderController extends Controller
     }
 
     /**
-     * Membatalkan SPK (Status: cancelled).
+     * Membatalkan SPK (Status: cancelled) dengan dukungan Intervensi Darurat Super Admin.
      */
     public function cancel(Request $request, ManufacturingOrder $manufacturingOrder): RedirectResponse
     {
@@ -442,22 +443,10 @@ class ManufacturingOrderController extends Controller
                 ->with('error', 'SPK yang sudah selesai atau sudah dibatalkan tidak dapat diubah.');
         }
 
-        // Cek jika ada bahan baku yang sudah dikeluarkan dan belum diretur
-        $hasActiveMaterialIssues = MaterialIssue::query()
-            ->where(function ($q) use ($manufacturingOrder) {
-                $q->where('manufacturing_order_id', $manufacturingOrder->id);
-                if ($manufacturingOrder->production_plan_id) {
-                    $q->orWhere('production_plan_id', $manufacturingOrder->production_plan_id);
-                }
-            })
-            ->whereIn('status', ['approved', 'completed'])
-            ->exists();
-
-        if ($hasActiveMaterialIssues) {
-            return redirect()
-                ->back()
-                ->with('error', 'SPK tidak dapat dibatalkan karena bahan baku sudah dikeluarkan dari gudang. Lakukan Retur Bahan Baku terlebih dahulu sebelum membatalkan SPK.');
-        }
+        $user = Auth::user();
+        $isSuperAdmin = $user && (MenuAccess::isSuper($user) || (method_exists($user, 'canManageAllCabang') && $user->canManageAllCabang()));
+        $forceCancel = $request->boolean('force_cancel') && $isSuperAdmin;
+        $cancelReason = trim((string) $request->input('cancel_reason', 'Dibatalkan oleh manajemen operasional'));
 
         // Cek jika ada produksi yang sudah lulus QC
         $hasApprovedQc = $manufacturingOrder->productions()
@@ -470,21 +459,111 @@ class ManufacturingOrderController extends Controller
                 ->with('error', 'SPK tidak dapat dibatalkan karena hasil produksi sudah lulus QC dan masuk stok barang jadi gudang.');
         }
 
+        // Cek jika ada bahan baku yang sudah dikeluarkan
+        $activeMaterialIssues = MaterialIssue::query()
+            ->where(function ($q) use ($manufacturingOrder) {
+                $q->where('manufacturing_order_id', $manufacturingOrder->id);
+                if ($manufacturingOrder->production_plan_id) {
+                    $q->orWhere('production_plan_id', $manufacturingOrder->production_plan_id);
+                }
+            })
+            ->whereIn('status', ['approved', 'completed'])
+            ->get();
+
+        if ($activeMaterialIssues->isNotEmpty() && ! $forceCancel) {
+            return redirect()
+                ->back()
+                ->with('error', 'SPK tidak dapat dibatalkan karena bahan baku sudah dikeluarkan dari gudang. Lakukan Retur Bahan Baku terlebih dahulu atau gunakan Intervensi Batal Darurat (Super Admin).');
+        }
+
         DB::beginTransaction();
         try {
             $moNumber = $manufacturingOrder->mo_number;
 
-            $manufacturingOrder->update(['status' => 'cancelled']);
+            // Jika force cancel oleh Super Admin: balikkan mutasi stok dan jurnal BDP bahan baku yang sudah keluar
+            if ($forceCancel && $activeMaterialIssues->isNotEmpty()) {
+                foreach ($activeMaterialIssues as $mi) {
+                    // Hapus stock movements (StockMovementObserver::deleted akan mengembalikan kuantitas stok di gudang)
+                    $movements = \App\Models\StockMovement::where('from_model_type', MaterialIssue::class)
+                        ->where('from_model_id', $mi->id)
+                        ->get();
+                    foreach ($movements as $m) {
+                        $m->delete();
+                    }
+
+                    // Hapus jurnal BDP
+                    \App\Models\JournalEntry::where('source_type', MaterialIssue::class)
+                        ->where('source_id', $mi->id)
+                        ->delete();
+
+                    // Batalkan warehouse confirmation
+                    $mi->warehouseConfirmations()->update([
+                        'status' => 'rejected',
+                        'rejection_reason' => "SPK {$moNumber} dibatalkan paksa: {$cancelReason}",
+                        'confirmed_by' => $user?->id,
+                        'confirmed_at' => now(),
+                    ]);
+
+                    $mi->update([
+                        'status' => MaterialIssue::STATUS_CANCELLED,
+                        'notes' => trim(($mi->notes ? $mi->notes . "\n\n" : '') . "DIBATALKAN DARURAT OLEH SUPER ADMIN: {$cancelReason} (" . now()->format('d/m/Y H:i') . ')'),
+                    ]);
+                }
+            }
+
+            // Bersihkan dokumen Material Issue yang masih draft / pending_approval agar tidak menggantung
+            $pendingIssues = MaterialIssue::query()
+                ->where(function ($q) use ($manufacturingOrder) {
+                    $q->where('manufacturing_order_id', $manufacturingOrder->id);
+                    if ($manufacturingOrder->production_plan_id) {
+                        $q->orWhere('production_plan_id', $manufacturingOrder->production_plan_id);
+                    }
+                })
+                ->whereIn('status', ['draft', 'pending_approval'])
+                ->get();
+
+            $stockReservationService = app(\App\Services\StockReservationService::class);
+            foreach ($pendingIssues as $pi) {
+                try {
+                    $stockReservationService->releaseStockReservationsForMaterialIssue($pi);
+                } catch (\Throwable $e) {
+                    // Abaikan jika tidak ada reservasi
+                }
+
+                $pi->warehouseConfirmations()->update([
+                    'status' => 'rejected',
+                    'rejection_reason' => "SPK {$moNumber} dibatalkan",
+                    'confirmed_by' => $user?->id,
+                    'confirmed_at' => now(),
+                ]);
+
+                $pi->update([
+                    'status' => MaterialIssue::STATUS_CANCELLED,
+                    'notes' => trim(($pi->notes ? $pi->notes . "\n\n" : '') . "Dibatalkan karena SPK {$moNumber} dibatalkan"),
+                ]);
+            }
+
+            // Bersihkan produksi yang belum ada QC
+            $manufacturingOrder->productions()->whereDoesntHave('qualityControl')->delete();
+
+            $cancellationNote = "SPK DIBATALKAN: {$cancelReason} (" . now()->format('d/m/Y H:i') . ')';
+            $manufacturingOrder->update([
+                'status' => 'cancelled',
+            ]);
 
             if ($manufacturingOrder->productionPlan) {
-                $manufacturingOrder->productionPlan->update(['status' => 'cancelled']);
+                $planNotes = trim(($manufacturingOrder->productionPlan->notes ? $manufacturingOrder->productionPlan->notes . "\n\n" : '') . $cancellationNote);
+                $manufacturingOrder->productionPlan->update([
+                    'status' => 'cancelled',
+                    'notes' => $planNotes,
+                ]);
             }
 
             DB::commit();
 
             return redirect()
                 ->route('manufaktur.spk.index')
-                ->with('success', "SPK {$moNumber} telah dibatalkan.");
+                ->with('success', "SPK {$moNumber} telah berhasil dibatalkan beserta seluruh alokasi bahan bakunya.");
         } catch (Throwable $e) {
             DB::rollBack();
             return redirect()

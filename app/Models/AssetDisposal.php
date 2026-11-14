@@ -22,6 +22,9 @@ class AssetDisposal extends Model
         'approved_by',
         'approved_at',
         'status',
+        'void_reason',
+        'voided_by',
+        'voided_at',
     ];
 
     protected $casts = [
@@ -30,6 +33,7 @@ class AssetDisposal extends Model
         'book_value_at_disposal' => 'decimal:2',
         'gain_loss_amount' => 'decimal:2',
         'approved_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     // Relationships
@@ -41,6 +45,21 @@ class AssetDisposal extends Model
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
+    public function isCancelled(): bool
+    {
+        return in_array($this->status, ['cancelled', 'voided']);
+    }
+
+    public function isVoided(): bool
+    {
+        return in_array($this->status, ['cancelled', 'voided']);
     }
 
     public function journalEntries()

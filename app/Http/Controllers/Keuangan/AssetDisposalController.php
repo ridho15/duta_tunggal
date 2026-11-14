@@ -190,4 +190,28 @@ class AssetDisposalController extends Controller
         $filename = "Berita_Acara_Pelepasan_Aset_{$disposal->id}.pdf";
         return $pdf->stream($filename);
     }
+
+    /**
+     * Batalkan / Void Pelepasan Aset (Intervensi Super Admin / Finance Manager).
+     */
+    public function void(AssetDisposal $disposal, Request $request): RedirectResponse
+    {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete asset disposal'], 'Anda tidak memiliki hak akses untuk membatalkan pelepasan aset.');
+
+        $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'reason.required' => 'Alasan pembatalan pelepasan aset wajib diisi.',
+            'reason.min' => 'Alasan pembatalan minimal 5 karakter.',
+        ]);
+
+        try {
+            $this->disposalService->voidDisposal($disposal, $request->input('reason'), auth()->id());
+
+            return redirect()->route('keuangan.asset.disposal.show', $disposal->id)
+                ->with('success', 'Pelepasan aset berhasil dibatalkan. Status aset dipulihkan menjadi aktif dan jurnal GL telah dibersihkan.');
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Gagal membatalkan pelepasan aset: ' . $e->getMessage());
+        }
+    }
 }

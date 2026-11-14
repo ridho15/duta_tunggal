@@ -18,11 +18,22 @@
             </div>
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-mono">{{ $transfer->number }}</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    &bull; {{ ucfirst($transfer->status ?? 'posted') }}
-                </span>
+                @if ($transfer->isCancelled())
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        &bull; Dibatalkan
+                    </span>
+                @else
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        &bull; {{ ucfirst($transfer->status ?? 'posted') }}
+                    </span>
+                @endif
             </div>
-            <p class="text-sm text-gray-500 mt-0.5">Tanggal transfer: {{ \Carbon\Carbon::parse($transfer->date)->translatedFormat('d F Y') }}</p>
+            <p class="text-sm text-gray-500 mt-0.5">
+                Tanggal transfer: {{ \Carbon\Carbon::parse($transfer->date)->translatedFormat('d F Y') }}
+                @if ($transfer->isCancelled())
+                    &bull; <span class="text-rose-600 font-semibold">Dibatalkan pada {{ $transfer->cancelled_at?->format('d/m/Y H:i') }} oleh {{ $transfer->cancelledBy->name ?? 'Admin' }} (Alasan: "{{ $transfer->cancel_reason }}")</span>
+                @endif
+            </p>
         </div>
 
         <div class="flex items-center gap-2.5">
@@ -40,14 +51,16 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Cetak Bukti Transfer PDF
             </a>
-            <button
-                type="button"
-                @click="deleteModalOpen = true"
-                class="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-rose-300 hover:bg-rose-50 text-rose-600 text-xs font-semibold rounded-lg shadow-sm transition"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                Batalkan
-            </button>
+            @if (!$transfer->isCancelled())
+                <button
+                    type="button"
+                    @click="deleteModalOpen = true"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Batalkan Transfer
+                </button>
+            @endif
         </div>
     </div>
 
@@ -252,35 +265,61 @@
     >
         <div
             @click.away="deleteModalOpen = false"
-            class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-gray-100"
+            class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-gray-100 space-y-4"
         >
-            <div class="flex items-center gap-3 text-rose-600 mb-3">
+            <div class="flex items-center gap-3 text-rose-600 border-b border-gray-100 pb-3">
                 <div class="p-2.5 bg-rose-50 rounded-full">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>
-                <h3 class="text-lg font-bold text-gray-900">Batalkan &amp; Hapus Transfer</h3>
+                <div>
+                    <h3 class="text-base font-extrabold text-gray-900">Batalkan Transfer Antar Rekening</h3>
+                    <p class="text-xs text-gray-500 font-mono">{{ $transfer->number }}</p>
+                </div>
             </div>
-            <p class="text-xs text-gray-600 leading-relaxed mb-4">
-                Apakah Anda yakin ingin membatalkan transfer nomor <span class="font-bold text-gray-900 font-mono">{{ $transfer->number }}</span>?
-                <br><br>
-                <span class="text-rose-600 font-semibold">Peringatan:</span> Transaksi dan jurnal transfer saldo terkait akan dihapus secara permanen.
-            </p>
-            <form action="{{ route('keuangan.cashbank.transfer.destroy', $transfer) }}" method="POST" class="flex items-center justify-end gap-2.5">
+
+            <div class="text-xs text-gray-600 space-y-2">
+                <p>
+                    Pembatalan ini akan memulihkan saldo akun kas/bank dan membatalkan seluruh mutasi jurnal:
+                </p>
+                <ul class="list-disc list-inside space-y-1 text-gray-700 bg-rose-50/60 p-3 rounded-xl border border-rose-100">
+                    <li>Saldo akun <span class="font-bold">{{ $transfer->fromCoa?->name }}</span> akan dikembalikan.</li>
+                    <li>Saldo akun tujuan <span class="font-bold">{{ $transfer->toCoa?->name }}</span> akan dikurangi kembali.</li>
+                    <li>Seluruh baris entri jurnal akuntansi transfer akan dibersihkan.</li>
+                    <li>Status dokumen transfer akan ditandai <span class="font-bold text-rose-700">Dibatalkan</span>.</li>
+                </ul>
+            </div>
+
+            <form action="{{ route('keuangan.cashbank.transfer.cancel', $transfer) }}" method="POST" class="space-y-4">
                 @csrf
-                @method('DELETE')
-                <button
-                    type="button"
-                    @click="deleteModalOpen = false"
-                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition"
-                >
-                    Batal
-                </button>
-                <button
-                    type="submit"
-                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
-                >
-                    Ya, Batalkan Transfer
-                </button>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-gray-700">
+                        Alasan Pembatalan Transfer <span class="text-red-500">* (Minimal 5 karakter)</span>
+                    </label>
+                    <textarea
+                        name="cancel_reason"
+                        rows="3"
+                        required
+                        minlength="5"
+                        placeholder="Contoh: Kliring antar bank ditolak / salah input rekening tujuan..."
+                        class="w-full text-xs p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                    ></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
+                    <button
+                        type="button"
+                        @click="deleteModalOpen = false"
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition"
+                    >
+                        Konfirmasi Batalkan Transfer
+                    </button>
+                </div>
             </form>
         </div>
     </div>

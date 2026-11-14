@@ -656,6 +656,136 @@ class MaterialIssueController extends Controller
     }
 
     /**
+     * Membatalkan pengajuan Material Issue yang belum selesai (Draft / Pending Approval / Approved).
+     */
+    public function cancel(Request $request, MaterialIssue $materialIssue): RedirectResponse
+    {
+        if (in_array($materialIssue->status, [MaterialIssue::STATUS_COMPLETED, MaterialIssue::STATUS_CANCELLED], true)) {
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('error', "Dokumen berstatus {$materialIssue->status} tidak dapat dibatalkan melalui aksi ini. Gunakan fitur Void jika dokumen sudah Selesai.");
+        }
+
+        $reason = trim((string) $request->input('cancel_reason', 'Dibatalkan oleh staf produksi'));
+
+        try {
+            DB::beginTransaction();
+
+            // Batalkan konfirmasi gudang
+            foreach ($materialIssue->warehouseConfirmations as $wc) {
+                $wc->update([
+                    'status' => 'rejected',
+                    'rejection_reason' => $reason,
+                    'confirmed_by' => Auth::id(),
+                    'confirmed_at' => now(),
+                ]);
+            }
+
+            // Lepaskan reservasi stok jika ada
+            $stockReservationService = app(\App\Services\StockReservationService::class);
+            try {
+                $stockReservationService->releaseStockReservationsForMaterialIssue($materialIssue);
+            } catch (\Throwable $e) {
+                // Abaikan jika tidak ada reservasi
+            }
+
+            $notes = trim(($materialIssue->notes ? $materialIssue->notes . "\n\n" : '') . "DIBATALKAN: {$reason} (" . now()->format('d/m/Y H:i') . ')');
+
+            $materialIssue->update([
+                'status' => MaterialIssue::STATUS_CANCELLED,
+                'approved_by' => null,
+                'approved_at' => null,
+                'notes' => $notes,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('success', "Dokumen {$materialIssue->issue_number} berhasil dibatalkan dan reservasi stok telah dilepaskan.");
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('error', 'Gagal membatalkan dokumen: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Void Material Issue yang sudah selesai (Completed) khusus Super Admin.
+     * Mengembalikan stok fisik bahan baku ke gudang dan menghapus jurnal BDP.
+     */
+    public function void(Request $request, MaterialIssue $materialIssue): RedirectResponse
+    {
+        $user = Auth::user();
+        $isSuperAdmin = $user && (\App\Support\MenuAccess::isSuper($user) || (method_exists($user, 'canManageAllCabang') && $user->canManageAllCabang()));
+
+        if (! $isSuperAdmin) {
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('error', 'Hanya Super Admin / Owner yang memiliki hak akses untuk melakukan Void dokumen bahan baku.');
+        }
+
+        if ($materialIssue->status !== MaterialIssue::STATUS_COMPLETED) {
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('error', 'Hanya dokumen berstatus Selesai (Completed) yang dapat di-void.');
+        }
+
+        $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $reason = $request->input('cancel_reason');
+
+        try {
+            DB::beginTransaction();
+
+            // 1. Hapus stock movements terkait agar StockMovementObserver::deleted otomatis mengembalikan qty_available stok fisik di gudang
+            $movements = \App\Models\StockMovement::where('from_model_type', MaterialIssue::class)
+                ->where('from_model_id', $materialIssue->id)
+                ->get();
+            foreach ($movements as $m) {
+                $m->delete();
+            }
+
+            // 2. Hapus jurnal BDP terkait
+            \App\Models\JournalEntry::where('source_type', MaterialIssue::class)
+                ->where('source_id', $materialIssue->id)
+                ->delete();
+
+            // 3. Batalkan warehouse confirmation
+            foreach ($materialIssue->warehouseConfirmations as $wc) {
+                $wc->update([
+                    'status' => 'rejected',
+                    'rejection_reason' => "VOID: {$reason}",
+                    'confirmed_by' => $user->id,
+                    'confirmed_at' => now(),
+                ]);
+            }
+
+            // 4. Update status dokumen ke cancelled
+            $notes = trim(($materialIssue->notes ? $materialIssue->notes . "\n\n" : '') . "DIVOID OLEH SUPER ADMIN: {$reason} (" . now()->format('d/m/Y H:i') . ')');
+
+            $materialIssue->update([
+                'status' => MaterialIssue::STATUS_CANCELLED,
+                'notes' => $notes,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('success', "Dokumen {$materialIssue->issue_number} berhasil di-void. Stok bahan baku telah dikembalikan ke gudang dan jurnal BDP telah dibatalkan.");
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return redirect()
+                ->route('manufaktur.material-issue.show', $materialIssue)
+                ->with('error', 'Gagal melakukan void dokumen: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Cetak PDF Bukti Pengeluaran / Retur Bahan Baku.
      */
     public function pdf(MaterialIssue $materialIssue): Response

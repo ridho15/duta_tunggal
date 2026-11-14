@@ -129,6 +129,58 @@ class PurchaseReceiptService
     }
 
     /**
+     * Membatalkan transaksi penerimaan barang (Void GRN):
+     * Menghapus mutasi stok masuk, merekonsiliasi ulang kartu persediaan (InventoryStock),
+     * membatalkan jurnal akuntansi sementara, dan memulihkan status pemenuhan PO.
+     */
+    public function voidPurchaseReceipt(PurchaseReceipt $penerimaan, string $reason): void
+    {
+        $penerimaan->loadMissing(['purchaseReceiptItem', 'purchaseOrder']);
+        $itemIds = $penerimaan->purchaseReceiptItem->pluck('id')->filter()->all();
+
+        // 1. Hapus mutasi stok yang berasal dari penerimaan ini
+        StockMovement::where(function ($q) use ($itemIds, $penerimaan) {
+            $q->where('from_model_type', PurchaseReceiptItem::class)
+              ->whereIn('from_model_id', $itemIds);
+        })->orWhere(function ($q) use ($penerimaan) {
+            $q->where('meta->purchase_receipt_id', $penerimaan->id);
+        })->delete();
+
+        // 2. Sinkronisasi ulang saldo stok fisik di gudang untuk setiap item
+        foreach ($penerimaan->purchaseReceiptItem as $item) {
+            $this->syncInventoryStockFromMovements($item);
+        }
+
+        // 3. Hapus jurnal akuntansi yang dibukukan dari penerimaan ini
+        \App\Models\JournalEntry::where(function ($q) use ($penerimaan, $itemIds) {
+            $q->where('source_type', PurchaseReceipt::class)->where('source_id', $penerimaan->id);
+        })->orWhere(function ($q) use ($itemIds) {
+            $q->where('source_type', PurchaseReceiptItem::class)->whereIn('source_id', $itemIds);
+        })->delete();
+
+        // 4. Batalkan QC otomatis dan draft retur jika ada
+        \App\Models\QualityControl::where('from_model_type', PurchaseReceipt::class)
+            ->where('from_model_id', $penerimaan->id)
+            ->delete();
+
+        \App\Models\PurchaseReturn::where('purchase_receipt_id', $penerimaan->id)
+            ->where('status', 'draft')
+            ->delete();
+
+        // 5. Update status GRN menjadi cancelled
+        $penerimaan->update([
+            'status' => 'cancelled',
+            'notes' => trim(($penerimaan->notes ? $penerimaan->notes . "\n" : '') . '[DIBATALKAN] ' . $reason),
+        ]);
+        $penerimaan->purchaseReceiptItem()->update(['status' => 'cancelled']);
+
+        // 6. Sinkronisasi ulang status pemenuhan Purchase Order
+        if ($penerimaan->purchaseOrder) {
+            $penerimaan->purchaseOrder->syncReceiptFulfillmentStatus(\Illuminate\Support\Facades\Auth::id());
+        }
+    }
+
+    /**
      * Validate that journal entries are balanced (debit = credit)
      */
     public function validateJournalBalance(array $entries): bool

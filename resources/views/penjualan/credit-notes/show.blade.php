@@ -1,9 +1,9 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', "Detail Nota Kredit {$creditNote->credit_note_number} – Duta Tunggal ERP")
 
 @section('content')
-<div class="space-y-6" x-data="{ showIssueModal: false, showTaxDocModal: false }">
+<div class="space-y-6" x-data="{ showIssueModal: false, showTaxDocModal: false, showVoidModal: false }">
     {{-- Header & Aksi --}}
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
@@ -24,6 +24,7 @@
 
                     $statusBadge = match ($creditNote->status) {
                         \App\Models\CreditNote::STATUS_ISSUED => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'border' => 'border-emerald-200', 'label' => 'Terbit (Issued)'],
+                        \App\Models\CreditNote::STATUS_VOID => ['bg' => 'bg-rose-50', 'text' => 'text-rose-700', 'border' => 'border-rose-200', 'label' => 'Dibatalkan (Void)'],
                         default => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'border' => 'border-amber-200', 'label' => 'Draf'],
                     };
                 @endphp
@@ -39,6 +40,8 @@
                 oleh <span class="font-semibold text-gray-700">{{ $creditNote->createdBy->name ?? 'Sistem' }}</span>
                 @if ($creditNote->isIssued())
                     • Diterbitkan oleh <span class="font-semibold text-emerald-800">{{ $creditNote->issuedBy->name ?? 'Admin' }}</span> pada {{ $creditNote->issued_at ? \Carbon\Carbon::parse($creditNote->issued_at)->translatedFormat('d M Y H:i') : '-' }}
+                @elseif ($creditNote->isVoid())
+                    • <span class="font-bold text-rose-700">Dibatalkan (Void)</span> oleh <span class="font-semibold text-rose-800">{{ $creditNote->voidedBy->name ?? 'Admin' }}</span> pada {{ $creditNote->voided_at ? \Carbon\Carbon::parse($creditNote->voided_at)->translatedFormat('d M Y H:i') : '-' }} — Alasan: "{{ $creditNote->void_reason }}"
                 @endif
             </p>
         </div>
@@ -91,16 +94,32 @@
                 </button>
             @else
                 {{-- Tombol Ubah Faktur Pajak Retur --}}
-                <button
-                    type="button"
-                    @click="showTaxDocModal = true"
-                    class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg transition"
-                >
-                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    No. Faktur Pajak Retur
-                </button>
+                @if(!$creditNote->isVoid())
+                    <button
+                        type="button"
+                        @click="showTaxDocModal = true"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg transition"
+                    >
+                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        No. Faktur Pajak Retur
+                    </button>
+
+                    @if(auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || auth()->user()->hasRole(['Super Admin', 'Finance Manager', 'Director']) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+                        <button
+                            type="button"
+                            @click="showVoidModal = true"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                            title="Batalkan / Void Nota Kredit Terbit (Super Admin / Finance Manager)"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Void Nota Kredit
+                        </button>
+                    @endif
+                @endif
             @endif
         </div>
     </div>
@@ -614,6 +633,79 @@
                         class="px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-lg shadow-sm transition"
                     >
                         Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal Konfirmasi Void Nota Kredit (Super Admin) --}}
+    <div
+        x-show="showVoidModal"
+        x-cloak
+        class="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+        <div
+            @click.away="showVoidModal = false"
+            class="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl border border-gray-100"
+        >
+            <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div class="flex items-center gap-2 text-rose-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h3 class="text-base font-extrabold text-gray-900">Batalkan / Void Nota Kredit</h3>
+                </div>
+                <button type="button" @click="showVoidModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="text-xs text-gray-600 space-y-2">
+                <p>
+                    Anda akan membatalkan Nota Kredit <span class="font-bold text-gray-900 font-mono">{{ $creditNote->credit_note_number }}</span>:
+                </p>
+                <ul class="list-disc list-inside space-y-1 text-gray-700 bg-rose-50/60 p-3 rounded-xl border border-rose-100">
+                    <li>Saldo Piutang (AR) invoice rujukan akan dipulihkan kembali sebesar <span class="font-bold text-gray-900">Rp {{ number_format((float) $creditNote->applied_to_ar, 0, ',', '.') }}</span>.</li>
+                    @if((float) $creditNote->applied_to_deposit > 0)
+                        <li>Saldo Deposit Customer sebesar <span class="font-bold text-gray-900">Rp {{ number_format((float) $creditNote->applied_to_deposit, 0, ',', '.') }}</span> akan ditarik kembali.</li>
+                    @endif
+                    <li>Jurnal akuntansi Buku Besar yang pernah dibukukan oleh Nota Kredit ini akan dibersihkan.</li>
+                    <li>Status Nota Kredit akan diubah menjadi <span class="font-bold text-rose-700">Dibatalkan (Void)</span>.</li>
+                </ul>
+            </div>
+
+            <form method="POST" action="{{ route('penjualan.credit-notes.void', $creditNote->id) }}" class="space-y-4">
+                @csrf
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-gray-700">
+                        Alasan Pembatalan / Void <span class="text-red-500">* (Minimal 10 karakter)</span>
+                    </label>
+                    <textarea
+                        name="reason"
+                        rows="3"
+                        required
+                        minlength="10"
+                        placeholder="Contoh: Kesalahan nominal retur barang / salah customer, akan dibuatkan nota kredit revisi..."
+                        class="w-full text-xs p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                    ></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                    <button
+                        type="button"
+                        @click="showVoidModal = false"
+                        class="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition"
+                    >
+                        Tutup
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-4 py-2 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs transition"
+                    >
+                        Konfirmasi Void Nota Kredit
                     </button>
                 </div>
             </form>

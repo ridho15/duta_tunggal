@@ -192,6 +192,46 @@ class ProductionController extends Controller
             ->with('success', "Produksi {$production->production_number} telah diselesaikan. Quality Control otomatis diterbitkan untuk inspeksi mutu barang jadi.");
     }
 
+    public function revertDraft(Production $production): RedirectResponse
+    {
+        if ($production->status !== 'finished') {
+            return redirect()
+                ->route('manufaktur.production.show', $production)
+                ->with('error', 'Hanya dokumen produksi berstatus Selesai (finished) yang dapat dikembalikan ke draft.');
+        }
+
+        $qc = $production->qualityControl;
+        if ($qc && (int) $qc->status === 1) {
+            return redirect()
+                ->route('manufaktur.production.show', $production)
+                ->with('error', 'Dokumen produksi tidak dapat dikembalikan ke draft karena hasil QC sudah diproses dan barang jadi telah masuk ke gudang.');
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            // Hapus QC yang belum diproses jika ada
+            if ($qc && (int) $qc->status === 0) {
+                $qc->delete();
+            }
+
+            $production->update([
+                'status' => 'draft',
+            ]);
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return redirect()
+                ->route('manufaktur.production.show', $production)
+                ->with('success', "Dokumen produksi {$production->production_number} berhasil dikembalikan ke status Draft untuk koreksi kuantitas.");
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return redirect()
+                ->route('manufaktur.production.show', $production)
+                ->with('error', 'Gagal mengembalikan dokumen ke draft: ' . $e->getMessage());
+        }
+    }
+
     public function pdf(Production $production): Response
     {
         $production->loadMissing([

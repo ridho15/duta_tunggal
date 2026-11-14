@@ -539,6 +539,45 @@ class CashBankController extends Controller
     }
 
     /**
+     * Membatalkan resmi transfer antar rekening (Void / Cancelled) dengan alasan wajib.
+     */
+    public function cancelTransfer(Request $request, CashBankTransfer $transfer): RedirectResponse
+    {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_DELETE_ROLES, ['delete cash bank transfer'], 'Anda tidak memiliki hak akses untuk membatalkan transfer antar rekening.');
+
+        if (strtolower((string) $transfer->status) === 'cancelled') {
+            return back()->with('error', 'Transfer ini sudah dibatalkan sebelumnya.');
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'cancel_reason.required' => 'Alasan pembatalan transfer wajib diisi.',
+            'cancel_reason.min' => 'Alasan pembatalan minimal 5 karakter.',
+        ]);
+
+        try {
+            DB::transaction(function () use ($transfer, $validated) {
+                // 1. Hapus entri jurnal akuntansi transfer
+                $transfer->journalEntries()->delete();
+
+                // 2. Tandai status transfer menjadi Cancelled
+                $transfer->forceFill([
+                    'status' => 'cancelled',
+                    'cancel_reason' => $validated['cancel_reason'],
+                    'cancelled_by' => Auth::id(),
+                    'cancelled_at' => now(),
+                ])->save();
+            });
+
+            return redirect()->route('keuangan.cashbank.transfer.show', $transfer)
+                ->with('success', "Transfer {$transfer->number} berhasil dibatalkan secara resmi dan jurnal akuntansinya telah ditarik.");
+        } catch (Throwable $e) {
+            return back()->with('error', 'Gagal membatalkan transfer: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Hapus / Batalkan transfer antar rekening dan jurnalnya.
      */
     public function destroyTransfer(CashBankTransfer $transfer): RedirectResponse

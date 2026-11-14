@@ -129,17 +129,24 @@ class TrialBalanceService
         $grandCredit    = $ordered->sum('period_credit');
         $grandEnding    = $ordered->sum('ending_balance');
 
+        $difference = round($grandDebit - $grandCredit, 2);
+        $isBalanced = abs($difference) < 0.01;
+
         return [
             'period' => [
                 'start_date' => $startDate,
                 'end_date'   => $endDate,
             ],
             'rows'          => $ordered->values(),
+            'is_balanced'   => $isBalanced,
+            'difference'    => $difference,
             'grand_totals'  => [
                 'beginning_balance' => $grandBeginning,
                 'period_debit'      => $grandDebit,
                 'period_credit'     => $grandCredit,
                 'ending_balance'    => $grandEnding,
+                'is_balanced'       => $isBalanced,
+                'difference'        => $difference,
             ],
         ];
     }

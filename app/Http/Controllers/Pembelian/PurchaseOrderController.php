@@ -739,14 +739,57 @@ class PurchaseOrderController extends Controller
 
         $reason = $validated['reason'] ?: $purchaseOrder->close_reason ?: 'Ditutup oleh manajemen / gudang.';
 
-        $purchaseOrder->update([
-            'status' => 'closed',
-            'closed_by' => Auth::id(),
-            'closed_at' => Carbon::now(),
-            'close_reason' => $reason,
-        ]);
+        DB::transaction(function () use ($purchaseOrder, $reason) {
+            $purchaseOrder->update([
+                'status' => 'closed',
+                'closed_by' => Auth::id(),
+                'closed_at' => Carbon::now(),
+                'close_reason' => $reason,
+            ]);
+
+            $this->resyncOrderRequestFulfillment($purchaseOrder);
+        });
 
         return back()->with('success', "Pesanan Pembelian {$purchaseOrder->po_number} telah resmi ditutup.");
+    }
+
+    /**
+     * Batalkan transaksi Pesanan Pembelian resmi (Cancel / Void PO)
+     */
+    public function cancel(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|min:5|max:500',
+        ], [
+            'reason.required' => 'Alasan pembatalan PO wajib diisi.',
+            'reason.min' => 'Alasan pembatalan PO minimal 5 karakter.',
+        ]);
+
+        if (!in_array($purchaseOrder->status, ['draft', 'request_approve', 'approved'])) {
+            return back()->with('error', 'Pesanan Pembelian dengan status saat ini tidak dapat dibatalkan.');
+        }
+
+        $hasActiveReceipts = $purchaseOrder->purchaseReceipt()
+            ->whereNull('deleted_at')
+            ->where('status', '!=', 'cancelled')
+            ->exists();
+
+        if ($hasActiveReceipts) {
+            return back()->with('error', 'PO tidak dapat dibatalkan karena sudah memiliki bukti penerimaan barang (GRN). Batalkan penerimaan barang terlebih dahulu.');
+        }
+
+        DB::transaction(function () use ($purchaseOrder, $validated) {
+            $purchaseOrder->update([
+                'status' => 'cancelled',
+                'closed_by' => Auth::id(),
+                'closed_at' => Carbon::now(),
+                'close_reason' => '[DIBATALKAN] ' . $validated['reason'],
+            ]);
+
+            $this->resyncOrderRequestFulfillment($purchaseOrder);
+        });
+
+        return back()->with('success', "Pesanan Pembelian {$purchaseOrder->po_number} berhasil dibatalkan dan kuota permintaan barang (RO) telah dipulihkan.");
     }
 
     /**
@@ -759,10 +802,68 @@ class PurchaseOrderController extends Controller
         }
 
         $poNumber = $purchaseOrder->po_number;
-        $purchaseOrder->delete();
+
+        DB::transaction(function () use ($purchaseOrder) {
+            $affectedOrItemIds = $purchaseOrder->purchaseOrderItem()
+                ->where('refer_item_model_type', OrderRequestItem::class)
+                ->pluck('refer_item_model_id')
+                ->filter()
+                ->all();
+
+            $affectedOrIds = [];
+            if ($purchaseOrder->refer_model_type === OrderRequest::class && $purchaseOrder->refer_model_id) {
+                $affectedOrIds[] = $purchaseOrder->refer_model_id;
+            }
+
+            $purchaseOrder->delete();
+
+            $this->resyncOrderRequestFulfillment($purchaseOrder, $affectedOrItemIds, $affectedOrIds);
+        });
 
         return redirect()->route('pembelian.po.index')
             ->with('success', "Pesanan Pembelian {$poNumber} berhasil dihapus.");
+    }
+
+    /**
+     * Resinkronisasi kuota Order Request dan status pemenuhannya setelah perubahan PO
+     */
+    private function resyncOrderRequestFulfillment(PurchaseOrder $purchaseOrder, array $affectedOrItemIds = [], array $affectedOrIds = []): void
+    {
+        if (empty($affectedOrItemIds)) {
+            $affectedOrItemIds = $purchaseOrder->purchaseOrderItem()
+                ->where('refer_item_model_type', OrderRequestItem::class)
+                ->pluck('refer_item_model_id')
+                ->filter()
+                ->all();
+        }
+
+        if (empty($affectedOrIds) && $purchaseOrder->refer_model_type === OrderRequest::class && $purchaseOrder->refer_model_id) {
+            $affectedOrIds[] = $purchaseOrder->refer_model_id;
+        }
+
+        foreach (array_unique($affectedOrItemIds) as $affectedOrItemId) {
+            $orItem = OrderRequestItem::find($affectedOrItemId);
+            if ($orItem) {
+                $totalActiveQty = PurchaseOrderItem::where('refer_item_model_type', OrderRequestItem::class)
+                    ->where('refer_item_model_id', $affectedOrItemId)
+                    ->whereNull('deleted_at')
+                    ->whereHas('purchaseOrder', function ($q) {
+                        $q->whereNull('deleted_at')
+                          ->whereNotIn('status', ['cancelled', 'rejected', 'closed']);
+                    })
+                    ->sum('quantity');
+
+                $acceptedReceiptQty = OrderRequestQuantityLock::receiptQuantityForOrderRequestItem($affectedOrItemId, 'qty_accepted');
+                $orItem->fulfilled_quantity = max((float) $totalActiveQty, (float) $acceptedReceiptQty);
+                $orItem->saveQuietly();
+                $affectedOrIds[] = $orItem->order_request_id;
+            }
+        }
+
+        foreach (array_unique(array_filter($affectedOrIds)) as $orId) {
+            $or = OrderRequest::find($orId);
+            $or?->syncFulfillmentStatus();
+        }
     }
 
     /**

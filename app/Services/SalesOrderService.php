@@ -237,12 +237,8 @@ class SalesOrderService
      */
     private function creditOverrideGranted($saleOrder, array $options, array $messages): bool
     {
-        if (! config('sales.controls.credit_policy', false)) {
-            return false;
-        }
-
         $user = Auth::user();
-        $reason = trim((string) ($options['credit_override_reason'] ?? ''));
+        $reason = trim((string) ($options['credit_override_reason'] ?? $options['override_reason'] ?? ''));
         if (! $user || ! $user->hasRole(['Super Admin', 'Owner', 'Finance Manager']) || mb_strlen($reason) < 10) {
             return false;
         }

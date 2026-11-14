@@ -250,6 +250,30 @@ class AssetTransferController extends Controller
     }
 
     /**
+     * Batalkan / Void Transfer Aset Selesai (Intervensi Super Admin / Finance Manager).
+     */
+    public function void(AssetTransfer $transfer, Request $request): RedirectResponse
+    {
+        $this->authorizeTransfer('update');
+
+        $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'reason.required' => 'Alasan pembatalan/void mutasi transfer wajib diisi.',
+            'reason.min' => 'Alasan pembatalan minimal 5 karakter.',
+            'reason.max' => 'Alasan pembatalan maksimal 500 karakter.',
+        ]);
+
+        try {
+            $this->transferService->voidTransfer($transfer, $request->input('reason'), auth()->id());
+
+            return back()->with('success', "Transfer aset '{$transfer->asset->name}' berhasil di-void. Kepemilikan aset telah dikembalikan ke cabang asal ({$transfer->fromCabang->nama}).");
+        } catch (Throwable $e) {
+            return back()->with('error', 'Gagal membatalkan transfer aset: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Cetak Berita Acara / Surat Pengantar Mutasi Aset (PDF A4 Portrait).
      */
     public function pdf(AssetTransfer $transfer): Response

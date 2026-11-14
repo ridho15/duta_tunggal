@@ -348,10 +348,16 @@ class AssetController extends Controller
         try {
             $name = $asset->name;
             $code = $asset->code;
+
+            // Bersihkan jurnal perolehan aset dari Buku Besar agar tidak tertinggal fiktif di GL
+            \App\Models\JournalEntry::where('source_type', 'App\Models\Asset')
+                ->where('source_id', $asset->id)
+                ->delete();
+
             $asset->delete();
 
             return redirect()->route('keuangan.asset.index')
-                ->with('success', "Aset '{$name}' ({$code}) berhasil dihapus.");
+                ->with('success', "Aset '{$name}' ({$code}) berhasil dihapus dan jurnal perolehan Buku Besar telah dibersihkan.");
         } catch (Throwable $e) {
             return back()->with('error', 'Gagal menghapus aset: ' . $e->getMessage());
         }

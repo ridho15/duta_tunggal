@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', $materialIssue->issue_number . ' – Detail Pengeluaran / Retur Bahan Baku')
 
@@ -102,6 +102,31 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Selesaikan Serah Terima
+                </button>
+            @endif
+
+            {{-- Cancel action for Pending Approval or Approved --}}
+            @if (in_array($materialIssue->status, ['pending_approval', 'approved']))
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition"
+                    @click="$dispatch('open-modal-cancel-issue')"
+                >
+                    Batalkan Pengajuan
+                </button>
+            @endif
+
+            {{-- Super Admin Void action for Completed --}}
+            @if ($materialIssue->status === 'completed' && auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
+                    @click="$dispatch('open-modal-void-issue')"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Void Pengeluaran (Super Admin)
                 </button>
             @endif
 
@@ -553,5 +578,53 @@
     <p class="text-sm text-gray-600">
         Apakah Anda yakin ingin menghapus draft pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
     </p>
+</x-confirmation-modal>
+{{-- Modal Konfirmasi Batalkan Pengajuan --}}
+<x-confirmation-modal
+    name="cancel-issue"
+    title="Batalkan Pengajuan Bahan Baku"
+    variant="danger"
+    confirm-text="Ya, Batalkan"
+    cancel-text="Kembali"
+    action="{{ route('manufaktur.material-issue.cancel', $materialIssue) }}"
+    method="POST"
+>
+    <p class="text-sm text-gray-600">
+        Apakah Anda yakin ingin membatalkan pengajuan pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>?
+    </p>
+    <p class="text-xs text-rose-600 mt-2 font-medium">
+        Seluruh reservasi stok bahan baku yang telah dialokasikan akan dilepaskan kembali ke stok bebas gudang.
+    </p>
+    <div class="mt-3 text-left">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Pembatalan:</label>
+        <input type="text" name="cancel_reason" required placeholder="Contoh: Salah kuantitas / salah gudang asal" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
+    </div>
+</x-confirmation-modal>
+
+{{-- Modal Konfirmasi Void (Super Admin) --}}
+<x-confirmation-modal
+    name="void-issue"
+    title="Void Pengeluaran Bahan Baku (Super Admin)"
+    variant="danger"
+    confirm-text="Ya, Void Dokumen"
+    cancel-text="Batal"
+    action="{{ route('manufaktur.material-issue.void', $materialIssue) }}"
+    method="POST"
+>
+    <p class="text-sm text-gray-600">
+        Apakah Anda yakin ingin melakukan <strong>Void</strong> pada pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>?
+    </p>
+    <div class="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-left">
+        <p class="text-xs text-rose-800 font-semibold">Tindakan ini akan membalikkan transaksi secara permanen:</p>
+        <ul class="text-[11px] text-rose-700 list-disc list-inside mt-1 space-y-0.5">
+            <li>Stok fisik bahan baku akan dikembalikan ke saldo gudang asal.</li>
+            <li>Jurnal akuntansi BDP (Barang Dalam Proses) akan dihapus.</li>
+            <li>Status dokumen akan menjadi Dibatalkan (Cancelled).</li>
+        </ul>
+    </div>
+    <div class="mt-3 text-left">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Void (Wajib Diisi):</label>
+        <input type="text" name="cancel_reason" required placeholder="Contoh: Kesalahan konfirmasi gudang / barang tidak jadi keluar" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
+    </div>
 </x-confirmation-modal>
 @endsection

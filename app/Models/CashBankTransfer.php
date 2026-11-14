@@ -25,11 +25,15 @@ class CashBankTransfer extends Model
         'reference', 
         'attachment_path', 
         'status',
+        'cancel_reason',
+        'cancelled_by',
+        'cancelled_at',
         'cabang_id'
     ];
 
     protected $casts = [
         'date' => 'date',
+        'cancelled_at' => 'datetime',
         'amount' => 'decimal:2',
         'other_costs' => 'decimal:2',
     ];
@@ -47,6 +51,16 @@ class CashBankTransfer extends Model
     public function otherCostsCoa()
     {
         return $this->belongsTo(ChartOfAccount::class, 'other_costs_coa_id');
+    }
+
+    public function cancelledBy()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function isCancelled(): bool
+    {
+        return strtolower((string) $this->status) === 'cancelled';
     }
 
     public function journalEntries()

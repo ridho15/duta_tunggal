@@ -571,9 +571,15 @@ class CustomerReceiptController extends Controller
             'journalEntries',
         ]);
 
+        $user = Auth::user();
+        $isSuperAdmin = $user && (
+            (method_exists($user, 'canManageAllCabang') && $user->canManageAllCabang())
+            || (method_exists($user, 'hasRole') && $user->hasRole(['Super Admin', 'Finance Manager', 'Director']))
+        );
+
         $doc = $this->docBuilder->receipt($customerReceipt);
-        $blocker = $this->cancellation->blocker($customerReceipt);
-        $canCancel = $blocker === null;
+        $blocker = $this->cancellation->blocker($customerReceipt, $user);
+        $canCancel = $blocker === null || ($isSuperAdmin && $this->cancellation->isSuperAdminCancellable($customerReceipt));
         $reversibleJournals = $this->cancellation->reversibleJournals($customerReceipt);
 
         return view('penjualan.receipts.show', compact('customerReceipt', 'doc', 'blocker', 'canCancel', 'reversibleJournals'));
@@ -615,9 +621,15 @@ class CustomerReceiptController extends Controller
         ]);
 
         try {
-            $this->cancellation->cancel($customerReceipt, (string) $request->input('reason'), Auth::user());
+            $user = Auth::user();
+            $isSuperAdmin = $user && (
+                (method_exists($user, 'canManageAllCabang') && $user->canManageAllCabang())
+                || (method_exists($user, 'hasRole') && $user->hasRole(['Super Admin', 'Finance Manager', 'Director']))
+            );
+
+            $this->cancellation->cancel($customerReceipt, (string) $request->input('reason'), $user, force: $isSuperAdmin);
             return redirect()->route('penjualan.receipts.show', $customerReceipt->id)
-                ->with('success', 'Penerimaan Customer berhasil dibatalkan secara resmi. Jurnal pembalik telah diposting dan piutang tagihan telah dikembalikan.');
+                ->with('success', 'Penerimaan Customer berhasil dibatalkan secara resmi. Jurnal pembalik telah diposting, mutasi deposit telah disesuaikan, dan piutang tagihan telah dikembalikan.');
         } catch (ValidationException $e) {
             return redirect()->route('penjualan.receipts.show', $customerReceipt->id)
                 ->withErrors($e->errors());

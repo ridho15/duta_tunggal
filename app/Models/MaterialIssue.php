@@ -38,6 +38,7 @@ class MaterialIssue extends Model
     const STATUS_APPROVED = 'approved';
     const STATUS_COMPLETED = 'completed';
     const STATUS_REJECTED = 'rejected';
+    const STATUS_CANCELLED = 'cancelled';
 
     protected $casts = [
         'issue_date' => 'date',
@@ -443,15 +444,16 @@ class MaterialIssue extends Model
                 }
             }
 
-            // Release stock reservations when rejected or set back to draft
-            if (($issue->status === 'draft' || $issue->status === 'rejected') &&
+            // Release stock reservations when rejected, cancelled, or set back to draft
+            if (($issue->status === 'draft' || $issue->status === 'rejected' || $issue->status === 'cancelled') &&
                 in_array($issue->getOriginal('status'), ['pending_approval', 'approved'])) {
                 try {
                     $stockReservationService->releaseStockReservationsForMaterialIssue($issue);
                     Log::info("Stock reservations released for MaterialIssue {$issue->id} (status: {$issue->status})");
 
-                    // Set all items back to draft
-                    $issue->items()->update(['status' => 'draft']);
+                    // Set all items to cancelled if issue is cancelled, otherwise draft
+                    $newItemStatus = $issue->status === 'cancelled' ? 'cancelled' : 'draft';
+                    $issue->items()->update(['status' => $newItemStatus]);
                 } catch (\Throwable $e) {
                     Log::error('Failed to release stock reservations for MaterialIssue', [
                         'material_issue_id' => $issue->id,

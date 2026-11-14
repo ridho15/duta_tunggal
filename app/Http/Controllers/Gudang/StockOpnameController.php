@@ -288,15 +288,15 @@ class StockOpnameController extends Controller
     }
 
     /**
-     * Menghapus sesi Stock Opname (hanya saat draft atau belum disetujui).
+     * Menghapus sesi Stock Opname (hanya saat draft atau cancelled).
      */
     public function destroy(StockOpname $opname)
     {
         $this->authorizeAccess('delete inventory stock');
 
-        if ($opname->status !== 'draft') {
+        if (!in_array($opname->status, ['draft', 'cancelled'], true)) {
             return redirect()->route('gudang.opname.show', $opname)
-                ->with('error', 'Hanya sesi stock opname berstatus draft yang dapat dihapus. Sesi yang telah disetujui tidak dapat dihapus untuk menjaga integritas kartu stok dan jurnal akuntansi.');
+                ->with('error', 'Hanya sesi stock opname berstatus Draft atau Dibatalkan yang dapat dihapus. Sesi yang telah disetujui tidak dapat dihapus untuk menjaga integritas kartu stok dan jurnal akuntansi.');
         }
 
         $number = $opname->opname_number;
@@ -304,7 +304,32 @@ class StockOpnameController extends Controller
         $opname->delete();
 
         return redirect()->route('gudang.opname.index')
-            ->with('success', "Stock opname draft {$number} berhasil dihapus.");
+            ->with('success', "Stock opname {$number} berhasil dihapus.");
+    }
+
+    /**
+     * Membatalkan sesi Stock Opname yang sedang berjalan (Draft / In Progress / Completed).
+     */
+    public function cancel(Request $request, StockOpname $opname)
+    {
+        $this->authorizeAccess('create inventory stock');
+
+        $validated = $request->validate([
+            'cancel_reason' => 'required|string|max:500',
+        ]);
+
+        try {
+            $this->stockOpnameService->cancelStockOpname($opname, $validated['cancel_reason']);
+
+            return redirect()->route('gudang.opname.show', $opname)
+                ->with('success', "Sesi stock opname {$opname->opname_number} berhasil dibatalkan.");
+        } catch (ValidationException $e) {
+            return redirect()->route('gudang.opname.show', $opname)
+                ->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            return redirect()->route('gudang.opname.show', $opname)
+                ->with('error', 'Gagal membatalkan sesi opname: ' . $e->getMessage());
+        }
     }
 
     /**

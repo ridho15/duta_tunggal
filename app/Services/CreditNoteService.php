@@ -194,11 +194,117 @@ class CreditNoteService
     public function deleteDraft(CreditNote $creditNote): void
     {
         if (! $creditNote->isDraft()) {
-            throw ValidationException::withMessages(['credit_note' => 'Nota Kredit yang sudah terbit bersifat final dan tidak dapat dihapus; koreksi dengan Nota Kredit baru.']);
+            throw ValidationException::withMessages(['credit_note' => 'Nota Kredit yang sudah terbit bersifat final dan tidak dapat dihapus; gunakan fitur Void jika diperlukan pembatalan.']);
         }
 
         $creditNote->items()->delete();
         $creditNote->delete();
+    }
+
+    /**
+     * Anulir / Void Nota Kredit terbit (Super Admin / Finance Manager override).
+     * Memulihkan sisa piutang, status invoice, membalik/menghapus jurnal, serta menarik kembali deposit jika dialokasikan.
+     *
+     * @throws ValidationException
+     */
+    public function void(CreditNote $creditNote, string $reason, ?User $actor = null): CreditNote
+    {
+        $this->assertEnabled();
+        $actor ??= Auth::user();
+
+        $reason = trim($reason);
+        if (mb_strlen($reason) < 10) {
+            throw ValidationException::withMessages(['reason' => 'Alasan pembatalan/void Nota Kredit wajib diisi (minimal 10 karakter).']);
+        }
+
+        return DB::transaction(function () use ($creditNote, $reason, $actor) {
+            $locked = CreditNote::query()->lockForUpdate()->findOrFail($creditNote->id);
+            if ($locked->isVoid()) {
+                return $locked;
+            }
+            if (! $locked->isIssued()) {
+                throw ValidationException::withMessages(['credit_note' => 'Hanya Nota Kredit yang sudah terbit yang dapat dibatalkan (void).']);
+            }
+
+            $invoice = Invoice::query()->lockForUpdate()->find($locked->invoice_id);
+            $ar = AccountReceivable::query()->where('invoice_id', $locked->invoice_id)->lockForUpdate()->first();
+
+            $appliedToAr = (float) $locked->applied_to_ar;
+            $appliedToDeposit = (float) $locked->applied_to_deposit;
+            $total = (float) $locked->total;
+
+            // 1. Tarik kembali Deposit customer jika sebelumnya dialokasikan ke deposit
+            if ($appliedToDeposit > 0.01) {
+                $depositLog = DepositLog::where('reference_type', CreditNote::class)
+                    ->where('reference_id', $locked->id)
+                    ->first();
+
+                if ($depositLog) {
+                    $deposit = $depositLog->deposit;
+                    if ($deposit && (float) $deposit->remaining_amount < (float) $depositLog->amount - 0.01) {
+                        throw ValidationException::withMessages([
+                            'credit_note' => 'Deposit pelanggan hasil Nota Kredit ini sudah terpakai sebagian/seluruhnya oleh transaksi lain. Batalkan transaksi pemakaian deposit terlebih dahulu.',
+                        ]);
+                    }
+
+                    if ($deposit) {
+                        $deposit->remaining_amount = max(0.0, round((float) $deposit->remaining_amount - (float) $depositLog->amount, 2));
+                        $deposit->amount = max(0.0, round((float) $deposit->amount - (float) $depositLog->amount, 2));
+                        if ($deposit->amount <= 0.01) {
+                            $deposit->status = 'closed';
+                        }
+                        $deposit->saveQuietly();
+                    }
+
+                    DepositLog::create([
+                        'deposit_id' => $deposit?->id ?? 1,
+                        'type' => 'use',
+                        'reference_type' => CreditNote::class,
+                        'reference_id' => $locked->id,
+                        'amount' => $appliedToDeposit,
+                        'note' => "Pembatalan Nota Kredit {$locked->credit_note_number}",
+                        'created_by' => $actor?->getKey(),
+                    ]);
+                }
+            }
+
+            // 2. Pulihkan saldo piutang jika ada
+            if ($ar) {
+                $rate = (float) ($ar->exchange_rate ?? 1);
+                $rate = $rate > 0 ? $rate : 1.0;
+
+                $ar->total = max(0.0, round((float) $ar->total + $total, 2));
+                $ar->paid = max(0.0, round((float) $ar->paid + $appliedToDeposit, 2));
+                $ar->remaining = max(0.0, round((float) $ar->remaining + $appliedToAr, 2));
+                $ar->total_original = round((float) $ar->total / $rate, 4);
+                $ar->paid_original = round((float) $ar->paid / $rate, 4);
+                $ar->remaining_original = round((float) $ar->remaining / $rate, 4);
+                $ar->status = $ar->remaining > self::EPS ? 'Belum Lunas' : 'Lunas';
+                $ar->save();
+            }
+
+            // 3. Pulihkan status invoice rujukan
+            if ($invoice) {
+                $invStatus = ($ar && (float) $ar->remaining <= self::EPS) ? Invoice::STATUS_PAID : (($ar && (float) $ar->paid > 0) ? Invoice::STATUS_PARTIALLY_PAID : Invoice::STATUS_SENT);
+                $invoice->update(['status' => $invStatus]);
+            }
+
+            // 4. Hapus / bersihkan entri jurnal akuntansi GL Credit Note
+            JournalEntry::withoutGlobalScopes()
+                ->where('source_type', CreditNote::class)
+                ->where('source_id', $locked->id)
+                ->delete();
+
+            // 5. Tandai status Credit Note menjadi Void
+            $locked->forceFill([
+                'status' => CreditNote::STATUS_VOID,
+                'void_reason' => $reason,
+                'voided_by' => $actor?->getKey(),
+                'voided_at' => now(),
+            ])->save();
+
+            return $locked->refresh();
+        });
     }
 
     /**

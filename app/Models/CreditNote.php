@@ -30,20 +30,24 @@ class CreditNote extends Model
 
     public const STATUS_ISSUED = 'issued';
 
+    public const STATUS_VOID = 'void';
+
     public const STATUS_LABELS = [
         self::STATUS_DRAFT => 'Draf',
         self::STATUS_ISSUED => 'Terbit',
+        self::STATUS_VOID => 'Dibatalkan (Void)',
     ];
 
     protected $fillable = [
         'credit_note_number', 'type', 'status', 'invoice_id', 'customer_id', 'cabang_id', 'customer_return_id', 'replacement_invoice_id',
-        'credit_date', 'reason', 'subtotal', 'other_fee_amount', 'tax_amount', 'total', 'applied_to_ar', 'applied_to_deposit',
+        'credit_date', 'reason', 'void_reason', 'voided_by', 'voided_at', 'subtotal', 'other_fee_amount', 'tax_amount', 'total', 'applied_to_ar', 'applied_to_deposit',
         'tax_document_number', 'currency_id', 'exchange_rate', 'created_by', 'issued_by', 'issued_at',
     ];
 
     protected $casts = [
         'credit_date' => 'date',
         'issued_at' => 'datetime',
+        'voided_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'other_fee_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
@@ -87,6 +91,11 @@ class CreditNote extends Model
         return $this->belongsTo(User::class, 'issued_by');
     }
 
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
     public function journalEntries()
     {
         return $this->morphMany(JournalEntry::class, 'source');
@@ -100,5 +109,10 @@ class CreditNote extends Model
     public function isIssued(): bool
     {
         return $this->status === self::STATUS_ISSUED;
+    }
+
+    public function isVoid(): bool
+    {
+        return $this->status === self::STATUS_VOID;
     }
 }

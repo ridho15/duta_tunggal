@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Detail SPK: ' . $manufacturingOrder->mo_number . ' – Duta Tunggal ERP')
 
@@ -74,7 +74,9 @@
                     </svg>
                     Mulai Produksi
                 </button>
+            @endif
 
+            @if (in_array($manufacturingOrder->status, ['draft', 'in_progress']))
                 <button
                     type="button"
                     @click="$dispatch('open-modal-cancel-spk')"
@@ -367,8 +369,23 @@
             Apakah Anda yakin ingin membatalkan SPK <strong>{{ $manufacturingOrder->mo_number }}</strong>?
         </p>
         <p class="text-xs text-rose-600 mt-2 font-medium">
-            SPK yang dibatalkan tidak dapat diproses lagi untuk produksi atau pengeluaran bahan baku.
+            SPK yang dibatalkan tidak dapat diproses lagi untuk produksi atau pengeluaran bahan baku. Seluruh alokasi bahan baku draf akan dibersihkan.
         </p>
+        <div class="mt-3 text-left">
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Pembatalan:</label>
+            <input type="text" name="cancel_reason" required placeholder="Contoh: Kerusakan mesin / Batal pesanan" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
+        </div>
+        @if (auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+            <div class="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-xl text-left">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="force_cancel" value="1" class="rounded border-rose-300 text-rose-600 focus:ring-rose-500">
+                    <span class="text-xs font-semibold text-rose-900">Intervensi Batal Darurat (Super Admin)</span>
+                </label>
+                <p class="text-[11px] text-rose-700 mt-1">
+                    Centang untuk membatalkan SPK secara paksa meskipun bahan baku sudah dikeluarkan. Sistem akan mengembalikan sisa stok bahan baku ke gudang secara otomatis dan membatalkan draf hasil produksi terkait.
+                </p>
+            </div>
+        @endif
     </x-confirmation-modal>
 </div>
 @endsection

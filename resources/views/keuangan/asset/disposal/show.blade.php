@@ -3,7 +3,7 @@
 @section('title', 'Detail Pelepasan Aset Tetap – Duta Tunggal ERP')
 
 @section('content')
-<div class="space-y-6 max-w-5xl mx-auto">
+<div x-data="{ voidModalOpen: false }" class="space-y-6 max-w-5xl mx-auto">
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -18,13 +18,30 @@
             </div>
             <div class="flex items-center gap-3">
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Pelepasan #{{ $disposal->id }}</h1>
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                    Selesai / Aset Dihentikan (Disposed)
-                </span>
+                @if ($disposal->isCancelled())
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-300">
+                        Dibatalkan / Voided
+                    </span>
+                @else
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                        Selesai / Aset Dihentikan (Disposed)
+                    </span>
+                @endif
             </div>
         </div>
 
         <div class="flex items-center gap-2">
+            @if (!$disposal->isCancelled())
+                <button
+                    type="button"
+                    @click="voidModalOpen = true"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
+                    title="Batalkan / Void Pelepasan Aset (Super Admin / Finance)"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    Void Pelepasan Aset
+                </button>
+            @endif
             <a
                 href="{{ route('keuangan.asset.disposal.pdf', $disposal) }}"
                 target="_blank"
@@ -263,6 +280,104 @@
                     </tfoot>
                 @endif
             </table>
+        </div>
+    </div>
+
+    {{-- Modal Konfirmasi Void Pelepasan Aset --}}
+    <div
+        x-show="voidModalOpen"
+        x-cloak
+        class="fixed inset-0 z-50 overflow-y-auto"
+        aria-labelledby="modal-title"
+        role="dialog"
+        aria-modal="true"
+    >
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+                x-show="voidModalOpen"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                @click="voidModalOpen = false"
+                aria-hidden="true"
+            ></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div
+                x-show="voidModalOpen"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-100"
+            >
+                <form action="{{ route('keuangan.asset.disposal.void', $disposal) }}" method="POST">
+                    @csrf
+                    <div class="bg-white px-6 pt-6 pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-rose-100 sm:mx-0 sm:h-10 sm:w-10">
+                                <svg class="h-6 w-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </div>
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                                <h3 class="text-base font-extrabold text-gray-900" id="modal-title">
+                                    Batalkan / Void Pelepasan Aset
+                                </h3>
+                                <div class="mt-2 text-xs text-gray-600 space-y-2">
+                                    <p>
+                                        Anda akan membatalkan penghapusan aset <strong class="text-gray-900">{{ $disposal->asset->name }}</strong> ({{ $disposal->asset->code }}).
+                                    </p>
+                                    <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px] leading-relaxed">
+                                        <strong>Dampak Pembatalan:</strong>
+                                        <ul class="list-disc pl-4 mt-1 space-y-0.5">
+                                            <li>Status aset akan dipulihkan menjadi <strong>Aktif</strong>.</li>
+                                            <li>Seluruh jurnal disposal (kerugian/keuntungan & akumulasi) akan dibersihkan dari Buku Besar.</li>
+                                            <li>Pencatatan depresiasi bulanan dapat dilanjutkan kembali.</li>
+                                        </ul>
+                                    </div>
+                                    <div class="mt-3 text-left">
+                                        <label for="reason" class="block text-xs font-semibold text-gray-700 mb-1">
+                                            Alasan Pembatalan / Void * (Minimal 5 karakter)
+                                        </label>
+                                        <textarea
+                                            id="reason"
+                                            name="reason"
+                                            rows="3"
+                                            required
+                                            minlength="5"
+                                            class="w-full text-xs rounded-xl border-gray-300 focus:border-rose-500 focus:ring-rose-500 shadow-sm"
+                                            placeholder="Contoh: Kesalahan input unit aset yang dihapuskan atau transaksi penjualan dibatalkan oleh pembeli"
+                                        ></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-3.5 sm:flex sm:flex-row-reverse gap-2">
+                        <button
+                            type="submit"
+                            class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-2 bg-rose-600 text-xs font-bold text-white hover:bg-rose-700 focus:outline-none transition sm:w-auto"
+                        >
+                            Konfirmasi Void Pelepasan
+                        </button>
+                        <button
+                            type="button"
+                            @click="voidModalOpen = false"
+                            class="mt-2 sm:mt-0 w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-2 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none transition sm:w-auto"
+                        >
+                            Tutup
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>

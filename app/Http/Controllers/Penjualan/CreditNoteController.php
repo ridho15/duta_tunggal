@@ -109,6 +109,8 @@ class CreditNoteController extends Controller
             $baseQuery->where('status', CreditNote::STATUS_DRAFT);
         } elseif ($tab === 'issued') {
             $baseQuery->where('status', CreditNote::STATUS_ISSUED);
+        } elseif ($tab === 'void') {
+            $baseQuery->where('status', CreditNote::STATUS_VOID);
         }
 
         // Pencarian Teks
@@ -558,6 +560,41 @@ class CreditNoteController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'Gagal menghapus draf: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Membatalkan / Void Nota Kredit terbit (Super Admin & Finance Manager).
+     */
+    public function void(Request $request, CreditNote $creditNote): RedirectResponse
+    {
+        $this->authorizeAccess(
+            ['Super Admin', 'Finance Manager', 'Director'],
+            ['approve credit note', 'delete credit note']
+        );
+
+        $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:500'],
+        ], [
+            'reason.required' => 'Alasan pembatalan/void Nota Kredit wajib diisi.',
+            'reason.min' => 'Alasan pembatalan minimal 10 karakter.',
+        ]);
+
+        try {
+            $cn = $this->creditNoteService->void($creditNote, (string) $request->input('reason'), Auth::user());
+
+            return redirect()
+                ->route('penjualan.credit-notes.show', $cn->id)
+                ->with('success', "Nota Kredit {$cn->credit_note_number} berhasil dibatalkan (Void). Saldo piutang tagihan dan jurnal buku besar telah dipulihkan.");
+        } catch (ValidationException $e) {
+            return redirect()
+                ->back()
+                ->withErrors($e->errors());
+        } catch (Throwable $e) {
+            Log::error('Error voiding Credit Note: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return redirect()
+                ->back()
+                ->with('error', 'Gagal membatalkan Nota Kredit: ' . $e->getMessage());
         }
     }
 

@@ -28,7 +28,13 @@ class Supplier extends Model
         'nama_bank',
         'nomor_rekening',
         'nama_rekening',
-        'cabang_id'
+        'cabang_id',
+        'is_active',
+        'merged_into',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     protected static function booted()
@@ -94,6 +100,11 @@ class Supplier extends Model
     public function accountPayables()
     {
         return $this->hasMany(AccountPayable::class, 'supplier_id');
+    }
+
+    public function mergedInto()
+    {
+        return $this->belongsTo(Supplier::class, 'merged_into');
     }
 
     /**

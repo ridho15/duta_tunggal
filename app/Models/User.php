@@ -152,4 +152,14 @@ class User extends Authenticatable implements MustVerifyEmail
 
         return (int) $this->cabang_id === (int) $cabangId;
     }
+
+    public function canManageAllCabang(): bool
+    {
+        $manageType = $this->manage_type ?? [];
+        if (is_array($manageType) && in_array('all', $manageType)) {
+            return true;
+        }
+
+        return $this->hasRole(['Super Admin', 'Director']);
+    }
 }

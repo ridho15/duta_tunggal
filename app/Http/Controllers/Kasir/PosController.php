@@ -19,6 +19,7 @@ use Illuminate\View\View;
 class PosController extends Controller
 {
     protected PosOrderService $posOrderService;
+
     protected PosShiftService $posShiftService;
 
     public function __construct(
@@ -30,17 +31,32 @@ class PosController extends Controller
     }
 
     /**
+     * Otorisasi hak akses peran modul Kasir POS.
+     */
+    protected function authorizeKasirAccess(): void
+    {
+        $user = Auth::user();
+        abort_unless(
+            $user && (\App\Support\MenuAccess::isSuper($user) || $user->hasAnyRole(['Super Admin', 'Owner', 'Admin', 'Kasir', 'Sales Manager'])),
+            403,
+            'Anda tidak memiliki hak akses untuk Terminal Kasir & POS.'
+        );
+    }
+
+    /**
      * Tampilan utama Terminal Kasir Cepat (Point of Sale).
      */
     public function index(Request $request): View
     {
+        $this->authorizeKasirAccess();
+
         $user = Auth::user();
         $cabangId = $user->cabang_id;
 
         $activeShift = $this->posShiftService->getActiveShift($user, $cabangId);
 
         $warehouses = Warehouse::withoutGlobalScopes()
-            ->when($cabangId, fn($q) => $q->where('cabang_id', $cabangId))
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->get();
 
         $selectedWarehouseId = $activeShift?->warehouse_id ?? $warehouses->first()?->id;
@@ -48,7 +64,7 @@ class PosController extends Controller
         // Ambil produk populer/katalog awal untuk tampilan cepat kasir
         $initialProducts = Product::withoutGlobalScopes()
             ->active()
-            ->when($cabangId, fn($q) => $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id'))
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id'))
             ->with(['inventoryStocks' => function ($q) use ($selectedWarehouseId) {
                 if ($selectedWarehouseId) {
                     $q->where('warehouse_id', $selectedWarehouseId);
@@ -60,6 +76,7 @@ class PosController extends Controller
                 $stock = (float) $product->inventoryStocks->sum('qty_available');
                 $hargaBatas = (float) $product->harga_batas;
                 $costPrice = (float) $product->cost_price;
+
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
@@ -74,7 +91,7 @@ class PosController extends Controller
             });
 
         $customers = Customer::withoutGlobalScopes()
-            ->when($cabangId, fn($q) => $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id'))
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId)->orWhereNull('cabang_id'))
             ->limit(30)
             ->get(['id', 'name', 'phone']);
 
@@ -99,6 +116,7 @@ class PosController extends Controller
 
         if ($barcode !== '') {
             $product = $this->posOrderService->findByBarcode($barcode, $warehouseId, $cabangId);
+
             return response()->json([
                 'found' => (bool) $product,
                 'product' => $product,
@@ -117,6 +135,8 @@ class PosController extends Controller
      */
     public function store(Request $request): JsonResponse|RedirectResponse
     {
+        $this->authorizeKasirAccess();
+
         $validated = $request->validate([
             'warehouse_id' => 'nullable|integer',
             'customer_id' => 'nullable|integer',
@@ -137,7 +157,7 @@ class PosController extends Controller
         $user = Auth::user();
         $activeShift = $this->posShiftService->getActiveShift($user, $user->cabang_id);
 
-        if (!$activeShift) {
+        if (! $activeShift) {
             throw ValidationException::withMessages([
                 'shift' => 'Shift kasir belum dibuka. Harap buka shift kasir terlebih dahulu dengan memasukkan modal awal.',
             ]);
@@ -188,9 +208,9 @@ class PosController extends Controller
         $date = $request->query('date');
 
         $query = PosOrder::withoutGlobalScopes()
-            ->when($cabangId, fn($q) => $q->where('cabang_id', $cabangId))
-            ->when($shiftId, fn($q) => $q->where('pos_shift_id', $shiftId))
-            ->when($date, fn($q) => $q->whereDate('order_date', $date))
+            ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+            ->when($shiftId, fn ($q) => $q->where('pos_shift_id', $shiftId))
+            ->when($date, fn ($q) => $q->whereDate('order_date', $date))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($sub) use ($search) {
                     $sub->where('order_number', 'like', "%{$search}%")

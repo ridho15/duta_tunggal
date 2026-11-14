@@ -25,10 +25,25 @@ class PosShiftController extends Controller
     }
 
     /**
+     * Otorisasi hak akses peran modul Kasir POS.
+     */
+    protected function authorizeKasirAccess(): void
+    {
+        $user = Auth::user();
+        abort_unless(
+            $user && (\App\Support\MenuAccess::isSuper($user) || $user->hasAnyRole(['Super Admin', 'Owner', 'Admin', 'Kasir', 'Sales Manager'])),
+            403,
+            'Anda tidak memiliki hak akses untuk Shift Kasir & Laporan POS.'
+        );
+    }
+
+    /**
      * Daftar Riwayat Shift Kasir & Laporan Penjualan POS (Z-Report Rekap).
      */
     public function index(Request $request): View
     {
+        $this->authorizeKasirAccess();
+
         $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->input('end_date', now()->toDateString());
         $userId = $request->integer('user_id') ?: null;
@@ -211,6 +226,8 @@ class PosShiftController extends Controller
      */
     public function summary(PosShift $posShift): View
     {
+        $this->authorizeKasirAccess();
+
         $posShift->loadMissing(['user', 'cabang', 'warehouse']);
         $summary = $this->posShiftService->getShiftSummary($posShift);
 
@@ -218,5 +235,42 @@ class PosShiftController extends Controller
             'shift' => $posShift,
             'summary' => $summary,
         ]);
+    }
+
+    /**
+     * Intervensi Super Admin / Owner: Tutup paksa shift yang menggantung (stuck shift).
+     */
+    public function forceClose(Request $request, PosShift $posShift): RedirectResponse
+    {
+        $user = Auth::user();
+        abort_unless(
+            $user && (\App\Support\MenuAccess::isSuper($user) || $user->hasRole(['Super Admin', 'Owner'])),
+            403,
+            'Hanya Super Admin atau Owner yang memiliki wewenang untuk menutup paksa shift kasir.'
+        );
+
+        if ($posShift->status !== 'open') {
+            return back()->with('error', "Shift kasir {$posShift->shift_number} sudah dalam status ditutup ({$posShift->status}).");
+        }
+
+        $validated = $request->validate([
+            'cash_actual' => 'required|numeric|min:0',
+            'notes' => 'required|string|min:5|max:255',
+        ], [
+            'cash_actual.required' => 'Jumlah fisik uang tunai wajib diisi.',
+            'notes.required' => 'Alasan intervensi penutupan paksa wajib diisi (minimal 5 karakter).',
+            'notes.min' => 'Alasan intervensi penutupan paksa minimal 5 karakter.',
+        ]);
+
+        $adminNote = "[INTERVENSI ADMIN - {$user->name}]: " . $validated['notes'];
+
+        $closedShift = $this->posShiftService->closeShift(
+            $posShift,
+            (float) $validated['cash_actual'],
+            $adminNote
+        );
+
+        return redirect()->route('kasir.shift.summary', $closedShift)
+            ->with('success', "Shift kasir {$closedShift->shift_number} milik {$posShift->user?->name} berhasil ditutup paksa oleh {$user->name}. Rekap kas telah diperbarui.");
     }
 }

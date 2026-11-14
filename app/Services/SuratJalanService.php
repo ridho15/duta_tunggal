@@ -49,6 +49,7 @@ class SuratJalanService
         if ($invalid->isNotEmpty()) {
             $details = $invalid->map(function ($do) {
                 $statusLabel = DeliveryOrder::statusLabel($do->status);
+
                 return "{$do->do_number} (Status: {$statusLabel})";
             })->implode(', ');
 
@@ -67,6 +68,7 @@ class SuratJalanService
         // Multi-DO Consolidation Rule: Semua DO yang digabungkan harus berasal dari customer yang sama
         $customerIds = $deliveryOrders->flatMap(function (DeliveryOrder $do) {
             $do->loadMissing('salesOrders.customer');
+
             return $do->salesOrders->pluck('customer_id');
         })->filter()->unique()->values();
 
@@ -115,11 +117,11 @@ class SuratJalanService
 
         if ($taken->isNotEmpty()) {
             $doNumbers = $deliveryOrders->keyBy('id');
-            $lines = $taken->map(fn ($row) => ($doNumbers[$row->delivery_order_id]->do_number ?? $row->delivery_order_id) . " (sudah di {$row->sj_number})");
+            $lines = $taken->map(fn ($row) => ($doNumbers[$row->delivery_order_id]->do_number ?? $row->delivery_order_id)." (sudah di {$row->sj_number})");
 
             throw ValidationException::withMessages([
-                $field => 'Delivery Order sudah tercantum di Surat Jalan lain yang masih berlaku: ' . $lines->implode(', ')
-                    . '. Batalkan Surat Jalan tersebut lebih dulu bila perlu diterbitkan ulang.',
+                $field => 'Delivery Order sudah tercantum di Surat Jalan lain yang masih berlaku: '.$lines->implode(', ')
+                    .'. Batalkan Surat Jalan tersebut lebih dulu bila perlu diterbitkan ulang.',
             ]);
         }
     }
@@ -208,16 +210,22 @@ class SuratJalanService
 
         if (mb_strlen($reason) < self::MIN_CANCEL_REASON_LENGTH) {
             throw ValidationException::withMessages([
-                'cancel_reason' => 'Alasan pembatalan wajib diisi (minimal ' . self::MIN_CANCEL_REASON_LENGTH . ' karakter).',
+                'cancel_reason' => 'Alasan pembatalan wajib diisi (minimal '.self::MIN_CANCEL_REASON_LENGTH.' karakter).',
             ]);
         }
 
-        $advanced = $suratJalan->deliveryOrder()->get()->filter(fn (DeliveryOrder $do) => in_array($do->status, ['sent', 'received', 'completed'], true));
-        if ($advanced->isNotEmpty()) {
+        if ($suratJalan->isInvoiced()) {
             throw ValidationException::withMessages([
-                'status' => "Surat Jalan {$suratJalan->sj_number} tidak dapat dibatalkan: DO "
-                    .$advanced->map(fn ($do) => $do->do_number.' ('.DeliveryOrder::statusLabel($do->status).')')->implode(', ')
-                    .' sudah ditandai Diterima saat Surat Jalan terbit. Koreksi barang lewat Retur Delivery Order / Return Product.',
+                'status' => "Surat Jalan {$suratJalan->sj_number} tidak dapat dibatalkan karena sudah ditagihkan (memiliki faktur penjualan aktif). Batalkan fakturnya terlebih dahulu.",
+            ]);
+        }
+
+        $completed = $suratJalan->deliveryOrder()->get()->filter(fn (DeliveryOrder $do) => in_array($do->status, ['completed', 'closed'], true));
+        if ($completed->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'status' => "Surat Jalan {$suratJalan->sj_number} tidak dapat dibatalkan karena pengiriman sudah selesai (DO: "
+                    .$completed->map(fn ($do) => $do->do_number.' ('.DeliveryOrder::statusLabel($do->status).')')->implode(', ')
+                    .'). Koreksi barang lewat Retur Delivery Order / Return Product.',
             ]);
         }
 
@@ -225,17 +233,25 @@ class SuratJalanService
         if ($schedules->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'status' => "Surat Jalan {$suratJalan->sj_number} masih dipakai Jadwal Pengiriman "
-                    . $schedules->map(fn ($s) => "{$s->schedule_number} ({$s->status_label})")->implode(', ')
-                    . '. Keluarkan dari jadwal (atau batalkan jadwal) terlebih dahulu.',
+                    .$schedules->map(fn ($s) => "{$s->schedule_number} ({$s->status_label})")->implode(', ')
+                    .'. Keluarkan dari jadwal (atau batalkan jadwal) terlebih dahulu.',
             ]);
         }
 
-        $suratJalan->update([
-            'status' => SuratJalan::STATUS_CANCELLED,
-            'cancelled_at' => now(),
-            'cancelled_by' => $userId ?? Auth::id(),
-            'cancel_reason' => $reason,
-        ]);
+        DB::transaction(function () use ($suratJalan, $reason, $userId) {
+            foreach ($suratJalan->deliveryOrder()->get() as $deliveryOrder) {
+                if (in_array($deliveryOrder->status, ['sent', 'received'], true)) {
+                    $deliveryOrder->update(['status' => 'confirmed']);
+                }
+            }
+
+            $suratJalan->update([
+                'status' => SuratJalan::STATUS_CANCELLED,
+                'cancelled_at' => now(),
+                'cancelled_by' => $userId ?? Auth::id(),
+                'cancel_reason' => $reason,
+            ]);
+        });
 
         return $suratJalan->refresh();
     }
@@ -249,7 +265,7 @@ class SuratJalanService
     public function reissue(SuratJalan $cancelled): SuratJalan
     {
         if (! $cancelled->isCancelled()) {
-            throw ValidationException::withMessages(['status' => "Hanya Surat Jalan yang dibatalkan yang dapat diterbitkan ulang."]);
+            throw ValidationException::withMessages(['status' => 'Hanya Surat Jalan yang dibatalkan yang dapat diterbitkan ulang.']);
         }
 
         $deliveryOrders = $cancelled->deliveryOrder()->get();

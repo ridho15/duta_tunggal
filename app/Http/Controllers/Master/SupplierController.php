@@ -269,6 +269,46 @@ class SupplierController extends Controller
     }
 
     /**
+     * Ubah status aktif/nonaktif supplier.
+     */
+    public function toggleActive(Supplier $supplier): RedirectResponse
+    {
+        $this->authorizeAccess('edit supplier');
+
+        $supplier->update([
+            'is_active' => !$supplier->is_active,
+        ]);
+
+        $statusText = $supplier->is_active ? 'diaktifkan kembali' : 'dinonaktifkan';
+
+        return back()->with('success', "Status supplier '{$supplier->perusahaan}' berhasil {$statusText}.");
+    }
+
+    /**
+     * Gabungkan supplier ganda ke supplier survivor (Intervensi Super Admin / Purchasing Manager).
+     */
+    public function merge(Request $request, Supplier $supplier, \App\Services\SupplierMerger $merger): RedirectResponse
+    {
+        $this->authorizeAccess('edit supplier');
+
+        $request->validate([
+            'target_supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $target = Supplier::findOrFail($request->input('target_supplier_id'));
+
+        try {
+            $result = $merger->merge($target, $supplier, $request->input('reason'));
+
+            return redirect()->route('master.suppliers.show', $target->id)
+                ->with('success', "Supplier '{$supplier->perusahaan}' berhasil digabung ke '{$target->perusahaan}'. Seluruh riwayat transaksi telah dialihkan.");
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Gagal menggabungkan supplier: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Endpoint AJAX: Cek potensi duplikasi nama supplier/perusahaan atau kontak.
      */
     public function checkDuplicates(Request $request): JsonResponse

@@ -90,7 +90,7 @@ class AccountingPeriodController extends Controller
 
         $this->service->reopenPeriod($period);
 
-        return back()->with('success', 'Periode dibuka kembali. Jurnal penutup yang sudah dibuat tidak dibatalkan otomatis.');
+        return back()->with('success', 'Periode akuntansi berhasil dibuka kembali. Jurnal penutup (closing entries) periode ini telah dibersihkan secara otomatis.');
     }
 
     public function destroy(AccountingPeriod $period): RedirectResponse

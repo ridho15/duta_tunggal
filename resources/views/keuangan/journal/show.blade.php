@@ -4,7 +4,8 @@
 
 @section('content')
 <div class="space-y-6" x-data="{
-    deleteModalOpen: false
+    deleteModalOpen: false,
+    reverseModalOpen: false
 }">
     {{-- Header Halaman & Breadcrumb --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -89,6 +90,15 @@
                 Cetak PDF
             </a>
             @if ($header->is_manual)
+                <button
+                    type="button"
+                    @click="reverseModalOpen = true"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
+                    title="Buat Jurnal Pembalik (Reverse Entry)"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Buat Jurnal Pembalik
+                </button>
                 <button
                     type="button"
                     @click="deleteModalOpen = true"
@@ -526,6 +536,114 @@
                             Batal
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Modal Konfirmasi Buat Jurnal Pembalik --}}
+        <div
+            x-show="reverseModalOpen"
+            x-cloak
+            class="fixed inset-0 z-50 overflow-y-auto"
+            aria-labelledby="modal-title"
+            role="dialog"
+            aria-modal="true"
+        >
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <div
+                    x-show="reverseModalOpen"
+                    x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-200"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+                    @click="reverseModalOpen = false"
+                ></div>
+
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                <div
+                    x-show="reverseModalOpen"
+                    x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave="ease-in duration-200"
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full p-6 space-y-4"
+                >
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                        <div class="flex items-center gap-2 text-amber-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <h3 class="text-base font-extrabold text-gray-900">Buat Jurnal Pembalik (Reversal)</h3>
+                        </div>
+                        <button type="button" @click="reverseModalOpen = false" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="text-xs text-gray-600 space-y-2">
+                        <p>
+                            Sistem akan secara otomatis membuat voucher jurnal pembalik baru untuk meniadakan saldo dari voucher <span class="font-mono font-bold text-gray-900">{{ $header->reference }}</span>.
+                        </p>
+                        <ul class="list-disc list-inside space-y-1 text-gray-700 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                            <li>Seluruh posisi <span class="font-bold">Debit</span> akan ditukar menjadi <span class="font-bold">Kredit</span>.</li>
+                            <li>Seluruh posisi <span class="font-bold">Kredit</span> akan ditukar menjadi <span class="font-bold">Debit</span>.</li>
+                            <li>Jejak audit kedua voucher tetap utuh untuk kepatuhan akuntansi.</li>
+                        </ul>
+                    </div>
+
+                    <form method="POST" action="{{ route('keuangan.journal.reverse', $header->reference) }}" class="space-y-4">
+                        @csrf
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-bold text-gray-700">
+                                Tanggal Pembukuan Jurnal Pembalik <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                name="reverse_date"
+                                required
+                                value="{{ now()->toDateString() }}"
+                                class="w-full text-xs p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                            >
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-bold text-gray-700">
+                                Alasan Pembuatan Jurnal Pembalik <span class="text-red-500">* (Minimal 5 karakter)</span>
+                            </label>
+                            <textarea
+                                name="reason"
+                                rows="3"
+                                required
+                                minlength="5"
+                                placeholder="Contoh: Koreksi salah catat akun beban perlengkapan kantor..."
+                                class="w-full text-xs p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                            ></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                            <button
+                                type="button"
+                                @click="reverseModalOpen = false"
+                                class="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="submit"
+                                class="px-4 py-2 text-xs font-extrabold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs transition"
+                            >
+                                Proses Jurnal Pembalik
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

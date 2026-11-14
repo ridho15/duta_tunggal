@@ -89,6 +89,22 @@
                 </button>
             @endif
 
+            @if (in_array(strtolower($transfer->status), ['reject', 'cancelled']))
+                <form action="{{ route('gudang.transfer.revert-draft', $transfer) }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit"
+                            class="px-3.5 py-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition shadow-sm">
+                        Kembalikan ke Draft
+                    </button>
+                </form>
+
+                <button type="button"
+                        @click="$dispatch('open-modal-delete-transfer')"
+                        class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
+                    Hapus
+                </button>
+            @endif
+
             @if (in_array($transfer->status, ['Approved', 'completed']))
                 <a href="{{ route('gudang.transfer.pdf', $transfer) }}"
                    target="_blank"
@@ -98,6 +114,17 @@
                     </svg>
                     <span>Cetak Surat Jalan (PDF)</span>
                 </a>
+
+                @if (auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+                    <button type="button"
+                            @click="$dispatch('open-modal-void-transfer')"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm active:scale-[0.98]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Void Transfer Stok (Super Admin)</span>
+                    </button>
+                @endif
             @endif
         </div>
     </div>
@@ -300,8 +327,8 @@
         </p>
     </x-confirmation-modal>
 
-    {{-- Modal Konfirmasi Hapus Transfer (Hanya untuk Draft) --}}
-    @if (strtolower((string) $transfer->status) === 'draft')
+    {{-- Modal Konfirmasi Hapus Transfer (Draft, Reject, Cancelled) --}}
+    @if (in_array(strtolower((string) $transfer->status), ['draft', 'reject', 'cancelled']))
     <x-confirmation-modal
         name="delete-transfer"
         title="Hapus Dokumen Transfer Stok"
@@ -312,7 +339,7 @@
         method="DELETE"
     >
         <p class="text-sm text-gray-600">
-            Apakah Anda yakin ingin menghapus draft transfer stok <strong>{{ $transfer->transfer_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
+            Apakah Anda yakin ingin menghapus transfer stok <strong>{{ $transfer->transfer_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
     @endif
@@ -333,5 +360,32 @@
         <p class="text-xs text-[#15803d] mt-2 font-medium">
             Stok barang di gudang asal akan langsung berkurang dan dialokasikan/ditambahkan ke gudang tujuan sesuai surat jalan transfer.
         </p>
+    </x-confirmation-modal>
+
+    {{-- Modal Konfirmasi Void Transfer (Super Admin) --}}
+    <x-confirmation-modal
+        name="void-transfer"
+        title="Void Transfer Stok Antar Gudang (Super Admin)"
+        variant="danger"
+        confirm-text="Ya, Void Transfer"
+        cancel-text="Batal"
+        action="{{ route('gudang.transfer.void', $transfer) }}"
+        method="POST"
+    >
+        <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin melakukan <strong>Void</strong> pada transfer stok <strong>{{ $transfer->transfer_number }}</strong>?
+        </p>
+        <div class="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-left">
+            <p class="text-xs text-rose-800 font-semibold">Tindakan ini akan membalikkan mutasi fisik secara otomatis:</p>
+            <ul class="text-[11px] text-rose-700 list-disc list-inside mt-1 space-y-0.5">
+                <li>Stok barang di gudang tujuan akan dikurangi kembali.</li>
+                <li>Stok barang di gudang asal akan dipulihkan kembali.</li>
+                <li>Status dokumen transfer akan berubah menjadi Dibatalkan (Cancelled).</li>
+            </ul>
+        </div>
+        <div class="mt-3 text-left">
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Void (Wajib Diisi):</label>
+            <input type="text" name="cancel_reason" required placeholder="Contoh: Muatan rusak di jalan / salah gudang tujuan" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
+        </div>
     </x-confirmation-modal>
 @endsection

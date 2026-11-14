@@ -10,6 +10,7 @@
         approveModalOpen: false,
         requestCloseModalOpen: false,
         closeModalOpen: false,
+        cancelModalOpen: false,
         deleteModalOpen: false
     }"
 >
@@ -138,6 +139,23 @@
                 >
                     Tutup PO
                 </button>
+                @php
+                    $canCancelPo = in_array($purchaseOrder->status, ['draft', 'request_approve', 'approved'])
+                        && ($purchaseOrder->purchaseReceipt->whereNull('deleted_at')->where('status', '!=', 'cancelled')->count() === 0);
+                @endphp
+                @if ($canCancelPo && $purchaseOrder->status === 'approved')
+                    <button
+                        type="button"
+                        @click="cancelModalOpen = true"
+                        class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5 cursor-pointer"
+                        title="Batalkan PO resmi dan pulihkan kuota Order Request"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Batalkan PO
+                    </button>
+                @endif
             @endif
 
             <a
@@ -812,6 +830,43 @@
                 <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer">
                     Ya, Hapus
                 </button>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal Batalkan PO Resmi --}}
+    <div
+        x-show="cancelModalOpen"
+        x-cloak
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
+        @keydown.escape.window="cancelModalOpen = false"
+    >
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-100" @click.away="cancelModalOpen = false">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-900">Batalkan Pesanan Pembelian</h3>
+                    <p class="text-xs text-gray-500">Membatalkan PO {{ $purchaseOrder->po_number }} & memulihkan kuota Order Request.</p>
+                </div>
+            </div>
+            <form action="{{ route('pembelian.po.cancel', $purchaseOrder) }}" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Alasan Pembatalan <span class="text-red-500">*</span></label>
+                    <textarea name="reason" rows="3" required minlength="5" class="w-full p-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Contoh: Supplier mengonfirmasi stok habis / gagal kesepakatan harga..."></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="cancelModalOpen = false" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        Kembali
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer">
+                        Konfirmasi Batalkan PO
+                    </button>
+                </div>
             </form>
         </div>
     </div>

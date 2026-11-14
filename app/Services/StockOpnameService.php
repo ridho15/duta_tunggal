@@ -14,6 +14,32 @@ use Illuminate\Validation\ValidationException;
 
 class StockOpnameService
 {
+    public function cancelStockOpname(StockOpname $stockOpname, string $reason): StockOpname
+    {
+        return DB::transaction(function () use ($stockOpname, $reason) {
+            /** @var StockOpname $lockedOpname */
+            $lockedOpname = StockOpname::query()
+                ->whereKey($stockOpname->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedOpname->status === 'approved') {
+                throw ValidationException::withMessages([
+                    'status' => 'Stock opname yang sudah disetujui tidak dapat dibatalkan karena mutasi kartu stok dan jurnal telah terbentuk.',
+                ]);
+            }
+
+            $notes = trim(($lockedOpname->notes ? $lockedOpname->notes."\n\n" : '')."DIBATALKAN: {$reason} (".now()->format('d/m/Y H:i').')');
+
+            $lockedOpname->forceFill([
+                'status' => 'cancelled',
+                'notes' => $notes,
+            ])->save();
+
+            return $lockedOpname->fresh();
+        });
+    }
+
     public function approveStockOpname(StockOpname $stockOpname, ?int $approvedBy = null): StockOpname
     {
         return DB::transaction(function () use ($stockOpname, $approvedBy) {
@@ -96,7 +122,7 @@ class StockOpnameService
                     'type' => $type,
                     'reference_id' => $lockedOpname->opname_number,
                     'date' => $lockedOpname->opname_date,
-                    'notes' => 'Penyesuaian hasil opname ' . $lockedOpname->opname_number,
+                    'notes' => 'Penyesuaian hasil opname '.$lockedOpname->opname_number,
                     'from_model_type' => StockOpname::class,
                     'from_model_id' => $lockedOpname->id,
                     'meta' => [
@@ -292,6 +318,7 @@ class StockOpnameService
 
         if ($purchaseItems->isEmpty()) {
             $product = Product::find($productId);
+
             return (float) ($product ? ($product->cost_price ?? $product->price_buy ?? 0) : 0);
         }
 

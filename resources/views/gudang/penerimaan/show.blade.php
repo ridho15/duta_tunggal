@@ -6,6 +6,7 @@
 <div class="space-y-6" x-data="{ 
     confirmModalOpen: false, 
     deleteModalOpen: false,
+    voidModalOpen: false,
     previewPhotoModalOpen: false,
     activePhotoUrl: '' 
 }">
@@ -71,6 +72,27 @@
                     </svg>
                     Buat Retur
                 </a>
+                @php
+                    $canVoidReceipt = in_array(strtolower((string)$receipt->status), ['completed', 'partial'])
+                        && ! \App\Models\Invoice::where(function ($q) use ($receipt) {
+                            $q->whereJsonContains('purchase_receipts', $receipt->id)
+                              ->orWhere('purchase_receipts', 'like', '%"' . $receipt->id . '"%');
+                        })->where('status', '!=', \App\Models\Invoice::STATUS_CANCELLED)->exists()
+                        && ! \App\Models\PurchaseReturn::where('purchase_receipt_id', $receipt->id)->where('status', '!=', 'rejected')->exists();
+                @endphp
+                @if ($canVoidReceipt)
+                    <button
+                        type="button"
+                        @click="voidModalOpen = true"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-xs transition active:scale-[0.98] cursor-pointer"
+                        title="Batalkan penerimaan dan pulihkan saldo stok gudang serta status PO"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Batalkan GRN (Void)
+                    </button>
+                @endif
             @endif
 
             {{-- Jika Masih Draf --}}
@@ -706,6 +728,48 @@
             <div class="flex items-center justify-center max-h-[70vh] overflow-hidden rounded-xl bg-gray-900">
                 <img :src="activePhotoUrl" alt="Preview Foto" class="max-h-[70vh] w-auto object-contain">
             </div>
+        </div>
+    </div>
+
+    {{-- Modal Batalkan Penerimaan (Void GRN) --}}
+    <div
+        x-show="voidModalOpen"
+        x-cloak
+        class="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+        <div
+            @click.away="voidModalOpen = false"
+            class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 transform transition-all space-y-4"
+        >
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-900">Batalkan Penerimaan Barang (Void)</h3>
+                    <p class="text-xs text-gray-500 font-mono">{{ $receipt->receipt_number ?: ('GRN-' . $receipt->id) }}</p>
+                </div>
+            </div>
+            <p class="text-xs text-gray-600 leading-relaxed">
+                Tindakan ini akan membatalkan penerimaan barang, menarik kembali kuota persediaan dari gudang, membalikkan jurnal akuntansi, dan memulihkan status pemenuhan PO.
+            </p>
+            <form action="{{ route('gudang.penerimaan.void', $receipt) }}" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Alasan Pembatalan GRN <span class="text-red-500">*</span></label>
+                    <textarea name="reason" rows="3" required minlength="5" class="w-full p-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Contoh: Salah pilih nomor PO / salah kuantitas fisik masuk..."></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="voidModalOpen = false" class="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        Kembali
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer">
+                        Konfirmasi Batalkan GRN
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

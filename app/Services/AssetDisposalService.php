@@ -69,6 +69,49 @@ class AssetDisposalService
     }
 
     /**
+     * Membatalkan / Void pencatatan pelepasan aset tetap (Intervensi Super Admin / Finance).
+     * Mengembalikan status aset ke active dan menghapus postingan jurnal disposal dari Buku Besar.
+     */
+    public function voidDisposal(AssetDisposal $disposal, string $reason, ?int $userId = null): AssetDisposal
+    {
+        return DB::transaction(function () use ($disposal, $reason, $userId) {
+            /** @var AssetDisposal $lockedDisposal */
+            $lockedDisposal = AssetDisposal::query()
+                ->whereKey($disposal->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedDisposal->isCancelled()) {
+                throw new \RuntimeException('Pelepasan aset ini sudah dibatalkan sebelumnya.');
+            }
+
+            /** @var Asset $lockedAsset */
+            $lockedAsset = Asset::query()
+                ->whereKey($lockedDisposal->asset_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Kembalikan status aset fisik
+            $lockedAsset->update(['status' => 'active']);
+
+            // Hapus jurnal pembalikan/disposal di Buku Besar
+            JournalEntry::where('source_type', AssetDisposal::class)
+                ->where('source_id', $lockedDisposal->id)
+                ->delete();
+
+            // Update catatan disposal
+            $lockedDisposal->update([
+                'status' => 'cancelled',
+                'void_reason' => $reason,
+                'voided_by' => $userId ?? Auth::id(),
+                'voided_at' => now(),
+            ]);
+
+            return $lockedDisposal;
+        });
+    }
+
+    /**
      * Post journal entries for asset disposal
      */
     public function postDisposalJournalEntries(Asset $asset, AssetDisposal $disposal): void

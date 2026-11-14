@@ -53,11 +53,65 @@ class StockTransferService
             ]);
         }
 
+        $notes = trim(($stockTransfer->notes ? $stockTransfer->notes . "\n\n" : '') . ($reason ? "DITOLAK: {$reason}" : 'DITOLAK OLEH SUPERVISOR'));
+
         $stockTransfer->update([
             'status' => 'Reject',
+            'notes' => $notes,
         ]);
 
         return $stockTransfer->fresh();
+    }
+
+    public function revertToDraft(StockTransfer $stockTransfer): StockTransfer
+    {
+        if (!in_array(strtolower((string) $stockTransfer->status), ['reject', 'request'], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Hanya transfer stok berstatus Reject atau Request yang dapat dikembalikan ke Draft.',
+            ]);
+        }
+
+        $stockTransfer->update([
+            'status' => 'Draft',
+        ]);
+
+        return $stockTransfer->fresh();
+    }
+
+    public function voidStockTransfer(StockTransfer $stockTransfer, string $reason): StockTransfer
+    {
+        return DB::transaction(function () use ($stockTransfer, $reason) {
+            /** @var StockTransfer $lockedTransfer */
+            $lockedTransfer = StockTransfer::query()
+                ->whereKey($stockTransfer->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (strtolower((string) $lockedTransfer->status) !== 'approved') {
+                throw ValidationException::withMessages([
+                    'status' => 'Hanya transfer stok berstatus Approved yang dapat di-void.',
+                ]);
+            }
+
+            // Hapus pergerakan stok mutasi
+            $movements = StockMovement::query()
+                ->where('from_model_type', StockTransfer::class)
+                ->where('from_model_id', $lockedTransfer->id)
+                ->get();
+
+            foreach ($movements as $movement) {
+                $movement->delete();
+            }
+
+            $notes = trim(($lockedTransfer->notes ? $lockedTransfer->notes . "\n\n" : '') . "DIVOID OLEH SUPER ADMIN: {$reason} (" . now()->format('d/m/Y H:i') . ')');
+
+            $lockedTransfer->update([
+                'status' => 'Cancelled',
+                'notes' => $notes,
+            ]);
+
+            return $lockedTransfer->fresh();
+        });
     }
 
     public function approveStockTransfer(StockTransfer $stockTransfer): StockTransfer

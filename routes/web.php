@@ -278,6 +278,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/nota-kredit/{creditNote}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'show'])->name('credit-notes.show');
         Route::post('/nota-kredit/{creditNote}/issue', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'issue'])->name('credit-notes.issue');
         Route::post('/nota-kredit/{creditNote}/tax-document', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'updateTaxDocument'])->name('credit-notes.updateTaxDocument');
+        Route::post('/nota-kredit/{creditNote}/void', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'void'])->name('credit-notes.void');
         Route::delete('/nota-kredit/{creditNote}', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'destroy'])->name('credit-notes.destroy');
         Route::get('/nota-kredit/{creditNote}/pdf', [\App\Http\Controllers\Penjualan\CreditNoteController::class, 'pdf'])->name('credit-notes.pdf');
 
@@ -331,6 +332,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/shift', [\App\Http\Controllers\Kasir\PosShiftController::class, 'index'])->name('shift.index');
         Route::post('/shift/buka', [\App\Http\Controllers\Kasir\PosShiftController::class, 'open'])->name('shift.open');
         Route::post('/shift/tutup', [\App\Http\Controllers\Kasir\PosShiftController::class, 'close'])->name('shift.close');
+        Route::post('/shift/{posShift}/force-close', [\App\Http\Controllers\Kasir\PosShiftController::class, 'forceClose'])->name('shift.forceClose');
         Route::get('/shift/{posShift}/rekap', [\App\Http\Controllers\Kasir\PosShiftController::class, 'summary'])->name('shift.summary');
         Route::get('/laporan', [\App\Http\Controllers\Kasir\PosShiftController::class, 'report'])->name('laporan.index');
         Route::get('/laporan/pdf', [\App\Http\Controllers\Kasir\PosShiftController::class, 'exportPdf'])->name('laporan.pdf');
@@ -360,6 +362,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::put('/penerimaan/{penerimaan}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'update'])->name('penerimaan.update');
         Route::delete('/penerimaan/{penerimaan}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'destroy'])->name('penerimaan.destroy');
         Route::post('/penerimaan/{penerimaan}/confirm', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'confirm'])->name('penerimaan.confirm');
+        Route::post('/penerimaan/{penerimaan}/void', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'void'])->name('penerimaan.void');
         Route::get('/penerimaan/{penerimaan}/pdf', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'pdf'])->name('penerimaan.pdf');
         Route::get('/penerimaan-po-items/{purchaseOrder}', [\App\Http\Controllers\Gudang\PenerimaanBarangController::class, 'poItems'])->name('penerimaan.po-items');
 
@@ -382,6 +385,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/transfer/{transfer}/request', [\App\Http\Controllers\Gudang\StockTransferController::class, 'requestTransfer'])->name('transfer.request');
         Route::post('/transfer/{transfer}/approve', [\App\Http\Controllers\Gudang\StockTransferController::class, 'approve'])->name('transfer.approve');
         Route::post('/transfer/{transfer}/reject', [\App\Http\Controllers\Gudang\StockTransferController::class, 'reject'])->name('transfer.reject');
+        Route::post('/transfer/{transfer}/revert-draft', [\App\Http\Controllers\Gudang\StockTransferController::class, 'revertDraft'])->name('transfer.revert-draft');
+        Route::post('/transfer/{transfer}/void', [\App\Http\Controllers\Gudang\StockTransferController::class, 'void'])->name('transfer.void');
         Route::get('/transfer/{transfer}/pdf', [\App\Http\Controllers\Gudang\StockTransferController::class, 'pdf'])->name('transfer.pdf');
         Route::get('/transfer-available-products/{warehouse}', [\App\Http\Controllers\Gudang\StockTransferController::class, 'availableProducts'])->name('transfer.available-products');
 
@@ -411,6 +416,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/opname/{opname}/complete', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'completeCount'])->name('opname.complete');
         Route::post('/opname/{opname}/recount', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'recount'])->name('opname.recount');
         Route::post('/opname/{opname}/approve', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'approve'])->name('opname.approve');
+        Route::post('/opname/{opname}/cancel', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'cancel'])->name('opname.cancel');
         Route::get('/opname/{opname}/pdf', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'pdf'])->name('opname.pdf');
         Route::get('/opname/{opname}/excel', [\App\Http\Controllers\Gudang\StockOpnameController::class, 'excel'])->name('opname.excel');
 
@@ -451,6 +457,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/po/{purchaseOrder}/approve', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'approve'])->name('po.approve');
         Route::post('/po/{purchaseOrder}/request-close', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'requestClose'])->name('po.request-close');
         Route::post('/po/{purchaseOrder}/close', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'close'])->name('po.close');
+        Route::post('/po/{purchaseOrder}/cancel', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'cancel'])->name('po.cancel');
         Route::get('/po/{purchaseOrder}/pdf', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'pdf'])->name('po.pdf');
         Route::get('/supplier-details/{supplier}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'supplierDetails'])->name('supplier-details');
         Route::get('/product-details/{product}', [\App\Http\Controllers\Pembelian\PurchaseOrderController::class, 'productDetails'])->name('product-details');
@@ -551,6 +558,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/transfer/create', [\App\Http\Controllers\Keuangan\CashBankController::class, 'createTransfer'])->name('cashbank.transfer.create');
         Route::post('/transfer', [\App\Http\Controllers\Keuangan\CashBankController::class, 'storeTransfer'])->name('cashbank.transfer.store');
         Route::get('/transfer/{transfer}', [\App\Http\Controllers\Keuangan\CashBankController::class, 'showTransfer'])->name('cashbank.transfer.show');
+        Route::post('/transfer/{transfer}/cancel', [\App\Http\Controllers\Keuangan\CashBankController::class, 'cancelTransfer'])->name('cashbank.transfer.cancel');
         Route::delete('/transfer/{transfer}', [\App\Http\Controllers\Keuangan\CashBankController::class, 'destroyTransfer'])->name('cashbank.transfer.destroy');
         Route::get('/transfer/{transfer}/pdf', [\App\Http\Controllers\Keuangan\CashBankController::class, 'pdfTransfer'])->name('cashbank.transfer.pdf');
 
@@ -563,6 +571,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/jurnal/create', [\App\Http\Controllers\Keuangan\JournalController::class, 'create'])->name('journal.create');
         Route::post('/jurnal', [\App\Http\Controllers\Keuangan\JournalController::class, 'store'])->name('journal.store');
         Route::get('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'show'])->name('journal.show');
+        Route::post('/jurnal/{reference}/reverse', [\App\Http\Controllers\Keuangan\JournalController::class, 'reverse'])->name('journal.reverse');
         Route::delete('/jurnal/{reference}', [\App\Http\Controllers\Keuangan\JournalController::class, 'destroy'])->name('journal.destroy');
         Route::get('/jurnal/{reference}/pdf', [\App\Http\Controllers\Keuangan\JournalController::class, 'pdf'])->name('journal.pdf');
 
@@ -593,6 +602,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
                 Route::post('/{transfer}/approve', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'approve'])->name('approve');
                 Route::post('/{transfer}/complete', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'complete'])->name('complete');
                 Route::post('/{transfer}/cancel', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'cancel'])->name('cancel');
+                Route::post('/{transfer}/void', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'void'])->name('void');
                 Route::get('/{transfer}/pdf', [\App\Http\Controllers\Keuangan\AssetTransferController::class, 'pdf'])->name('pdf');
             });
 
@@ -602,6 +612,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
                 Route::get('/create', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'create'])->name('create');
                 Route::post('/', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'store'])->name('store');
                 Route::get('/{disposal}', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'show'])->name('show');
+                Route::post('/{disposal}/void', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'void'])->name('void');
                 Route::get('/{disposal}/pdf', [\App\Http\Controllers\Keuangan\AssetDisposalController::class, 'pdf'])->name('pdf');
             });
 
@@ -643,6 +654,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         // Master Supplier
         Route::get('/supplier/api/generate-code', [\App\Http\Controllers\Master\SupplierController::class, 'generateCode'])->name('suppliers.generate-code');
         Route::get('/supplier/api/check-duplicates', [\App\Http\Controllers\Master\SupplierController::class, 'checkDuplicates'])->name('suppliers.check-duplicates');
+        Route::post('/supplier/{supplier}/toggle-active', [\App\Http\Controllers\Master\SupplierController::class, 'toggleActive'])->name('suppliers.toggle-active');
+        Route::post('/supplier/{supplier}/merge', [\App\Http\Controllers\Master\SupplierController::class, 'merge'])->name('suppliers.merge');
         Route::resource('supplier', \App\Http\Controllers\Master\SupplierController::class)->names('suppliers');
 
         // Master Bagan Akun (COA)
@@ -755,6 +768,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
             Route::post('/{materialIssue}/confirm-warehouse', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'confirmWarehouse'])->name('confirm-warehouse');
             Route::post('/{materialIssue}/complete', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'complete'])->name('complete');
             Route::post('/{materialIssue}/reject', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'reject'])->name('reject');
+            Route::post('/{materialIssue}/cancel', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'cancel'])->name('cancel');
+            Route::post('/{materialIssue}/void', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'void'])->name('void');
             Route::get('/{materialIssue}/pdf', [\App\Http\Controllers\Manufaktur\MaterialIssueController::class, 'pdf'])->name('pdf');
         });
 
@@ -769,6 +784,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
             Route::put('/{production}', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'update'])->name('update');
             Route::delete('/{production}', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'destroy'])->name('destroy');
             Route::post('/{production}/finish', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'finish'])->name('finish');
+            Route::post('/{production}/revert-draft', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'revertDraft'])->name('revert-draft');
             Route::get('/{production}/pdf', [\App\Http\Controllers\Manufaktur\ProductionController::class, 'pdf'])->name('pdf');
         });
 

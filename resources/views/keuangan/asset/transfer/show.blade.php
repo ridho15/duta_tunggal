@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Detail Mutasi Aset Tetap – Duta Tunggal ERP')
 
@@ -155,6 +155,22 @@
                     </button>
                 </div>
             </div>
+        @elseif ($transfer->status === 'completed' && auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || auth()->user()->hasRole(['Super Admin', 'Finance Manager', 'Director'])))
+            <div class="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div class="text-xs text-gray-500">
+                    Aksi Khusus Super Admin / Finance Manager:
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onclick="document.getElementById('voidTransferModal').classList.remove('hidden')"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-sm transition active:scale-[0.98]"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        Void Transfer Aset
+                    </button>
+                </div>
+            </div>
         @endif
     </div>
 
@@ -293,6 +309,58 @@
                     class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-sm transition"
                 >
                     Ya, Batalkan Mutasi
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal Konfirmasi Void Transfer Aset --}}
+<div id="voidTransferModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm hidden p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 class="text-sm font-bold text-gray-900">Batalkan / Void Transfer Aset</h3>
+            <button type="button" onclick="document.getElementById('voidTransferModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <form action="{{ route('keuangan.asset.transfer.void', $transfer) }}" method="POST" class="space-y-4">
+            @csrf
+            <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px] leading-relaxed">
+                <strong>Perhatian:</strong>
+                <p class="mt-1">Kepemilikan aset <strong>{{ $transfer->asset->name ?? 'Aset' }}</strong> akan otomatis dikembalikan ke cabang pengirim semula (<strong>{{ $transfer->fromCabang->nama ?? 'Cabang Asal' }}</strong>).</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Alasan Void Transfer <span class="text-rose-500">*</span> (Minimal 5 karakter)
+                </label>
+                <textarea
+                    name="reason"
+                    rows="3"
+                    required
+                    minlength="5"
+                    placeholder="Tuliskan alasan mengapa transfer ini di-void..."
+                    class="w-full text-xs rounded-xl border-gray-200 focus:border-rose-500 focus:ring focus:ring-rose-200"
+                ></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2">
+                <button
+                    type="button"
+                    onclick="document.getElementById('voidTransferModal').classList.add('hidden')"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition"
+                >
+                    Tutup
+                </button>
+                <button
+                    type="submit"
+                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm transition"
+                >
+                    Konfirmasi Void Transfer
                 </button>
             </div>
         </form>

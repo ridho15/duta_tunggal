@@ -539,6 +539,60 @@ class PenerimaanBarangController extends Controller
     }
 
     /**
+     * Membatalkan transaksi penerimaan barang yang sudah terkonfirmasi (Void GRN).
+     * Membalikkan saldo stok fisik, jurnal akuntansi, dan memulihkan status pemenuhan PO.
+     */
+    public function void(Request $request, PurchaseReceipt $penerimaan): RedirectResponse
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|min:5|max:500',
+        ], [
+            'reason.required' => 'Alasan pembatalan penerimaan barang wajib diisi.',
+            'reason.min' => 'Alasan pembatalan minimal 5 karakter.',
+        ]);
+
+        if (strtolower((string) $penerimaan->status) === 'cancelled') {
+            return back()->with('error', 'Penerimaan barang ini sudah dibatalkan sebelumnya.');
+        }
+
+        // Cek apakah sudah ditagihkan ke Faktur Pembelian (Invoice)
+        $invoiced = \App\Models\Invoice::where(function ($q) use ($penerimaan) {
+                $q->whereJsonContains('purchase_receipts', $penerimaan->id)
+                  ->orWhere('purchase_receipts', 'like', '%"' . $penerimaan->id . '"%')
+                  ->orWhere('purchase_receipts', 'like', '%[' . $penerimaan->id . ',%')
+                  ->orWhere('purchase_receipts', 'like', '%,' . $penerimaan->id . ']%')
+                  ->orWhere('purchase_receipts', 'like', '%,' . $penerimaan->id . ',%');
+            })
+            ->where('status', '!=', \App\Models\Invoice::STATUS_CANCELLED)
+            ->exists();
+
+        if ($invoiced) {
+            return back()->with('error', 'Penerimaan barang tidak dapat dibatalkan karena sudah ditagihkan pada Faktur Pembelian (Invoice) aktif. Batalkan faktur pembelian terlebih dahulu.');
+        }
+
+        // Cek apakah ada retur aktif
+        $hasReturn = \App\Models\PurchaseReturn::where('purchase_receipt_id', $penerimaan->id)
+            ->where('status', '!=', 'rejected')
+            ->exists();
+
+        if ($hasReturn) {
+            return back()->with('error', 'Penerimaan barang memiliki dokumen Retur Pembelian aktif. Hapus atau tolak retur pembelian terlebih dahulu.');
+        }
+
+        try {
+            DB::transaction(function () use ($penerimaan, $validated) {
+                $this->receiptService->voidPurchaseReceipt($penerimaan, $validated['reason']);
+            });
+
+            return redirect()->route('gudang.penerimaan.show', $penerimaan)
+                ->with('success', "Penerimaan barang {$penerimaan->receipt_number} berhasil dibatalkan. Stok gudang dan jurnal telah dipulihkan.");
+        } catch (\Throwable $e) {
+            Log::error('PenerimaanBarangController@void failed: ' . $e->getMessage());
+            return back()->with('error', 'Gagal membatalkan penerimaan barang: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Menghapus draf penerimaan barang.
      */
     public function destroy(PurchaseReceipt $penerimaan): RedirectResponse

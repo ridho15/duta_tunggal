@@ -483,6 +483,72 @@ class JournalController extends Controller
     }
 
     /**
+     * Buat Jurnal Pembalik (Reversal Voucher) untuk transaksi jurnal tertentu.
+     * Menukar posisi seluruh baris Debit menjadi Kredit dan Kredit menjadi Debit.
+     */
+    public function reverse(Request $request, string $reference): RedirectResponse
+    {
+        MenuAccess::authorizeRolesOrPermissions(MenuAccess::FINANCE_WRITE_ROLES, ['create journal entry'], 'Anda tidak memiliki hak akses untuk membuat Jurnal Pembalik.');
+
+        $validated = $request->validate([
+            'reverse_date' => ['required', 'date'],
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'reverse_date.required' => 'Tanggal jurnal pembalik wajib diisi.',
+            'reason.required' => 'Alasan pembuatan jurnal pembalik wajib diisi.',
+            'reason.min' => 'Alasan jurnal pembalik minimal 5 karakter.',
+        ]);
+
+        $lines = JournalEntry::where('reference', $reference)->get();
+
+        if ($lines->isEmpty()) {
+            return back()->with('error', "Voucher jurnal {$reference} tidak ditemukan.");
+        }
+
+        try {
+            $newReference = DB::transaction(function () use ($lines, $validated, $reference) {
+                $cabangId = $lines->first()->cabang_id ?? Auth::user()?->cabang_id;
+                $userId = Auth::id();
+                $date = $validated['reverse_date'];
+
+                AccountingPeriod::ensureDateIsOpen($date, $cabangId);
+
+                $revRef = 'REV-' . $reference . '-' . now()->format('His');
+
+                foreach ($lines as $line) {
+                    $debit = (float) $line->debit;
+                    $credit = (float) $line->credit;
+
+                    if ($debit > 0 || $credit > 0) {
+                        JournalEntry::create([
+                            'coa_id' => $line->coa_id,
+                            'date' => $date,
+                            'reference' => $revRef,
+                            'description' => '[PEMBALIK] ' . ($line->description ?: $lines->first()->description) . ' (' . $validated['reason'] . ')',
+                            'debit' => $credit,   // Dibalik: credit menjadi debit
+                            'credit' => $debit,   // Dibalik: debit menjadi credit
+                            'journal_type' => 'reversal',
+                            'cabang_id' => $cabangId,
+                            'created_by' => $userId,
+                            'source_type' => $line->source_type,
+                            'source_id' => $line->source_id,
+                            'is_reversal' => true,
+                            'reversal_of_transaction_id' => $reference,
+                        ]);
+                    }
+                }
+
+                return $revRef;
+            });
+
+            return redirect()->route('keuangan.journal.show', $newReference)
+                ->with('success', "Jurnal Pembalik {$newReference} berhasil dibuat dan dibukukan ke Buku Besar.");
+        } catch (Throwable $e) {
+            return back()->with('error', 'Gagal membuat jurnal pembalik: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Cetak PDF Voucher Jurnal (A4 Portrait formal).
      */
     public function pdf(string $reference): Response

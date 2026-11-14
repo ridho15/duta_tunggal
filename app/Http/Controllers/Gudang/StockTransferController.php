@@ -386,16 +386,63 @@ class StockTransferController extends Controller
     {
         $this->authorizeAccess('delete stock transfer');
 
-        if (strtolower((string) $transfer->status) !== 'draft') {
+        if (!in_array(strtolower((string) $transfer->status), ['draft', 'reject', 'cancelled'], true)) {
             return redirect()->route('gudang.transfer.show', $transfer)
-                ->with('error', 'Hanya transfer stok berstatus Draft yang dapat dihapus. Transfer yang telah diajukan, disetujui, atau diproses mutasi fisik tidak dapat dihapus demi integritas persediaan.');
+                ->with('error', 'Hanya transfer stok berstatus Draft, Ditolak, atau Dibatalkan yang dapat dihapus. Transfer yang telah disetujui memiliki mutasi fisik dan harus di-void terlebih dahulu demi integritas persediaan.');
         }
 
         $transferNumber = $transfer->transfer_number;
+        $transfer->stockTransferItem()->forceDelete();
         $transfer->delete();
 
         return redirect()->route('gudang.transfer.index')
             ->with('success', "Transfer {$transferNumber} berhasil dihapus.");
+    }
+
+    /**
+     * Mengembalikan status transfer stok yang ditolak kembali ke Draft agar dapat direvisi.
+     */
+    public function revertDraft(StockTransfer $transfer)
+    {
+        $this->authorizeAccess('update stock transfer');
+
+        try {
+            $this->stockTransferService->revertToDraft($transfer);
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('success', "Transfer {$transfer->transfer_number} berhasil dikembalikan ke status Draft untuk direvisi.");
+        } catch (ValidationException $e) {
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('error', collect($e->errors())->flatten()->first());
+        }
+    }
+
+    /**
+     * Void transfer stok yang sudah disetujui (Approved) khusus Super Admin / Kepala Gudang.
+     */
+    public function void(Request $request, StockTransfer $transfer)
+    {
+        $user = Auth::user();
+        $isSuperAdmin = $user && (MenuAccess::isSuper($user) || (method_exists($user, 'canManageAllCabang') && $user->canManageAllCabang()) || self::userMay($user, 'response stock transfer'));
+
+        if (! $isSuperAdmin) {
+            abort(403, 'Hanya Super Admin atau Kepala Gudang yang berhak melakukan Void Transfer Stok.');
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => 'required|string|max:500',
+        ]);
+
+        try {
+            $this->stockTransferService->voidStockTransfer($transfer, $validated['cancel_reason']);
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('success', "Transfer {$transfer->transfer_number} berhasil di-void! Mutasi persediaan di gudang asal dan tujuan telah dibalikkan secara aman.");
+        } catch (ValidationException $e) {
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('error', 'Gagal memproses void transfer: ' . $e->getMessage());
+        }
     }
 
     /**

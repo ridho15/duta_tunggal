@@ -145,6 +145,8 @@ class OrderRequest extends Model
             $this->update(['status' => 'complete']);
         } elseif ($anyFulfilled) {
             $this->update(['status' => 'partial']);
+        } else {
+            $this->update(['status' => 'approved']);
         }
     }
 
