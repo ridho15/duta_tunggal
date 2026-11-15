@@ -327,8 +327,13 @@
                 <td>DPP:</td>
                 <td class="text-right rupiah">Rp {{ number_format($invoice->dpp ?? $invoice->subtotal, 0, ',', '.') }}</td>
             </tr>
+            {{-- DPP Nilai Lain = 11/12 × DPP; PPN 12% × Nilai Lain (efektif 11%), untuk Faktur Pajak --}}
             <tr>
-                <td>PPN {{ number_format($effectivePpnRate, 2, ',', '.') }}%:</td>
+                <td>DPP Nilai Lain (11/12):</td>
+                <td class="text-right rupiah">Rp {{ number_format(($invoice->dpp ?? $invoice->subtotal) * 11 / 12, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td>PPN (12% × DPP Nilai Lain):</td>
                 <td class="text-right rupiah">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</td>
             </tr>
             @endif

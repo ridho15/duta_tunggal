@@ -340,8 +340,10 @@
                         <span class="font-bold text-gray-800">{{ $fulfillment['status_label'] ?? 'Belum Diterima' }}</span>
                     </div>
                     @php
+                        // Pemenuhan dibatasi per item (tidak melebihi qty pesan) agar persen konsisten dengan status.
+                        $fulfilled = $fulfillment['total_fulfilled_capped'] ?? $fulfillment['total_accepted'];
                         $pct = $fulfillment['total_ordered'] > 0
-                            ? min(100, round(($fulfillment['total_accepted'] / $fulfillment['total_ordered']) * 100))
+                            ? min(100, round(($fulfilled / $fulfillment['total_ordered']) * 100))
                             : 0;
                     @endphp
                     <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
@@ -349,7 +351,7 @@
                     </div>
                     <div class="flex justify-between text-[11px] text-gray-400 mt-1">
                         <span>{{ $pct }}% Diterima Lengkap</span>
-                        <span>{{ round($fulfillment['total_accepted']) }} / {{ round($fulfillment['total_ordered']) }} Unit</span>
+                        <span>{{ round($fulfilled) }} / {{ round($fulfillment['total_ordered']) }} Unit</span>
                     </div>
                 </div>
             </div>

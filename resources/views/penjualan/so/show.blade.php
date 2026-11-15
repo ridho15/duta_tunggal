@@ -133,8 +133,10 @@
                         @foreach($saleOrder->saleOrderItem as $item)
                             @php
                                 $prog = $itemProgress[$item->id] ?? null;
-                                $delivered = $prog ? (float) $prog['delivered'] : (float) $item->delivered_quantity;
-                                $available = $prog ? (float) $prog['available'] : max(0, $item->quantity - $delivered);
+                                // "Sudah DO" = qty yang sudah punya DO (terkirim + masih diproses), bukan hanya yang sudah dikirim.
+                                $committed = $prog ? (float) $prog['delivered'] + (float) $prog['in_process'] : (float) $item->delivered_quantity;
+                                $inProcess = $prog ? (float) $prog['in_process'] : 0.0;
+                                $available = $prog ? (float) $prog['available'] : max(0, $item->quantity - $committed);
                             @endphp
                             <tr>
                                 <td class="py-3 px-2">
@@ -148,7 +150,7 @@
                                     {{ round($item->quantity) }}
                                 </td>
                                 <td class="py-3 px-2 text-right font-medium text-gray-800">
-                                    {{ round($delivered) }}
+                                    {{ round($committed) }}@if($inProcess > 0)<span class="block text-[10px] font-normal text-amber-600">{{ round($inProcess) }} blm kirim</span>@endif
                                 </td>
                                 <td class="py-3 px-2 text-right font-bold {{ $available <= 0 ? 'text-emerald-700' : 'text-amber-700' }}">
                                     {{ round($available) }}{{ $available <= 0 ? ' ✓' : '' }}

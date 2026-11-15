@@ -172,8 +172,15 @@
                     <span>DPP (Subtotal):</span>
                     <span class="font-semibold text-gray-700">Rp {{ number_format((float) $creditNote->subtotal, 0, ',', '.') }}</span>
                 </div>
+                @if ((float) $creditNote->tax_amount > 0)
+                    {{-- DPP Nilai Lain = 11/12 × DPP, untuk Faktur Pajak Pengganti/Retur --}}
+                    <div class="flex justify-between">
+                        <span>DPP Nilai Lain (11/12):</span>
+                        <span class="font-semibold text-gray-700">Rp {{ number_format((float) $creditNote->subtotal * 11 / 12, 0, ',', '.') }}</span>
+                    </div>
+                @endif
                 <div class="flex justify-between">
-                    <span>PPN Reversal:</span>
+                    <span>PPN Reversal{{ (float) $creditNote->tax_amount > 0 ? ' (12% × DPP Nilai Lain)' : '' }}:</span>
                     <span class="font-semibold text-gray-700">Rp {{ number_format((float) $creditNote->tax_amount, 0, ',', '.') }}</span>
                 </div>
                 @if ((float) $creditNote->other_fee_amount > 0)

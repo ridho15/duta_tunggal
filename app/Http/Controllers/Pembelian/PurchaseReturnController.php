@@ -488,8 +488,14 @@ class PurchaseReturnController extends Controller
 
             $this->returnService->approve($return, $data);
 
-            return redirect()->route('pembelian.returns.show', $return->id)
-                ->with('success', "Retur Pembelian {$return->nota_retur} telah disetujui. Pengurangan persediaan gudang, pemotongan hutang dagang, dan jurnal akuntansi telah berhasil diproses.");
+            // Pesan mengikuti jalur sebenarnya: hanya retur gudang (barang sudah masuk gudang & ditagih) yang
+            // memotong stok, hutang, dan memposting jurnal. Retur QC (barang ditolak saat terima) tidak.
+            $postsAccounting = ! $return->isQcReturn() && $return->purchase_receipt_id;
+            $msg = $postsAccounting
+                ? "Retur Pembelian {$return->nota_retur} telah disetujui. Pengurangan persediaan gudang, pemotongan hutang dagang, dan jurnal akuntansi telah berhasil diproses."
+                : "Retur Pembelian {$return->nota_retur} telah disetujui. Karena barang ditolak saat penerimaan (belum masuk gudang dan belum ditagih), tidak ada pemotongan stok, hutang, atau jurnal — hanya kualitas barang yang ditindaklanjuti.";
+
+            return redirect()->route('pembelian.returns.show', $return->id)->with('success', $msg);
         } catch (Throwable $e) {
             Log::error('PurchaseReturnController approve failed', [
                 'return_id' => $return->id,

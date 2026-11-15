@@ -212,10 +212,23 @@
                     <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->dpp, 0, ',', '.') }}</span>
                 </div>
 
-                <div class="flex justify-between text-gray-600">
-                    <span>PPN ({{ (int)$invoice->ppn_rate }}%)</span>
-                    <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->tax, 0, ',', '.') }}</span>
-                </div>
+                @if((float)$invoice->tax > 0)
+                    {{-- DPP Nilai Lain = 11/12 × DPP; PPN 12% × Nilai Lain (efektif 11%). Dipakai untuk Faktur Pajak. --}}
+                    <div class="flex justify-between text-gray-600">
+                        <span>DPP Nilai Lain (11/12)</span>
+                        <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->dpp * 11 / 12, 0, ',', '.') }}</span>
+                    </div>
+
+                    <div class="flex justify-between text-gray-600">
+                        <span>PPN (12% × DPP Nilai Lain)</span>
+                        <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->tax, 0, ',', '.') }}</span>
+                    </div>
+                @else
+                    <div class="flex justify-between text-gray-600">
+                        <span>PPN ({{ (int)$invoice->ppn_rate }}%)</span>
+                        <span class="font-semibold text-gray-900">Rp {{ number_format((float)$invoice->tax, 0, ',', '.') }}</span>
+                    </div>
+                @endif
 
                 <div class="flex justify-between text-gray-600">
                     <span>Biaya Lain / Ongkos Kirim</span>
