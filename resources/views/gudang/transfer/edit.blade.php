@@ -323,7 +323,7 @@
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
                         <span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                            Stok: ${Number(p.qty_available).toLocaleString('id-ID')} ${p.uom_name || 'Pcs'}
+                            Stok bebas: ${Number(p.qty_available).toLocaleString('id-ID')} ${p.uom_name || 'Pcs'}
                         </span>
                     </div>
                 </div>
@@ -490,7 +490,7 @@
         availableProducts.forEach(p => {
             const sel = (initialData && initialData.product_id == p.product_id) ? 'selected' : '';
             productOptions += `<option value="${p.product_id}" data-stock="${p.qty_available}" data-uom="${p.uom_name}" data-rak="${p.rak_id || ''}" ${sel}>
-                ${p.name} (${p.sku}) – Stok: ${p.qty_available} ${p.uom_name}
+                ${p.name} (${p.sku}) – Stok bebas: ${p.qty_available} ${p.uom_name}
             </option>`;
         });
 
@@ -618,7 +618,7 @@
                 availableProducts.forEach(p => {
                     const sel = (p.product_id == currentVal) ? 'selected' : '';
                     productOptions += `<option value="${p.product_id}" data-stock="${p.qty_available}" data-uom="${p.uom_name}" data-rak="${p.rak_id || ''}" ${sel}>
-                        ${p.name} (${p.sku}) – Stok: ${p.qty_available} ${p.uom_name}
+                        ${p.name} (${p.sku}) – Stok bebas: ${p.qty_available} ${p.uom_name}
                     </option>`;
                 });
                 select.innerHTML = productOptions;
