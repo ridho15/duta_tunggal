@@ -768,4 +768,53 @@ class SaleOrderController extends Controller
             return redirect()->back()->with('error', 'Gagal menolak Sales Order: '.$e->getMessage());
         }
     }
+    /** Keputusan Ko Handy #4: SO tanpa DO aktif hanya boleh dibatalkan Manager / Super Admin / Owner. */
+    public static function canCancelSaleOrder($user, SaleOrder $saleOrder): bool
+    {
+        if (! $user || ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+        if (\App\Support\MenuAccess::isSuper($user)) {
+            return true;
+        }
+
+        return method_exists($user, 'hasRole') && $user->hasRole(['Sales Manager', 'Owner', 'Manager']);
+    }
+
+    /**
+     * Membatalkan Sales Order (bukan menolak draf). Keputusan Ko Handy #4: hanya Manager/Super Admin,
+     * dan hanya bila SO belum punya Perintah Kirim aktif (service menegakkan guard DO).
+     */
+    public function cancel(Request $request, SaleOrder $saleOrder): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! self::canCancelSaleOrder($user, $saleOrder)) {
+            return redirect()->back()->with('error', 'Hanya Manager atau Super Admin yang dapat membatalkan Sales Order.');
+        }
+
+        if (in_array($saleOrder->status, ['canceled', 'reject', 'closed'], true)) {
+            return redirect()->back()->with('error', "Sales Order {$saleOrder->so_number} sudah berstatus {$saleOrder->status_label}.");
+        }
+
+        $request->validate(
+            ['reason' => 'required|string|min:5|max:500'],
+            ['reason.required' => 'Alasan pembatalan wajib diisi.', 'reason.min' => 'Alasan pembatalan minimal 5 karakter.']
+        );
+
+        try {
+            $reason = trim((string) $request->input('reason'));
+            $saleOrder->update([
+                'notes' => trim((string) $saleOrder->notes."\n[Dibatalkan: ".now()->format('d/m/Y H:i')." oleh {$user->name}]: ".$reason),
+            ]);
+            $this->salesOrderService->cancel($saleOrder);
+
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('success', "Sales Order {$saleOrder->so_number} dibatalkan. Reservasi stok dilepas dan saldo titip COD (bila ada) dikembalikan.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Gagal membatalkan Sales Order: '.$e->getMessage());
+        }
+    }
 }

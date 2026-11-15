@@ -62,6 +62,22 @@
                 </button>
                 @endcan
             @endif
+
+            @php
+                // Pembatalan SO (Ko Handy #4): Manager/Super Admin, hanya bila belum terminal dan tanpa DO aktif.
+                $soHasActiveDo = $saleOrder->deliveryOrder()->whereNotIn('delivery_orders.status', ['closed', 'reject'])->exists();
+                $canCancelSo = ! in_array($saleOrder->status, ['draft', 'request_approve', 'canceled', 'reject', 'closed'], true)
+                    && \App\Http\Controllers\Penjualan\SaleOrderController::canCancelSaleOrder(auth()->user(), $saleOrder);
+            @endphp
+            @if($canCancelSo)
+                @if($soHasActiveDo)
+                    <span class="px-4 py-2 border border-gray-200 text-gray-400 text-sm font-semibold rounded-xl" title="Batalkan Perintah Kirim aktif lebih dulu">Batalkan SO (ada DO aktif)</span>
+                @else
+                    <button type="button" onclick="document.getElementById('cancelSoModal').classList.remove('hidden')" class="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer">
+                        Batalkan SO
+                    </button>
+                @endif
+            @endif
         </div>
     </div>
 
@@ -288,6 +304,27 @@
                 <button type="submit" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-sm font-bold shadow-sm cursor-pointer">
                     Ya, Setujui SO
                 </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Batalkan SO -->
+<div id="cancelSoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl flex flex-col gap-4">
+        <h3 class="text-lg font-bold text-red-900 m-0">Batalkan Sales Order {{ $saleOrder->so_number }}</h3>
+        <p class="text-sm text-gray-600">
+            Pembatalan melepas reservasi stok dan mengembalikan saldo titip COD (bila ada). Hanya untuk SO tanpa Perintah Kirim aktif.
+        </p>
+        <form method="POST" action="{{ route('penjualan.so.cancel', $saleOrder->id) }}" class="flex flex-col gap-3">
+            @csrf
+            <div class="flex flex-col gap-1">
+                <label class="text-xs font-semibold text-gray-700">Alasan Pembatalan <span class="text-red-500">*</span></label>
+                <textarea name="reason" rows="3" required minlength="5" placeholder="Contoh: Pelanggan membatalkan pesanan..." class="border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:border-red-500"></textarea>
+            </div>
+            <div class="flex justify-end gap-2 mt-2">
+                <button type="button" onclick="document.getElementById('cancelSoModal').classList.add('hidden')" class="px-4 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer">Batal</button>
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-sm cursor-pointer">Ya, Batalkan SO</button>
             </div>
         </form>
     </div>
