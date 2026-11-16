@@ -3,16 +3,17 @@
 @section('title', 'Buat Pesanan Penjualan – ERP Duta Tunggal')
 
 @section('content')
+@php $editSaleOrder = $editSaleOrder ?? null; @endphp
 <div class="max-w-[1080px] mx-auto w-full flex flex-col gap-5">
     <!-- Header Page -->
     <div class="pb-5 border-b border-gray-200">
         <div class="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mb-1">
             <a href="{{ route('penjualan.so.index') }}" class="hover:text-[#15803d] transition-colors">Pesanan Penjualan</a>
             <span class="text-gray-300">/</span>
-            <span class="font-semibold text-gray-800">Buat baru</span>
+            <span class="font-semibold text-gray-800">{{ $editSaleOrder ? 'Ubah '.$editSaleOrder->so_number : 'Buat baru' }}</span>
         </div>
-        <h1 class="text-2xl lg:text-[28px] font-extrabold text-gray-900 m-0">Buat Pesanan Penjualan</h1>
-        <div class="text-sm text-gray-500 mt-1">Nomor SO, cabang, dan tanggal terisi otomatis saat disimpan.</div>
+        <h1 class="text-2xl lg:text-[28px] font-extrabold text-gray-900 m-0">{{ $editSaleOrder ? 'Ubah Pesanan Penjualan' : 'Buat Pesanan Penjualan' }}</h1>
+        <div class="text-sm text-gray-500 mt-1">{{ $editSaleOrder ? 'Mengubah SO draft '.$editSaleOrder->so_number.'. Simpan sebagai draft atau ajukan persetujuan.' : 'Nomor SO, cabang, dan tanggal terisi otomatis saat disimpan.' }}</div>
     </div>
 
     @if($errors->any())
@@ -26,14 +27,19 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('penjualan.so.store') }}" id="soForm" class="flex flex-wrap lg:flex-nowrap gap-5 items-start">
+    <form method="POST" action="{{ $editSaleOrder ? route('penjualan.so.update', $editSaleOrder) : route('penjualan.so.store') }}" id="soForm" class="flex flex-wrap lg:flex-nowrap gap-5 items-start">
         @csrf
+        @if($editSaleOrder) @method('PUT') @endif
         <input type="hidden" name="action" id="formAction" value="request_approve">
 
         <!-- Kolom Kiri: Form Input -->
         <div class="w-full lg:flex-1 flex flex-col gap-4 min-w-0">
-            
-            @if(!empty($copyFrom))
+
+            @if($editSaleOrder)
+                <div class="rounded-2xl border border-sky-300 bg-sky-50 p-4 text-xs text-sky-900">
+                    <span class="font-bold">Mengubah SO draft {{ $editSaleOrder->so_number }}.</span> Perubahan menimpa isi SO ini (bukan membuat SO baru).
+                </div>
+            @elseif(!empty($copyFrom))
                 <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
                     <span class="font-bold">Disalin dari SO {{ $copyFrom->so_number }}</span> ({{ \App\Models\SaleOrder::statusLabel($copyFrom->status) }}). Periksa dan perbaiki isinya, lalu simpan sebagai SO baru.
                 </div>

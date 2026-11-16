@@ -55,6 +55,12 @@
                 </a>
             @endif
 
+            @if($saleOrder->status === 'draft' && \App\Http\Controllers\Penjualan\SaleOrderController::canEditDraftSaleOrder(auth()->user(), $saleOrder))
+                <a href="{{ route('penjualan.so.edit', $saleOrder->id) }}" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
+                    Ubah
+                </a>
+            @endif
+
             @if(in_array($saleOrder->status, ['draft', 'request_approve']))
                 @can('reject', $saleOrder)
                 <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer">

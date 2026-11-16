@@ -171,6 +171,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::get('/customers/search', \App\Http\Controllers\Penjualan\CustomerSearchController::class)->name('customers.search');
         Route::post('/so', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'store'])->name('so.store');
         Route::get('/so/{saleOrder}', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'show'])->name('so.show');
+        Route::get('/so/{saleOrder}/edit', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'edit'])->name('so.edit');
+        Route::put('/so/{saleOrder}', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'update'])->name('so.update');
         Route::post('/so/{saleOrder}/approve', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'approve'])->name('so.approve');
         Route::post('/so/{saleOrder}/reject', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'reject'])->name('so.reject');
         Route::post('/so/{saleOrder}/cancel', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'cancel'])->name('so.cancel');
