@@ -6,6 +6,7 @@ use App\Exceptions\DeliveryOrderTransitionException;
 use App\Http\Controllers\Controller;
 use App\Models\Cabang;
 use App\Models\DeliveryOrder;
+use App\Support\MenuAccess;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryOrderItemWarehouseSource;
 use App\Models\InventoryStock;
@@ -443,9 +444,12 @@ class DeliveryOrderController extends Controller
             && empty($deliveryOrder->returned_at)
             && ! $deliveryOrder->hasIssuedSuratJalan();
 
-        $canCancel = empty($deliveryOrder->returned_at)
+        $isCancellable = empty($deliveryOrder->returned_at)
             && ! in_array($deliveryOrder->status, ['closed', 'returned', 'sent', 'received', 'completed'], true)
             && ! $deliveryOrder->hasIssuedSuratJalan();
+        // Ko Handy #4: Sales/pembuat/atasan/Super Admin MENGAJUKAN; Gudang/Manager/Super Admin MENGHAPUS.
+        $canRequestCancel = $isCancellable && $this->canRequestDoCancel($deliveryOrder) && empty($deliveryOrder->cancel_requested_at);
+        $canCancel = $isCancellable && $this->canExecuteDoCancel();
 
         $canWarehouse = $this->canRespond();
         $canConfirmStock = $canWarehouse
@@ -456,7 +460,7 @@ class DeliveryOrderController extends Controller
             && empty($deliveryOrder->returned_at)
             && (! DeliveryOrderTransitions::requiresSuratJalan() || $deliveryOrder->hasIssuedSuratJalan());
 
-        return view('penjualan.do.show', compact('deliveryOrder', 'breakdown', 'canCreateSj', 'canCancel', 'canConfirmStock', 'canSend'));
+        return view('penjualan.do.show', compact('deliveryOrder', 'breakdown', 'canCreateSj', 'canCancel', 'canRequestCancel', 'canConfirmStock', 'canSend'));
     }
 
     /**
@@ -488,6 +492,10 @@ class DeliveryOrderController extends Controller
      */
     public function cancel(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
     {
+        if (! $this->canExecuteDoCancel()) {
+            return redirect()->back()->with('error', 'Hanya Gudang, Manager, atau Super Admin yang dapat menghapus/membatalkan Perintah Kirim.');
+        }
+
         if ($deliveryOrder->hasIssuedSuratJalan()) {
             return redirect()->back()->with('error', "Perintah Kirim {$deliveryOrder->do_number} tidak dapat dibatalkan karena sudah memiliki Surat Jalan aktif.");
         }
@@ -568,6 +576,68 @@ class DeliveryOrderController extends Controller
     }
 
     /** Sama dengan DeliveryOrderActions::can() di Filament, ditambah peran Checker. */
+    /** Boleh MENGAJUKAN pembatalan DO: pembuat DO, Sales / Sales Manager, atau Super Admin/Owner. */
+    private function canRequestDoCancel(DeliveryOrder $deliveryOrder): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return MenuAccess::isSuper($user)
+            || (int) $deliveryOrder->created_by === (int) $user->getKey()
+            || (bool) array_intersect(MenuAccess::codesFor($user), ['SLS', 'SM'])
+            || $user->hasRole(['Owner', 'Manager']);
+    }
+
+    /** Boleh MENGHAPUS/membatalkan DO: Gudang (GDG), Manager, atau Super Admin/Owner. */
+    private function canExecuteDoCancel(): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return MenuAccess::isSuper($user)
+            || (bool) array_intersect(MenuAccess::codesFor($user), ['GDG'])
+            || $user->hasRole(['Sales Manager', 'Inventory Manager', 'Owner', 'Manager'])
+            || $user->can('response delivery order');
+    }
+
+    /**
+     * Mengajukan pembatalan DO (Sales). Tidak mengubah stok; hanya menandai permintaan agar
+     * Gudang/Manager menindaklanjuti dengan pembatalan sebenarnya (Ko Handy #4).
+     */
+    public function requestCancel(DeliveryOrder $deliveryOrder, Request $request): RedirectResponse
+    {
+        if (! $this->canRequestDoCancel($deliveryOrder)) {
+            return redirect()->back()->with('error', 'Anda tidak berwenang mengajukan pembatalan Perintah Kirim ini.');
+        }
+        if ($deliveryOrder->hasIssuedSuratJalan()) {
+            return redirect()->back()->with('error', "Perintah Kirim {$deliveryOrder->do_number} sudah punya Surat Jalan aktif, tidak dapat diajukan batal.");
+        }
+        if (in_array($deliveryOrder->status, ['closed', 'returned', 'sent', 'received', 'completed'], true)) {
+            return redirect()->back()->with('error', "Perintah Kirim berstatus '{$deliveryOrder->status}' tidak dapat diajukan batal.");
+        }
+        if ($deliveryOrder->cancel_requested_at) {
+            return redirect()->back()->with('error', "Pembatalan Perintah Kirim {$deliveryOrder->do_number} sudah diajukan sebelumnya dan menunggu Gudang.");
+        }
+
+        $validated = $request->validate(
+            ['reason' => 'required|string|min:5|max:500'],
+            ['reason.required' => 'Alasan pengajuan pembatalan wajib diisi.', 'reason.min' => 'Alasan minimal 5 karakter.']
+        );
+
+        $deliveryOrder->update([
+            'cancel_requested_at' => now(),
+            'cancel_requested_by' => Auth::id(),
+            'cancel_request_reason' => $validated['reason'],
+        ]);
+
+        return redirect()->route('penjualan.do.show', $deliveryOrder->id)->with('success',
+            "Pengajuan pembatalan Perintah Kirim {$deliveryOrder->do_number} terkirim. Menunggu Gudang/Manager menghapus DO ini.");
+    }
+
     private function canRespond(): bool
     {
         $user = Auth::user();

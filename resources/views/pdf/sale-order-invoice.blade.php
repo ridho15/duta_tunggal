@@ -261,13 +261,19 @@
                 <td class="text-right rupiah">- {{ $money($sumDiscount) }}</td>
             </tr>
             @endif
+            @php $dppNilaiLain = ($sumDpp > 0 ? $sumDpp : (float) $invoice->subtotal) * 11 / 12; @endphp
             <tr>
                 <td>Subtotal (DPP):</td>
                 <td class="text-right rupiah">{{ $money($sumDpp > 0 ? $sumDpp : $invoice->subtotal) }}</td>
             </tr>
             @if($displayRate > 0)
+            {{-- DPP Nilai Lain = 11/12 × DPP; PPN 12% × Nilai Lain (efektif 11%), untuk Faktur Pajak --}}
             <tr>
-                <td>PPN ({{ number_format($displayRate, 2, ',', '.') }}%) :</td>
+                <td>DPP Nilai Lain (11/12):</td>
+                <td class="text-right rupiah">{{ $money($dppNilaiLain) }}</td>
+            </tr>
+            <tr>
+                <td>PPN (12% × DPP Nilai Lain) :</td>
                 <td class="text-right rupiah">{{ $money($sumPpn > 0 ? $sumPpn : $ppnMonetary) }}</td>
             </tr>
             @endif

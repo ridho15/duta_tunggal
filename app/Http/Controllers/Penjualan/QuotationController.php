@@ -230,6 +230,8 @@ class QuotationController extends Controller
             'items.min' => 'Tambahkan minimal satu item produk penawaran.',
         ]);
 
+        $this->assertNotBelowCostPrice($validated['items']);
+
         return DB::transaction(function () use ($validated, $request) {
             $cabangId = (int) $validated['cabang_id'];
             $number = ! empty($validated['quotation_number'])
@@ -393,7 +395,9 @@ class QuotationController extends Controller
             'items.*.notes' => 'nullable|string|max:255',
         ]);
 
-        return DB::transaction(function () use ($validated, $quotation) {
+$this->assertNotBelowCostPrice($validated['items']);
+
+                return DB::transaction(function () use ($validated, $quotation) {
             $quotation->update([
                 'customer_id' => $validated['customer_id'],
                 'cabang_id' => $validated['cabang_id'],
@@ -519,6 +523,38 @@ class QuotationController extends Controller
     /**
      * Terbitkan Revisi Baru dari Penawaran Disetujui / Kedaluwarsa.
      */
+    /**
+     * Keputusan Ko Handy #1 (15 Nov): harga penawaran BOLEH di bawah harga jual, tetapi TIDAK boleh di bawah
+     * harga beli (modal / cost_price). Dicek atas harga efektif setelah diskon. Produk tanpa cost_price (0) dilewati.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function assertNotBelowCostPrice(array $items): void
+    {
+        $errors = [];
+        foreach ($items as $i => $item) {
+            $product = Product::withoutGlobalScopes()->find($item['product_id'] ?? null);
+            $cost = (float) ($product->cost_price ?? 0);
+            if ($cost <= 0) {
+                continue;
+            }
+            $price = (float) ($item['unit_price'] ?? 0);
+            $discount = (float) ($item['discount'] ?? 0);
+            $effective = $price * (1 - min(100.0, max(0.0, $discount)) / 100.0);
+            if ($effective + 0.005 < $cost) {
+                $errors["items.$i.unit_price"] = sprintf(
+                    'Harga %s setelah diskon (Rp %s) di bawah harga beli (Rp %s). Harga penawaran boleh di bawah harga jual, tetapi tidak boleh di bawah harga beli.',
+                    $product->name ?? 'produk',
+                    number_format($effective, 0, ',', '.'),
+                    number_format($cost, 0, ',', '.')
+                );
+            }
+        }
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+    }
+
     public function createRevision(Quotation $quotation): RedirectResponse
     {
         Gate::authorize('revise', $quotation);

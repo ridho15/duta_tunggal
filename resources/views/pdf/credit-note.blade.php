@@ -70,7 +70,12 @@
 
     <table style="width: 48%; margin-left: auto; border-collapse: collapse;">
         <tr><td style="border: none;">DPP</td><td class="right" style="border: none;">{{ $money($totals['subtotal']) }}</td></tr>
+        @if ((float) $totals['tax'] > 0)
+        <tr><td style="border: none;">DPP Nilai Lain (11/12)</td><td class="right" style="border: none;">{{ $money((float) $totals['subtotal'] * 11 / 12) }}</td></tr>
+        <tr><td style="border: none;">PPN (12% × DPP Nilai Lain)</td><td class="right" style="border: none;">{{ $money($totals['tax']) }}</td></tr>
+        @else
         <tr><td style="border: none;">PPN</td><td class="right" style="border: none;">{{ $money($totals['tax']) }}</td></tr>
+        @endif
         @if ($totals['other_fee'] > 0)
             <tr><td style="border: none;">Biaya Pengiriman</td><td class="right" style="border: none;">{{ $money($totals['other_fee']) }}</td></tr>
         @endif

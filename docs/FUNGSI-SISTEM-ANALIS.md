@@ -218,6 +218,25 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 
 ---
 
+**Temuan & Keputusan Ko Handy — ditangani 15 Nov 2026**
+
+| Item | Penyelesaian |
+|---|---|
+| DPP 11/12 di dokumen pajak | **Sudah.** DPP Nilai Lain (11/12) & PPN (12% × Nilai Lain) ditampilkan di Invoice (layar+PDF), Nota Kredit (layar+PDF), dan Faktur Pembelian PDF. Nilai uang tidak berubah — hanya penyajian untuk Faktur Pajak. Retur Pembelian tidak menampilkan PPN sehingga tidak diberi Nilai Lain (hindari menyesatkan). |
+| PO "100%" tapi "Diterima Sebagian" | **Sudah.** Persen pemenuhan dibatasi per item (tidak melebihi qty pesan); 100% hanya saat semua item lengkap. |
+| Kolom "Sudah DO" = 0 di SO | **Sudah.** Kini = terkirim + masih diproses (punya DO), dengan catatan "blm kirim". |
+| Teks approve Retur Pembelian keliru | **Sudah.** Pesan mengikuti jalur: retur QC (barang ditolak saat terima) tidak mengklaim potong stok/hutang/jurnal. |
+| Pindah Stok menawarkan stok terkunci DO | **Sudah.** Hanya menawarkan STOK BEBAS (fisik − terpesan); validasi create & update sadar reservasi. |
+| Opname tidak blind | **Sudah.** Stok sistem & selisih disembunyikan selama penghitungan (in_progress), muncul setelah sesi diselesaikan. Catatan: freeze stok selama opname (anti snapshot basi) belum — perlu keputusan lanjutan. |
+| Retur Pembelian duplikat lama | **Command** `purchase-returns:dedup-qc` (dry-run; hanya hapus duplikat draft, approved tidak disentuh). Kode sudah mencegah duplikat baru. |
+| Saldo Persediaan historis (harga PO vs HPP) | **Command laporan** `inventory:valuation-gap` (read-only): selisih saldo Buku Besar vs nilai HPP fisik, sebagai dasar SATU jurnal koreksi manual oleh akuntan. Perintah tidak menjurnal. |
+| #6 PO berharga disembunyikan dari gudang | **Sudah.** `MenuAccess::canSeePurchasePrices` (Owner/Admin, Purchasing, Finance, Inventory Manager). Layar PO menolak staf gudang (403) dengan arahan ke Terima Barang; blok jurnal & link PO di penerimaan disembunyikan. |
+| #4 Pembatalan SO/DO | **Sudah.** SO: tombol "Batalkan SO" (Manager/Super Admin, hanya tanpa DO aktif). DO: Sales MENGAJUKAN pembatalan → Gudang/Manager/Super Admin MENGHAPUS (sebelumnya DO cancel tanpa gate peran). |
+| C2b Persetujuan Retur DO | **Sudah (13 Nov).** Menu Gudang → Persetujuan Retur DO. |
+| #9 Pengajuan Pembayaran & Voucher | **Sudah dibangun tim dev** (bukan oleh sesi ini): modul "Pembayaran Hutang" (`pembelian.payments.*`) — pilih supplier → invoice belum lunas → metode → rekening → bukti → status post/cancel → voucher PDF; plus backend `VoucherRequest`/`PaymentRequest`. **Perlu dicek:** dukungan pembayaran NON-barang (tanpa PO/invoice: alat kantor, jasa, sparepart) — Ko Handy #9(B). |
+| #7 Barang reject supplier & #3 Retur by SJ | **Belum diverifikasi ulang** terhadap aturan Ko Handy ("reject dikembalikan ke kurir; hanya qty lolos QC diterima → PI < PO"). Perlu analisis terpisah; berisiko bila diubah tanpa konfirmasi alur. |
+
+
 ## 9. Cara Menguji
 
 **Aturan praktis**

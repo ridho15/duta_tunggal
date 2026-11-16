@@ -270,6 +270,9 @@ class PurchaseOrder extends Model
         $totalOrdered = 0.0;
         $totalReceived = 0.0;
         $totalAccepted = 0.0;
+        // Penerimaan efektif per item dibatasi maksimal sebesar qty pesanan: lebih-terima pada satu item tidak boleh
+        // menutupi kekurangan pada item lain (bug UAT: PO tampil 100% padahal status Diterima Sebagian).
+        $totalFulfilledCapped = 0.0;
 
         foreach ($this->purchaseOrderItem as $item) {
             $ordered = (float) ($item->quantity ?? 0);
@@ -283,6 +286,7 @@ class PurchaseOrder extends Model
             $totalOrdered += $ordered;
             $totalReceived += $received;
             $totalAccepted += $accepted;
+            $totalFulfilledCapped += $ordered > 0 ? min($accepted, $ordered) : $accepted;
 
             if ($received > 0 || $accepted > 0) {
                 $itemsWithReceiptActivity++;
@@ -309,6 +313,7 @@ class PurchaseOrder extends Model
             'total_ordered' => $totalOrdered,
             'total_received' => $totalReceived,
             'total_accepted' => $totalAccepted,
+            'total_fulfilled_capped' => $totalFulfilledCapped,
             'all_received' => $allAccepted,
             'status_label' => $statusLabel,
         ];

@@ -19,6 +19,7 @@ use App\Models\Warehouse;
 use App\Services\ApprovalControlService;
 use App\Services\PurchaseOrderService;
 use App\Support\TaxTypeHelper;
+use App\Support\MenuAccess;
 use App\Support\CurrencyConversionResolver;
 use App\Support\OrderRequestQuantityLock;
 use Carbon\Carbon;
@@ -49,6 +50,7 @@ class PurchaseOrderController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->guardPurchasePriceAccess();
         $user = Auth::user();
         $cabangId = $user?->cabang_id;
         $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
@@ -411,6 +413,7 @@ class PurchaseOrderController extends Controller
      */
     public function show(PurchaseOrder $purchaseOrder): View
     {
+        $this->guardPurchasePriceAccess();
         $purchaseOrder->loadMissing([
             'supplier',
             'cabang',
@@ -452,6 +455,7 @@ class PurchaseOrderController extends Controller
      */
     public function edit(PurchaseOrder $purchaseOrder): View|RedirectResponse
     {
+        $this->guardPurchasePriceAccess();
         if ($purchaseOrder->status !== 'draft') {
             return redirect()->route('pembelian.po.show', $purchaseOrder)
                 ->with('error', 'Hanya Pesanan Pembelian berstatus Draf yang dapat diubah.');
@@ -871,6 +875,7 @@ class PurchaseOrderController extends Controller
      */
     public function pdf(PurchaseOrder $purchaseOrder)
     {
+        $this->guardPurchasePriceAccess();
         $purchaseOrder->loadMissing([
             'supplier',
             'cabang',
@@ -921,5 +926,18 @@ class PurchaseOrderController extends Controller
             'tipe_pajak' => TaxTypeHelper::normalize($product->tipe_pajak ?? 'eklusif'),
             'pajak' => (float) ($product->pajak ?? 11),
         ]);
+    }
+    /**
+     * Keputusan Ko Handy #6: PO berharga tidak boleh dilihat staf gudang murni. Hanya Owner/Super Admin/Admin,
+     * Purchasing, Finance/Akuntansi, dan Manajer Gudang (Inventory Manager). Gudang menerima barang lewat
+     * menu Terima Barang (tanpa harga), bukan dari PO.
+     */
+    private function guardPurchasePriceAccess(): void
+    {
+        abort_unless(
+            MenuAccess::canSeePurchasePrices(Auth::user()),
+            403,
+            'Pesanan Pembelian memuat harga sehingga tidak dapat dibuka oleh staf gudang. Gunakan menu Terima Barang untuk daftar barang yang akan diterima.'
+        );
     }
 }

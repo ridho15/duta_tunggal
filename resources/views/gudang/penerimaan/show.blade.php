@@ -228,7 +228,7 @@
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                 <div class="flex items-center justify-between border-b border-gray-100 pb-3">
                     <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider">Informasi Dokumen & Pengiriman</h3>
-                    @if ($receipt->purchaseOrder && $receipt->purchaseOrder->exists)
+                    @if ($receipt->purchaseOrder && $receipt->purchaseOrder->exists && \App\Support\MenuAccess::canSeePurchasePrices(auth()->user()))
                         <a
                             href="{{ route('pembelian.po.show', $receipt->purchaseOrder) }}"
                             class="text-xs font-bold text-[#15803d] hover:text-[#166534] hover:underline flex items-center gap-1 font-mono"
@@ -567,6 +567,7 @@
                             Buat Faktur Pembelian
                         </a>
                     @endif
+                    @if (\App\Support\MenuAccess::canSeePurchasePrices(auth()->user()))
                     <a
                         href="{{ route('pembelian.po.show', $receipt->purchase_order_id) }}"
                         class="inline-flex items-center gap-1.5 text-xs font-bold text-[#15803d] hover:text-[#166534] hover:underline py-1.5"
@@ -574,11 +575,12 @@
                         <span>Halaman Purchase Order</span>
                         <span>&rarr;</span>
                     </a>
+                    @endif
                 </div>
             </div>
 
-            {{-- Jurnal Persediaan Terkait (Jika Completed) --}}
-            @if ($receipt->journalEntries->count() > 0)
+            {{-- Jurnal Persediaan Terkait (Jika Completed) — nilai disembunyikan dari staf gudang murni (keputusan Ko Handy #6) --}}
+            @if ($receipt->journalEntries->count() > 0 && \App\Support\MenuAccess::canSeePurchasePrices(auth()->user()))
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
                     <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
                         Jurnal Persediaan Terkait

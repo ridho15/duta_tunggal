@@ -496,6 +496,201 @@ class SaleOrderController extends Controller
         return redirect()->route('penjualan.so.show', $saleOrder->id)->with('success', $msg);
     }
 
+    /** Siapa yang boleh mengubah SO draft: pembuat, Manager/Super Admin, atau pemegang izin update. */
+    public static function canEditDraftSaleOrder($user, SaleOrder $saleOrder): bool
+    {
+        if (! $user || ! $user->canAccessCabang($saleOrder->cabang_id) || $saleOrder->status !== 'draft') {
+            return false;
+        }
+        if (\App\Support\MenuAccess::isSuper($user) || (int) $saleOrder->created_by === (int) $user->getKey()) {
+            return true;
+        }
+
+        // Pembuat boleh melanjutkan draftnya sendiri; selain itu hanya Manager/Owner (di atas level sales).
+        return method_exists($user, 'hasRole') && $user->hasRole(['Sales Manager', 'Owner', 'Manager']);
+    }
+
+    /**
+     * Form Ubah SO (hanya status draft). Memakai ulang tampilan form pembuatan dengan isian dari SO (#3c Ko Handy).
+     */
+    public function edit(SaleOrder $saleOrder): View|RedirectResponse
+    {
+        $user = Auth::user();
+        if ($saleOrder->status !== 'draft') {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('warning', "Pesanan Penjualan {$saleOrder->so_number} tidak berstatus Draft sehingga tidak dapat diubah langsung. Untuk SO yang sudah diajukan, tolak lalu buat ulang.");
+        }
+        if (! self::canEditDraftSaleOrder($user, $saleOrder)) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', 'Anda tidak berwenang mengubah Pesanan Penjualan ini.');
+        }
+
+        $saleOrder->loadMissing('saleOrderItem.product');
+        $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
+
+        $cabangs = $canAccessAll ? Cabang::query()->orderBy('nama')->get(['id', 'nama', 'kode']) : collect();
+        $currencies = Currency::query()->orderBy('name')->get(['id', 'name', 'code', 'symbol', 'to_rupiah']);
+        $defaultCurrencyId = (int) ($saleOrder->currency_id ?? (CurrencyConversionResolver::resolveCurrencyIdByCode('IDR') ?? $currencies->first()?->id ?? 1));
+
+        $prefillItems = $saleOrder->saleOrderItem->map(fn ($item) => [
+            'product_id' => $item->product_id,
+            'quantity' => (float) $item->quantity,
+            'unit_price' => (float) $item->unit_price,
+            'discount' => (float) ($item->discount ?? 0),
+        ])->values()->all();
+        $prefillTaxType = $this->formTaxType($saleOrder->saleOrderItem->first()?->tipe_pajak);
+
+        $products = $this->productPayload($this->activeProducts()->whereIn('id', $saleOrder->saleOrderItem->pluck('product_id')->filter()->unique())->get());
+        $customers = CustomerPicker::prefill([$saleOrder->customer_id]);
+
+        $quotations = Quotation::query()->usable()->with('customer:id,name')->orderByDesc('id')->limit(50)
+            ->get(['id', 'quotation_number', 'customer_id', 'total_amount']);
+        $selectedQuotation = $saleOrder->quotation_id ? Quotation::find($saleOrder->quotation_id) : null;
+
+        // $copyFrom dipakai view untuk mengisi field header (tipe pengiriman, ongkir, alamat kirim, dll).
+        return view('penjualan.so.create', [
+            'nextSoNumber' => $saleOrder->so_number,
+            'cabangs' => $cabangs,
+            'currencies' => $currencies,
+            'defaultCurrencyId' => $defaultCurrencyId,
+            'customers' => $customers,
+            'products' => $products,
+            'quotations' => $quotations,
+            'selectedQuotation' => null,
+            'selectedQuotationId' => $saleOrder->quotation_id,
+            'copyFrom' => $saleOrder,
+            'prefillItems' => $prefillItems,
+            'prefillTaxType' => $prefillTaxType,
+            'editSaleOrder' => $saleOrder,
+            'user' => $user,
+        ]);
+    }
+
+    /**
+     * Simpan perubahan SO draft (#3c Ko Handy). Memvalidasi & menegakkan batas harga seperti store().
+     */
+    public function update(Request $request, SaleOrder $saleOrder): RedirectResponse
+    {
+        $user = Auth::user();
+        if (! self::canEditDraftSaleOrder($user, $saleOrder)) {
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('error', 'Pesanan Penjualan ini tidak dapat diubah (hanya Draft, oleh pembuat/Manager/Super Admin).');
+        }
+
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'cabang_id' => 'required|exists:cabangs,id',
+            'order_date' => 'required|date',
+            'delivery_date' => 'nullable|date',
+            'tipe_pengiriman' => 'required|string',
+            'shipped_to' => 'nullable|string|max:500',
+            'shipping_recipient_name' => 'nullable|string|max:255',
+            'shipping_recipient_phone' => 'nullable|string|max:50',
+            'currency_id' => 'required|exists:currencies,id',
+            'exchange_rate' => 'nullable|numeric|min:0',
+            'tempo_pembayaran' => 'nullable|integer|min:0',
+            'shipping_cost' => 'nullable|numeric|min:0',
+            'quotation_id' => 'nullable|exists:quotations,id',
+            'notes' => 'nullable|string|max:1000',
+            'action' => 'required|in:draft,request_approve',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0|max:100',
+            'items.*.tax_type' => 'nullable|in:None,Inklusif,Eksklusif',
+            'tax_type' => 'nullable|in:None,Inklusif,Eksklusif',
+        ], [
+            'customer_id.required' => 'Customer wajib dipilih.',
+            'items.required' => 'Minimal harus ada 1 item barang.',
+            'items.min' => 'Minimal harus ada 1 item barang.',
+        ]);
+
+        $customer = Customer::findOrFail($validated['customer_id']);
+        $currencyId = (int) $validated['currency_id'];
+        $currency = Currency::find($currencyId);
+        $exchangeRate = (float) ($validated['exchange_rate'] ?? ($currency?->to_rupiah ?? 1.0));
+        $shippingCost = (float) ($validated['shipping_cost'] ?? 0);
+
+        $approvedQuotePrices = $this->approvedQuotationEffectivePrices($validated['quotation_id'] ?? $saleOrder->quotation_id);
+        $ppnRate = (float) (\App\Models\TaxSetting::activeRate('PPN') ?: 11.0);
+        $lineTax = function (array $item) use ($validated, $ppnRate): array {
+            $type = strtolower((string) ($validated['tax_type'] ?? ($item['tax_type'] ?? 'None')));
+
+            return [$type, $type === 'none' ? 0.0 : $ppnRate];
+        };
+
+        $priceErrors = [];
+        $total = 0;
+        foreach ($validated['items'] as $idx => $item) {
+            $product = Product::find($item['product_id']);
+            $unitPrice = (float) $item['unit_price'];
+            $disc = (float) ($item['discount'] ?? 0);
+            $qty = (float) $item['quantity'];
+            $message = $product ? ProductPriceLimitation::validatePrice($product, $unitPrice, $disc) : null;
+            $effective = $unitPrice * (1 - max(0.0, min(100.0, $disc)) / 100);
+            $approvedFloor = $approvedQuotePrices[(int) $item['product_id']] ?? null;
+            if ($message && ($approvedFloor === null || $effective + 0.005 < $approvedFloor)) {
+                $priceErrors["items.{$idx}.unit_price"] = $message.' Harga di bawah batas hanya bisa lewat Penawaran yang sudah di-approve.';
+            }
+            [$taxType, $taxRate] = $lineTax($item);
+            $total += (float) HelperController::hitungSubtotal($qty, $unitPrice, $disc, $taxRate, $taxType);
+        }
+        if ($priceErrors !== []) {
+            return redirect()->back()->withInput()->withErrors($priceErrors);
+        }
+
+        $status = $validated['action'] === 'request_approve' ? 'request_approve' : 'draft';
+
+        DB::transaction(function () use ($saleOrder, $validated, $customer, $currencyId, $exchangeRate, $shippingCost, $status, $lineTax) {
+            $saleOrder->update([
+                'customer_id' => $validated['customer_id'],
+                'cabang_id' => $validated['cabang_id'],
+                'order_date' => $validated['order_date'],
+                'delivery_date' => $validated['delivery_date'] ?? null,
+                'tipe_pengiriman' => $validated['tipe_pengiriman'],
+                'shipped_to' => $validated['shipped_to'] ?? $customer->address,
+                'shipping_recipient_name' => $validated['shipping_recipient_name'] ?? null,
+                'shipping_recipient_phone' => $validated['shipping_recipient_phone'] ?? null,
+                'currency_id' => $currencyId,
+                'exchange_rate' => $exchangeRate,
+                'tempo_pembayaran' => (int) ($validated['tempo_pembayaran'] ?? ($customer->tempo_kredit ?? 0)),
+                'shipping_cost' => $shippingCost,
+                'notes' => $validated['notes'] ?? null,
+                'status' => $status,
+                'request_approve_at' => $status === 'request_approve' ? now() : null,
+                'request_approve_by' => $status === 'request_approve' ? Auth::id() : null,
+            ]);
+
+            $saleOrder->saleOrderItem()->delete();
+            $total = 0;
+            foreach ($validated['items'] as $item) {
+                $qty = (float) $item['quantity'];
+                $price = (float) $item['unit_price'];
+                $disc = (float) ($item['discount'] ?? 0);
+                [$taxType, $taxRate] = $lineTax($item);
+                $total += (float) HelperController::hitungSubtotal($qty, $price, $disc, $taxRate, $taxType);
+                SaleOrderItem::create([
+                    'sale_order_id' => $saleOrder->id,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $qty,
+                    'delivered_quantity' => 0,
+                    'unit_price' => $price,
+                    'discount' => $disc,
+                    'tax' => $taxRate,
+                    'tipe_pajak' => $taxType,
+                ]);
+            }
+            $saleOrder->update(['total_amount' => $total]);
+        });
+
+        $msg = $status === 'request_approve'
+            ? "Perubahan Pesanan Penjualan {$saleOrder->so_number} disimpan dan diajukan untuk persetujuan."
+            : "Perubahan Pesanan Penjualan {$saleOrder->so_number} disimpan sebagai draft.";
+
+        return redirect()->route('penjualan.so.show', $saleOrder->id)->with('success', $msg);
+    }
+
     /**
      * Tampilan Detail SO & Stepper Progres (Mockup E2_SO-Detail.html).
      */
@@ -766,6 +961,55 @@ class SaleOrderController extends Controller
             return redirect()->back()->with('warning', "Sales Order {$saleOrder->so_number} telah ditolak dengan alasan: ".$request->input('reason'));
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Gagal menolak Sales Order: '.$e->getMessage());
+        }
+    }
+    /** Keputusan Ko Handy #4: SO tanpa DO aktif hanya boleh dibatalkan Manager / Super Admin / Owner. */
+    public static function canCancelSaleOrder($user, SaleOrder $saleOrder): bool
+    {
+        if (! $user || ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return false;
+        }
+        if (\App\Support\MenuAccess::isSuper($user)) {
+            return true;
+        }
+
+        return method_exists($user, 'hasRole') && $user->hasRole(['Sales Manager', 'Owner', 'Manager']);
+    }
+
+    /**
+     * Membatalkan Sales Order (bukan menolak draf). Keputusan Ko Handy #4: hanya Manager/Super Admin,
+     * dan hanya bila SO belum punya Perintah Kirim aktif (service menegakkan guard DO).
+     */
+    public function cancel(Request $request, SaleOrder $saleOrder): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! self::canCancelSaleOrder($user, $saleOrder)) {
+            return redirect()->back()->with('error', 'Hanya Manager atau Super Admin yang dapat membatalkan Sales Order.');
+        }
+
+        if (in_array($saleOrder->status, ['canceled', 'reject', 'closed'], true)) {
+            return redirect()->back()->with('error', "Sales Order {$saleOrder->so_number} sudah berstatus {$saleOrder->status_label}.");
+        }
+
+        $request->validate(
+            ['reason' => 'required|string|min:5|max:500'],
+            ['reason.required' => 'Alasan pembatalan wajib diisi.', 'reason.min' => 'Alasan pembatalan minimal 5 karakter.']
+        );
+
+        try {
+            $reason = trim((string) $request->input('reason'));
+            $saleOrder->update([
+                'notes' => trim((string) $saleOrder->notes."\n[Dibatalkan: ".now()->format('d/m/Y H:i')." oleh {$user->name}]: ".$reason),
+            ]);
+            $this->salesOrderService->cancel($saleOrder);
+
+            return redirect()->route('penjualan.so.show', $saleOrder->id)
+                ->with('success', "Sales Order {$saleOrder->so_number} dibatalkan. Reservasi stok dilepas dan saldo titip COD (bila ada) dikembalikan.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Gagal membatalkan Sales Order: '.$e->getMessage());
         }
     }
 }

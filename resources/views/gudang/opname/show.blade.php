@@ -223,6 +223,17 @@
         </div>
     @else
         {{-- State 2, 3, 4: IN_PROGRESS / COMPLETED / APPROVED --}}
+        @php
+            // Blind count: selama penghitungan (in_progress), stok sistem & selisih DISEMBUNYIKAN dari penghitung
+            // agar angka fisik murni. Baru ditampilkan setelah sesi diselesaikan (temuan UAT).
+            $blind = $opname->status === 'in_progress';
+        @endphp
+        @if ($blind)
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <span><strong>Hitung buta (blind count):</strong> stok sistem &amp; selisih disembunyikan selama penghitungan agar hasil fisik objektif. Angka akan muncul setelah sesi diselesaikan.</span>
+            </div>
+        @endif
         {{-- KPI Cards Ringkasan Hitung Fisik --}}
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {{-- Total Item --}}
@@ -240,27 +251,31 @@
             {{-- Cocok --}}
             <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Stok Cocok</span>
-                <span class="text-xl font-bold font-mono text-[#15803d]">{{ $summary['matched_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-[#15803d]">{{ $blind ? '—' : $summary['matched_items'] }}</span>
             </div>
 
             {{-- Surplus (+) --}}
             <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Surplus (+)</span>
-                <span class="text-xl font-bold font-mono text-[#15803d]">+{{ $summary['surplus_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-[#15803d]">{{ $blind ? '—' : '+'.$summary['surplus_items'] }}</span>
             </div>
 
             {{-- Defisit (-) --}}
             <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Defisit (-)</span>
-                <span class="text-xl font-bold font-mono text-rose-600">-{{ $summary['deficit_items'] }}</span>
+                <span class="text-xl font-bold font-mono text-rose-600">{{ $blind ? '—' : '-'.$summary['deficit_items'] }}</span>
             </div>
 
             {{-- Total Nilai Selisih --}}
             <div class="bg-white rounded-2xl p-3.5 border border-gray-100 text-center shadow-sm">
                 <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Total Selisih Rp</span>
-                <span class="text-sm font-bold font-mono {{ $summary['total_diff_value'] >= 0 ? 'text-[#15803d]' : 'text-rose-600' }} block mt-1">
-                    {{ $summary['total_diff_value'] >= 0 ? '+' : '' }}Rp {{ number_format($summary['total_diff_value'], 0, ',', '.') }}
-                </span>
+                @if ($blind)
+                    <span class="text-sm font-bold font-mono text-gray-300 block mt-1">—</span>
+                @else
+                    <span class="text-sm font-bold font-mono {{ $summary['total_diff_value'] >= 0 ? 'text-[#15803d]' : 'text-rose-600' }} block mt-1">
+                        {{ $summary['total_diff_value'] >= 0 ? '+' : '' }}Rp {{ number_format($summary['total_diff_value'], 0, ',', '.') }}
+                    </span>
+                @endif
             </div>
         </div>
 
@@ -340,9 +355,13 @@
                                         {{ $item->rak?->name ?? '-' }}
                                     </td>
 
-                                    {{-- Stok Sistem --}}
+                                    {{-- Stok Sistem (disembunyikan saat blind count) --}}
                                     <td class="py-2.5 px-3 text-right font-mono font-bold text-gray-700">
-                                        {{ number_format($item->system_qty, 0, ',', '.') }}
+                                        @if ($blind)
+                                            <span class="text-gray-300" title="Disembunyikan selama penghitungan">🔒</span>
+                                        @else
+                                            {{ number_format($item->system_qty, 0, ',', '.') }}
+                                        @endif
                                     </td>
 
                                     {{-- Input Fisik --}}
@@ -355,7 +374,7 @@
                                                    min="0"
                                                    value="{{ $item->physical_qty !== null ? $item->physical_qty : '' }}"
                                                    placeholder="Input fisik..."
-                                                   oninput="calculateRowVariance({{ $item->id }}, {{ $item->system_qty }}, {{ $item->unit_cost ?: ($item->average_cost ?: 0) }})"
+                                                   @unless($blind) oninput="calculateRowVariance({{ $item->id }}, {{ $item->system_qty }}, {{ $item->unit_cost ?: ($item->average_cost ?: 0) }})" @endunless
                                                    class="w-28 px-2 py-1.5 text-xs text-center font-bold font-mono border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] text-[#15803d]">
                                         @else
                                             <span class="font-mono font-bold text-gray-900 text-sm">
@@ -366,7 +385,9 @@
 
                                     {{-- Selisih Qty --}}
                                     <td class="py-2.5 px-3 text-right font-mono font-bold" id="diff-qty-{{ $item->id }}">
-                                        @if ($isUncounted)
+                                        @if ($blind)
+                                            <span class="text-gray-300">🔒</span>
+                                        @elseif ($isUncounted)
                                             <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Belum</span>
                                         @elseif ($isMatched)
                                             <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-[#15803d]">Cocok</span>
@@ -379,7 +400,9 @@
 
                                     {{-- Selisih Nilai --}}
                                     <td class="py-2.5 px-3 text-right font-mono font-bold" id="diff-val-{{ $item->id }}">
-                                        @if ($isUncounted)
+                                        @if ($blind)
+                                            <span class="text-gray-300">🔒</span>
+                                        @elseif ($isUncounted)
                                             <span class="text-gray-300">-</span>
                                         @elseif ($item->difference_value > 0)
                                             <span class="text-[#15803d]">+Rp {{ number_format($item->difference_value, 0, ',', '.') }}</span>

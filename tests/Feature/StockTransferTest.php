@@ -454,4 +454,33 @@ class StockTransferTest extends TestCase
         $this->assertInstanceOf(Rak::class, $stockTransfer->stockTransferItem->first()->fromRak);
         $this->assertInstanceOf(Rak::class, $stockTransfer->stockTransferItem->first()->toRak);
     }
+    #[Test]
+    public function available_products_only_offers_free_stock_not_do_locked()
+    {
+        // 10 fisik, 7 terkunci DO -> hanya 3 bebas yang boleh dipindah.
+        InventoryStock::factory()->create([
+            'warehouse_id' => $this->fromWarehouse->id,
+            'product_id' => $this->product->id,
+            'rak_id' => $this->fromRak->id,
+            'qty_available' => 10,
+            'qty_reserved' => 7,
+        ]);
+
+        $res = $this->actingAs($this->user)
+            ->getJson('/gudang/transfer-available-products/'.$this->fromWarehouse->id)
+            ->assertOk()
+            ->json();
+
+        $row = collect($res)->firstWhere('product_id', $this->product->id);
+        $this->assertNotNull($row, 'Produk dengan stok bebas harus muncul');
+        $this->assertEquals(3.0, (float) $row['qty_available'], 'qty_available harus = stok bebas (fisik - terpesan)');
+        $this->assertEquals(3.0, (float) $row['free_qty']);
+
+        // Semua terkunci -> tidak ditawarkan sama sekali.
+        InventoryStock::where('product_id', $this->product->id)->update(['qty_reserved' => 10]);
+        $res2 = $this->actingAs($this->user)
+            ->getJson('/gudang/transfer-available-products/'.$this->fromWarehouse->id)
+            ->assertOk()->json();
+        $this->assertNull(collect($res2)->firstWhere('product_id', $this->product->id));
+    }
 }

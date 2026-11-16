@@ -119,6 +119,22 @@ class MenuAccess
         return static::$codeCache[$user] = $codes;
     }
 
+    /**
+     * Boleh melihat harga/nilai dokumen pembelian (PO, penerimaan)?
+     * Keputusan Ko Handy #6: staf gudang murni TIDAK boleh melihat harga PO. Hanya Owner/Super Admin/Admin,
+     * Purchasing, dan Finance/Akuntansi yang boleh. Gudang hanya melihat barang & kuantitas.
+     */
+    public static function canSeePurchasePrices($user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        // Manajer gudang (Inventory Manager) termasuk "Manager" yang boleh melihat harga; staf gudang biasa tidak.
+        $isInventoryManager = method_exists($user, 'hasRole') && $user->hasRole('Inventory Manager');
+
+        return static::isSuper($user) || $isInventoryManager || (bool) array_intersect(static::codesFor($user), ['PUR', 'FIN']);
+    }
+
     /** Dipakai di test / setelah role user berubah. */
     public static function flush(): void
     {

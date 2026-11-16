@@ -337,11 +337,14 @@ class StockTransferController extends Controller
                     $stockQuery->where('rak_id', $itemData['from_rak_id']);
                 }
 
-                $available = (float) ($stockQuery->sum('qty_available') ?? 0);
+                // Sadar reservasi: barang yang sudah dikunci DO tidak boleh dipindah (stok bebas = fisik − terpesan).
+                $physical = (float) ($stockQuery->sum('qty_available') ?? 0);
+                $reserved = (float) ($stockQuery->sum('qty_reserved') ?? 0);
+                $available = max(0, $physical - $reserved);
                 if ($available < (float) $itemData['quantity']) {
                     $product = Product::find($itemData['product_id']);
                     throw ValidationException::withMessages([
-                        "items.{$index}.quantity" => "Stok untuk {$product->name} di gudang asal hanya tersedia {$available}. Diminta: {$itemData['quantity']}.",
+                        "items.{$index}.quantity" => "Stok bebas untuk {$product->name} di gudang asal hanya {$available} (sisanya terkunci DO). Diminta: {$itemData['quantity']}.",
                     ]);
                 }
             }
@@ -524,12 +527,15 @@ class StockTransferController extends Controller
     {
         $this->authorizeAccess('view any stock transfer');
 
+        // Hanya tawarkan STOK BEBAS (fisik − terpesan DO): barang yang sudah dikunci DO tidak boleh dipindah.
         $stocks = InventoryStock::where('warehouse_id', $warehouse->id)
-            ->where('qty_available', '>', 0)
+            ->whereRaw('(qty_available - qty_reserved) > 0')
             ->with(['product.uom', 'rak'])
             ->get();
 
         $data = $stocks->map(function ($stock) {
+            $free = max(0, (float) $stock->qty_available - (float) $stock->qty_reserved);
+
             return [
                 'product_id' => $stock->product_id,
                 'name' => $stock->product?->name ?? '-',
@@ -538,10 +544,12 @@ class StockTransferController extends Controller
                 'uom_name' => $stock->product?->uom?->name ?? 'Pcs',
                 'rak_id' => $stock->rak_id,
                 'rak_name' => $stock->rak?->name ?? '-',
-                'qty_available' => (float) $stock->qty_available,
-                'free_qty' => max(0, (float) $stock->qty_available - (float) $stock->qty_reserved),
+                // qty_available di payload ini = stok BEBAS (yang boleh dipindah), bukan stok fisik.
+                'qty_available' => $free,
+                'free_qty' => $free,
+                'qty_physical' => (float) $stock->qty_available,
             ];
-        });
+        })->values();
 
         return response()->json($data);
     }
