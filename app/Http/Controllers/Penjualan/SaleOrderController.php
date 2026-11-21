@@ -141,6 +141,11 @@ class SaleOrderController extends Controller
         }
 
         $saleOrders = $query->with(['customer', 'createdBy', 'saleOrderItem.product'])
+            // Untuk tombol "Selesai" (Ko Handy 21 Nov): jumlah DO yang sudah dikirim (ber-SJ) dan yang masih diproses.
+            ->withCount([
+                'deliveryOrder as shipped_do_count' => fn ($q) => $q->whereIn('delivery_orders.status', \App\Models\DeliveryOrder::DELIVERED_STATUSES),
+                'deliveryOrder as pending_do_count' => fn ($q) => $q->whereNotIn('delivery_orders.status', array_merge(\App\Models\DeliveryOrder::DELIVERED_STATUSES, ['closed', 'reject'])),
+            ])
             ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
@@ -989,7 +994,7 @@ class SaleOrderController extends Controller
         }
 
         if (in_array($saleOrder->status, ['canceled', 'reject', 'closed'], true)) {
-            return redirect()->back()->with('error', "Sales Order {$saleOrder->so_number} sudah berstatus {$saleOrder->status_label}.");
+            return redirect()->back()->with('error', "Sales Order {$saleOrder->so_number} sudah berstatus ".SaleOrder::statusLabel($saleOrder->status).".");
         }
 
         $request->validate(
@@ -1011,5 +1016,64 @@ class SaleOrderController extends Controller
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Gagal membatalkan Sales Order: '.$e->getMessage());
         }
+    }
+    /**
+     * Kapan transaksi SELESAI (keputusan Ko Handy 21 Nov 2026): sales pemilik SO menekan tombol "Selesai" di Daftar Penjualan.
+     * Syarat: SO aktif, tidak ada DO yang masih menunggu Surat Jalan, dan sudah ada barang yang dikirim (ber-SJ).
+     * Mengembalikan alasan penolakan, atau null bila boleh.
+     */
+    public static function completionBlockReason($user, SaleOrder $saleOrder): ?string
+    {
+        if (in_array($saleOrder->status, ['draft', 'request_approve', 'reject', 'canceled', 'completed', 'closed'], true)) {
+            return "Sales Order {$saleOrder->so_number} berstatus ".SaleOrder::statusLabel($saleOrder->status)." sehingga tidak dapat ditandai selesai.";
+        }
+        if (! $user || ! $user->canAccessCabang($saleOrder->cabang_id)) {
+            return 'Anda tidak memiliki akses ke cabang Sales Order ini.';
+        }
+        $isOwner = (int) $saleOrder->created_by === (int) $user->getKey();
+        $isManager = \App\Support\MenuAccess::isSuper($user) || (method_exists($user, 'hasRole') && $user->hasRole(['Sales Manager', 'Owner', 'Manager']));
+        if (! $isOwner && ! $isManager) {
+            return 'Hanya sales pembuat SO atau Manager yang dapat menandai transaksi selesai.';
+        }
+
+        $shipped = $saleOrder->shipped_do_count
+            ?? $saleOrder->deliveryOrder()->whereIn('delivery_orders.status', \App\Models\DeliveryOrder::DELIVERED_STATUSES)->count();
+        $pending = $saleOrder->pending_do_count
+            ?? $saleOrder->deliveryOrder()->whereNotIn('delivery_orders.status', array_merge(\App\Models\DeliveryOrder::DELIVERED_STATUSES, ['closed', 'reject']))->count();
+
+        if ($pending > 0) {
+            return "Masih ada {$pending} Perintah Kirim (DO) yang belum dibuatkan Surat Jalan. Selesaikan atau batalkan DO tersebut dulu.";
+        }
+        if ($shipped === 0) {
+            return 'Belum ada barang yang dikirim (belum ada Surat Jalan) untuk SO ini.';
+        }
+
+        return null;
+    }
+
+    /** Tandai transaksi SO selesai (tombol "Selesai" di Daftar Penjualan / detail SO). */
+    public function complete(SaleOrder $saleOrder): RedirectResponse
+    {
+        $user = Auth::user();
+        if ($reason = self::completionBlockReason($user, $saleOrder)) {
+            return redirect()->back()->with('error', $reason);
+        }
+
+        try {
+            $this->salesOrderService->completed($saleOrder);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->back()->with('error', "Gagal menandai SO {$saleOrder->so_number} selesai: {$e->getMessage()}");
+        }
+
+        $remaining = (float) collect($this->deliveryProgressService->forSaleOrder($saleOrder->fresh())['items'] ?? [])->sum('available');
+        $note = $remaining > 0.00001
+            ? ' Catatan: '.rtrim(rtrim(number_format($remaining, 2, ',', '.'), '0'), ',').' pcs tidak dikirim dan dianggap tidak dilanjutkan.'
+            : '';
+
+        return redirect()->back()->with('success', "Transaksi {$saleOrder->so_number} ditandai Selesai oleh {$user->name}.{$note}");
     }
 }

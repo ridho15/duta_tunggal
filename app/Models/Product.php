@@ -18,7 +18,9 @@ class Product extends Model
         'sku', // Kode
         'product_category_id',
         'cabang_id',
-        'cost_price', // Harga Beli Asli (Rp.)
+        'cost_price', // HPP rata-rata bergerak (Rp.) — diperbarui otomatis saat barang pembelian masuk
+        'last_purchase_price', // Referensi harga beli terakhir (Rp.), BUKAN HPP
+        'last_purchase_at',
         'sell_price', // Harga jual (Rp.)
         'biaya',
         'harga_batas',
@@ -50,6 +52,8 @@ class Product extends Model
         'is_raw_material' => 'boolean',
         'is_active' => 'boolean',
         'cost_price' => 'decimal:2',
+        'last_purchase_price' => 'decimal:2',
+        'last_purchase_at' => 'date',
         'sell_price' => 'decimal:2',
         'biaya' => 'decimal:2',
         'pajak' => 'decimal:2',

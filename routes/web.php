@@ -176,6 +176,7 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/so/{saleOrder}/approve', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'approve'])->name('so.approve');
         Route::post('/so/{saleOrder}/reject', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'reject'])->name('so.reject');
         Route::post('/so/{saleOrder}/cancel', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'cancel'])->name('so.cancel');
+        Route::post('/so/{saleOrder}/complete', [\App\Http\Controllers\Penjualan\SaleOrderController::class, 'complete'])->name('so.complete');
 
         // Perintah Kirim (Delivery Order / DO)
         Route::get('/do', [\App\Http\Controllers\Penjualan\DeliveryOrderController::class, 'index'])->name('do.index');

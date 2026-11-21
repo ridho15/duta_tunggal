@@ -54,9 +54,18 @@
     @endphp
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Harga Beli (Modal)</p>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">HPP (Rata-rata)</p>
             <p class="text-2xl font-bold text-gray-900 mt-1">Rp {{ number_format($product->cost_price, 0, ',', '.') }}</p>
-            <p class="text-[11px] text-gray-400 mt-1">Biaya tambahan: Rp {{ number_format($product->biaya, 0, ',', '.') }}</p>
+            <p class="text-[11px] text-gray-500 mt-1">
+                Harga beli terakhir:
+                @if($product->last_purchase_price !== null)
+                    <span class="font-semibold text-gray-800">Rp {{ number_format($product->last_purchase_price, 0, ',', '.') }}</span>
+                    <span class="text-gray-400">({{ $product->last_purchase_at?->format('d/m/Y') }})</span>
+                @else
+                    <span class="text-gray-400">belum ada pembelian</span>
+                @endif
+            </p>
+            <p class="text-[11px] text-gray-400">Biaya tambahan: Rp {{ number_format($product->biaya, 0, ',', '.') }}</p>
         </div>
 
         <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">

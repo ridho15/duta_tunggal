@@ -211,7 +211,7 @@ class PurchaseOrderController extends Controller
                     'suppliers' => function ($q) {
                         $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')->withPivot('supplier_price');
                     }
-                ])->whereIn('id', $orProductIds)->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak']);
+                ])->whereIn('id', $orProductIds)->get(['id', 'name', 'sku', 'cost_price', 'last_purchase_price', 'last_purchase_at', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak']);
 
                 foreach ($selectedOrderRequest->orderRequestItem as $orItem) {
                     $limit = OrderRequestQuantityLock::orderRequestItemLimit($orItem->id);
@@ -484,7 +484,7 @@ class PurchaseOrderController extends Controller
             'suppliers' => function ($q) {
                 $q->select('suppliers.id', 'suppliers.code', 'suppliers.perusahaan')->withPivot('supplier_price');
             }
-        ])->whereIn('id', $itemProductIds)->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak']);
+        ])->whereIn('id', $itemProductIds)->get(['id', 'name', 'sku', 'cost_price', 'last_purchase_price', 'last_purchase_at', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak']);
 
         $existingItems = $purchaseOrder->purchaseOrderItem->map(function ($item) {
             $maxQty = null;
@@ -923,6 +923,8 @@ class PurchaseOrderController extends Controller
             'sku' => $product->sku,
             'uom' => $product->uom?->name ?? 'Pcs',
             'cost_price' => (float) ($product->cost_price ?? 0),
+            'last_purchase_price' => $product->last_purchase_price !== null ? (float) $product->last_purchase_price : null,
+            'last_purchase_at' => $product->last_purchase_at?->format('d/m/Y'),
             'tipe_pajak' => TaxTypeHelper::normalize($product->tipe_pajak ?? 'eklusif'),
             'pajak' => (float) ($product->pajak ?? 11),
         ]);

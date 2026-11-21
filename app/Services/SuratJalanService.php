@@ -135,21 +135,18 @@ class SuratJalanService
      */
     public function markDeliveryOrdersReceived(SuratJalan $suratJalan): void
     {
-        // Ko Handy 10 Nov 2026: stok terpotong pada TANGGAL KIRIM SJ. Tanggal kirim di masa depan → DO tetap terkunci (Siap Kirim);
-        // `sales:dispatch-scheduled-surat-jalan` (harian) memberangkatkannya saat tanggalnya tiba.
-        if (! $suratJalan->isDeliveryDue()) {
-            return;
-        }
-
+        // Keputusan Ko Handy 21 Nov 2026 (merevisi 10 Nov): stok terpotong saat SJ TERBENTUK, walau tanggal kirimnya besok —
+        // begitu SJ dibuat barang sudah lolos cek checker/sales dan secara riil bukan milik gudang lagi. Tanggal gerakan stok &
+        // jurnal pengiriman = tanggal SJ dibuat. Tanggal kirim SJ tetap dipakai untuk jadwal pengiriman (logistik).
         $transitions = app(DeliveryOrderTransitions::class);
         $note = "Surat Jalan {$suratJalan->sj_number} terbit";
-        $deliveryDate = $suratJalan->effectiveDeliveryDate();
+        $deliveryDate = ($suratJalan->issued_at ?? now())->copy()->startOfDay();
 
         try {
             foreach ($suratJalan->deliveryOrder()->get() as $deliveryOrder) {
                 $deliveryOrder->refresh();
 
-                // Tanggal gerakan stok & jurnal pengiriman = tanggal kirim SJ (bukan tanggal DO dibuat).
+                // Tanggal gerakan stok & jurnal pengiriman = tanggal SJ dibuat (bukan tanggal DO dibuat).
                 if (in_array($deliveryOrder->status, ['approved', 'confirmed', 'partial'], true)) {
                     $deliveryOrder->forceFill(['delivery_date' => $deliveryDate])->saveQuietly();
                 }

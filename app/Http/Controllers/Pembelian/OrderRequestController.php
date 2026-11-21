@@ -661,7 +661,7 @@ class OrderRequestController extends Controller
             ])
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'name', 'sku', 'cost_price', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak'])
+            ->get(['id', 'name', 'sku', 'cost_price', 'last_purchase_price', 'last_purchase_at', 'uom_id', 'cabang_id', 'pajak', 'tipe_pajak'])
             ->map(function ($p) use ($activeTaxRate, $supplierId) {
                 $productTax = (float) ($p->pajak ?? 0);
                 $defaultTax = $productTax > 0 ? $productTax : $activeTaxRate;
@@ -706,6 +706,9 @@ class OrderRequestController extends Controller
                     'sku' => $p->sku ?? '-',
                     'label' => $p->sku && $p->sku !== '-' ? "({$p->sku}) {$p->name}" : $p->name,
                     'cost_price' => (float) ($p->cost_price ?? 0),
+                    // Referensi harga beli terakhir (Ko Handy 21 Nov) — terpisah dari HPP rata-rata (cost_price)
+                    'last_purchase_price' => $p->last_purchase_price !== null ? (float) $p->last_purchase_price : null,
+                    'last_purchase_at' => $p->last_purchase_at?->format('d/m/Y'),
                     'supplier_price' => $supplierPrice,
                     'tipe_pajak' => $p->tipe_pajak ?? 'inklusif',
                     'uom' => $p->uom?->abbreviation ?? $p->uom?->name ?? 'Pcs',

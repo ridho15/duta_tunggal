@@ -16,6 +16,11 @@ class StockMovementObserver
      */
     public function created(StockMovement $stockMovement): void
     {
+        // HPP rata-rata bergerak (Ko Handy 21 Nov): dihitung dari stok SEBELUM barang pembelian ini ditambahkan.
+        if ($stockMovement->type === 'purchase_in') {
+            \App\Support\InventoryValuation::applyPurchaseToAverage($stockMovement);
+        }
+
         if ($this->shouldSkipStockUpdate($stockMovement->meta)) {
             return;
         }

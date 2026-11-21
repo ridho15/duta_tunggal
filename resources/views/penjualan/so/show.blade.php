@@ -55,6 +55,14 @@
                 </a>
             @endif
 
+            @if(\App\Http\Controllers\Penjualan\SaleOrderController::completionBlockReason(auth()->user(), $saleOrder) === null)
+                <button type="button"
+                        @click="$dispatch('open-modal-complete-so', { action: '{{ route('penjualan.so.complete', $saleOrder->id) }}', number: '{{ $saleOrder->so_number }}' })"
+                        class="px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-xl transition-colors">
+                    Selesai
+                </button>
+            @endif
+
             @if($saleOrder->status === 'draft' && \App\Http\Controllers\Penjualan\SaleOrderController::canEditDraftSaleOrder(auth()->user(), $saleOrder))
                 <a href="{{ route('penjualan.so.edit', $saleOrder->id) }}" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
                     Ubah
@@ -362,4 +370,10 @@
         </form>
     </div>
 </div>
+<x-confirmation-modal name="complete-so" title="Tandai Transaksi Selesai" variant="success" confirm-text="Ya, Selesai" cancel-text="Batal" method="POST">
+    <p class="text-sm text-gray-600">
+        Tandai transaksi <span class="font-bold font-mono text-gray-900" x-text="data.number"></span> <strong>SELESAI</strong>?
+        Barang yang belum dikirim (bila ada) dianggap tidak dilanjutkan. Aksi ini tidak dapat dibatalkan.
+    </p>
+</x-confirmation-modal>
 @endsection
