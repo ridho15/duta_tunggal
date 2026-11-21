@@ -322,15 +322,23 @@ class DeliveryOrderReturnProcessor
 
     private function createReplacement(DeliveryOrder $original, ReturnProduct $returnProduct): ?DeliveryOrder
     {
-        $returnProduct->loadMissing('returnProductItem');
-        $lines = $returnProduct->returnProductItem
-            ->filter(fn (ReturnProductItem $i) => $i->from_item_model_type === DeliveryOrderItem::class && (float) $i->quantity > 0)
-            ->groupBy('from_item_model_id')
-            ->map(fn ($group, $itemId) => ['do_item' => DeliveryOrderItem::withoutGlobalScopes()->find($itemId), 'quantity' => (float) $group->sum('quantity')])
-            ->filter(fn ($line) => $line['do_item'] !== null);
+        // DO pengganti (…C) = SISA barang yang sesuai/bagus dari SELURUH item DO asal (qty asal − qty diretur), karena hanya DO
+        // pengganti yang boleh dibuatkan SJ. Dulu isinya justru qty yang diretur (mis. DO 8 retur 2 → pengganti 2, padahal
+        // seharusnya 6), sehingga barang bagus tertahan di DO asal yang sudah ditandai "diretur" (temuan UAT 21 Nov, Ko Handy).
+        // Kuantitas item DO asal sudah dikurangi sebesar retur oleh ReturnProductService sebelum langkah ini.
+        $lines = DeliveryOrderItem::withoutGlobalScopes()
+            ->where('delivery_order_id', $original->id)
+            ->get()
+            ->filter(fn (DeliveryOrderItem $i) => (float) $i->quantity > 0.00001)
+            ->map(fn (DeliveryOrderItem $i) => ['do_item' => $i, 'quantity' => (float) $i->quantity])
+            ->values();
+
+        // DO asal digantikan seluruhnya oleh R (retur) + C (pengganti): tutup agar kunci stoknya lepas dan tidak terhitung dua kali
+        // di progres SO. Barang yang diretur sudah "keluar lalu masuk" (netto 0), jadi penutupan tidak mengembalikan stok dua kali.
+        $this->closeReplacedOriginal($original, $returnProduct);
 
         if ($lines->isEmpty()) {
-            return null;
+            return null;   // semua barang diretur: tidak ada yang dikirim
         }
 
         $number = $this->uniqueReplacementNumber($original->do_number);
@@ -433,6 +441,21 @@ class DeliveryOrderReturnProcessor
         } finally {
             \App\Observers\DeliveryOrderObserver::$deferStockDeduction = $previousDefer;
         }
+    }
+
+    private function closeReplacedOriginal(DeliveryOrder $original, ReturnProduct $returnProduct): void
+    {
+        $original = $original->fresh();
+        if (! $original || in_array($original->status, ['closed', 'reject'], true)) {
+            return;
+        }
+
+        app(DeliveryOrderService::class)->updateStatus(
+            deliveryOrder: $original,
+            status: 'closed',
+            comments: "Digantikan DO pengganti setelah retur {$returnProduct->return_number}",
+            action: 'replaced_by_return'
+        );
     }
 
     private function uniqueReplacementNumber(string $doNumber): string
