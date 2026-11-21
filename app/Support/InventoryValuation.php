@@ -87,7 +87,16 @@ class InventoryValuation
         $product->forceFill([
             'cost_price' => round($newCost, 2),
             'last_purchase_price' => round($unitPrice, 2),
-            'last_purchase_at' => $movement->date ? substr((string) $movement->date, 0, 10) : now()->toDateString(),
+            'last_purchase_at' => self::dateString($movement->date),
         ])->saveQuietly();
+    }
+
+    private static function dateString(mixed $date): string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('Y-m-d');
+        }
+
+        return $date ? substr((string) $date, 0, 10) : now()->toDateString();
     }
 }

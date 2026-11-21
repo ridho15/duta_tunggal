@@ -237,6 +237,16 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 | #7 Barang reject supplier & #3 Retur by SJ | **Belum diverifikasi ulang** terhadap aturan Ko Handy ("reject dikembalikan ke kurir; hanya qty lolos QC diterima → PI < PO"). Perlu analisis terpisah; berisiko bila diubah tanpa konfirmasi alur. |
 
 
+**Keputusan Ko Handy & temuan test toko — 21 Nov 2026**
+
+| Item | Penyelesaian |
+|---|---|
+| Stok terpotong saat SJ terbentuk | **Sudah.** Merevisi aturan 10 Nov: SJ dibuat = stok langsung terpotong (tanggal gerakan = tanggal SJ) walau tanggal kirim besok. Jadwal kirim tetap mengikuti tanggal kirim. SJ yang sudah terbentuk boleh langsung difaktur. Perintah harian `sales:dispatch-scheduled-surat-jalan` kini hanya menyusulkan SJ lama yang tertunda — **jalankan sekali setelah deploy**. |
+| Kapan transaksi selesai | **Sudah.** Tombol **Selesai** di Daftar Penjualan & detail SO (sales pembuat / Manager). Syarat: tidak ada DO yang masih menunggu SJ dan sudah ada barang terkirim. Semua barang terkirim kini berstatus **Diterima** (bukan otomatis Selesai). SO draft: "Lanjutkan" membuka form Ubah. |
+| HPP | **Sudah.** HPP = **rata-rata bergerak**: persediaan didebit harga beli aktual, HPP produk dihitung ulang tiap barang pembelian masuk. **Harga beli terakhir** disimpan terpisah (`last_purchase_price`) sebagai referensi: jadi harga default saat buat PO dan tampil di master produk. Selisih PO vs HPP saat penerimaan tidak ada lagi; selisih faktur vs PO tetap ke 5160. |
+| Retur penjualan tidak tampil di kartu barang | **Diperbaiki.** Gerakan stok retur kini bertanggal hari *Selesaikan* (sebelumnya tanggal retur dibuat sehingga tergeser ke periode lalu). Jurnal retur memakai COA HPP/persediaan produk sebagai cadangan agar *Selesaikan* tidak gagal karena setting COA. Catatan: stok baru masuk saat tombol **Selesaikan** (setelah Disetujui). |
+| Retur by DO: DO pengganti salah | **Diperbaiki.** DO pengganti (…C) = sisa barang bagus seluruh DO asal (DO 8 retur 2 → 6; dulu 2). DO asal ditutup. Kartu barang: keluar 2 & masuk 2 (retur) + keluar 6 saat SJ pengganti = total keluar 8, masuk 2. |
+
 ## 9. Cara Menguji
 
 **Aturan praktis**

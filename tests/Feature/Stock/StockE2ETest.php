@@ -83,7 +83,7 @@ it('E2E: alur penuh SO → DO → jadwal → diterima → selesai; stok, reserva
     $transitions->complete($do2);
 
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 10.0, 'reserved' => 0.0, 'free' => 10.0])
-        ->and($so->fresh()->status)->toBe('completed')
+        ->and($so->fresh()->status)->toBe('received')   // Ko Handy 21 Nov: semua terkirim = Diterima; Selesai lewat tombol sales
         ->and(StockReservation::count())->toBe(0)
         ->and(StockMovement::where('type', 'sales')->count())->toBe(3)          // 12 + 8 + 8 (kirim ulang)
         ->and(StockMovement::where('type', 'adjustment_in')->count())->toBe(1);  // 8 kembali sekali

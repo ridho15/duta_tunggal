@@ -79,7 +79,7 @@ it('spec: DO Dikirim mengonsumsi reservasi; DO Selesai tidak menahan apa pun dan
 
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 18.0, 'reserved' => 0.0, 'free' => 18.0])
         ->and(StockReservation::count())->toBe(0)
-        ->and($so->fresh()->status)->toBe('completed');
+        ->and($so->fresh()->status)->toBe('received');   // Ko Handy 21 Nov: semua terkirim = Diterima; Selesai lewat tombol sales
 });
 
 it('spec: pengiriman parsial — DO1 12 dikirim menyisakan tertahan 8; DO2 8 dikirim menghabiskannya dan SO selesai', function () {
@@ -99,7 +99,7 @@ it('spec: pengiriman parsial — DO1 12 dikirim menyisakan tertahan 8; DO2 8 dik
 
     expect(stkStock($ctx['product'], $ctx['warehouse']))->toBe(['available' => 10.0, 'reserved' => 0.0, 'free' => 10.0])
         ->and(StockReservation::count())->toBe(0)
-        ->and($so->fresh()->status)->toBe('completed');
+        ->and($so->fresh()->status)->toBe('received');   // Ko Handy 21 Nov: semua terkirim = Diterima; Selesai lewat tombol sales
 });
 
 it('spec: tidak ada double reservasi — DO mengunci stoknya dan SO hanya menahan sisa, total tertahan tidak berlipat', function () {
