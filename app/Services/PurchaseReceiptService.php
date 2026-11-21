@@ -325,8 +325,8 @@ class PurchaseReceiptService
             ? round($amount / $unitCost['exchange_rate'], 4)
             : round($unitCost['raw_unit_price'] * $qtyAccepted, 4);
 
-        // Ko Handy 10 Nov 2026: persediaan dinilai pada HPP master produk (sama dengan Laporan Stok); akun belum-ditagih tetap
-        // pada harga PO; selisihnya ke Selisih Pembelian.
+        // Ko Handy 21 Nov 2026 (HPP averaging): persediaan didebit pada harga beli aktual; HPP rata-rata produk diperbarui
+        // dari gerakan stok purchase_in (InventoryValuation::applyPurchaseToAverage).
         $valuation = \App\Support\InventoryValuation::forPurchase($product, (float) $qtyAccepted, (float) $unitPrice);
         $inventoryAmount = $valuation['inventory_amount'];
         $toOriginal = fn (float $idr) => $unitCost['exchange_rate'] > 0 ? round($idr / $unitCost['exchange_rate'], 4) : $amountOriginalCurrency;
@@ -462,8 +462,8 @@ class PurchaseReceiptService
         if (! $existingMovement) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
             $unitPrice = (float) ($item->purchaseOrderItem?->unit_price ?? 0);
-            // Nilai gerakan stok = HPP (sama dengan jurnal persediaan & Laporan Stok)
-            $amount = round($qtyAccepted * \App\Support\InventoryValuation::unitCost($item->product, $unitPrice), 2);
+            // Nilai gerakan stok = harga beli aktual; HPP rata-rata diperbarui dari gerakan ini (Ko Handy 21 Nov: averaging)
+            $amount = round($qtyAccepted * $unitPrice, 2);
 
             if ($qtyAccepted <= 0 || $unitPrice <= 0 || $amount <= 0) {
                 return $this->skipWithWarning('Unable to reconcile stock for receipt item', [

@@ -171,8 +171,12 @@
                 {{-- Harga Beli --}}
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">
-                        Harga Beli Asli (Modal) <span class="text-rose-500">*</span>
+                        HPP (Rata-rata) <span class="text-rose-500">*</span>
                     </label>
+                    <p class="text-[11px] text-gray-500 mb-1">
+                        Diperbarui otomatis tiap barang pembelian masuk (rata-rata bergerak).
+                        Harga beli terakhir: {{ $product->last_purchase_price !== null ? 'Rp '.number_format($product->last_purchase_price, 0, ',', '.').' ('.$product->last_purchase_at?->format('d/m/Y').')' : 'belum ada pembelian' }}
+                    </p>
                     <div class="relative">
                         <span class="absolute left-3 top-2.5 text-xs font-bold text-gray-400 pointer-events-none">Rp</span>
                         <input

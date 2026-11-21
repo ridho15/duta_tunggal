@@ -20,7 +20,7 @@ class DispatchScheduledSuratJalan extends Command
         {--date= : Anggap hari ini tanggal ini (YYYY-MM-DD). Default: hari ini}
         {--dry-run : Tampilkan saja, jangan ubah apa pun}';
 
-    protected $description = 'Berangkatkan DO dari Surat Jalan yang tanggal kirimnya sudah tiba (stok dipotong pada tanggal kirim)';
+    protected $description = 'Susulkan pemotongan stok untuk Surat Jalan terbit yang DO-nya belum diberangkatkan (SJ lama sebelum aturan 21 Nov)';
 
     public function handle(SuratJalanService $service): int
     {
@@ -29,13 +29,13 @@ class DispatchScheduledSuratJalan extends Command
 
         $pending = SuratJalan::query()
             ->where('status', SuratJalan::STATUS_ISSUED)
-            ->where(fn ($q) => $q->whereDate('delivery_date', '<=', $today)
-                ->orWhere(fn ($w) => $w->whereNull('delivery_date')->whereDate('issued_at', '<=', $today)))
+            // Sejak 21 Nov stok terpotong saat SJ terbentuk; perintah ini kini hanya MENYUSUL SJ lama yang sempat tertunda
+            // (dibuat sebelum perubahan, tanggal kirim masa depan) — tanpa melihat tanggal kirim.
             ->whereHas('deliveryOrder', fn ($q) => $q->whereIn('delivery_orders.status', ['approved', 'confirmed', 'partial']))
             ->orderBy('id')
             ->get();
 
-        $this->info(sprintf('%s Surat Jalan jatuh tempo kirim s/d %s: %d', $dryRun ? '[DRY-RUN]' : '', $today->toDateString(), $pending->count()));
+        $this->info(sprintf('%s Surat Jalan terbit yang DO-nya belum diberangkatkan (per %s): %d', $dryRun ? '[DRY-RUN]' : '', $today->toDateString(), $pending->count()));
 
         $done = 0;
         $failed = 0;
@@ -49,11 +49,13 @@ class DispatchScheduledSuratJalan extends Command
             }
 
             try {
-                DB::transaction(function () use ($service, $suratJalan) {
+                DB::transaction(function () use ($service, $suratJalan, $today) {
                     $service->markDeliveryOrdersReceived($suratJalan);
                     // Jadwal kirim SJ ini ikut ditandai terkirim (tanpa memicu observer: DO sudah dipindah di atas).
-                    $suratJalan->deliverySchedules()->where('status', 'pending')->get()
-                        ->each(fn ($schedule) => $schedule->forceFill(['status' => 'delivered'])->saveQuietly());
+                    if ($suratJalan->isDeliveryDue($today)) {
+                        $suratJalan->deliverySchedules()->where('status', 'pending')->get()
+                            ->each(fn ($schedule) => $schedule->forceFill(['status' => 'delivered'])->saveQuietly());
+                    }
                 });
                 $done++;
             } catch (\Throwable $e) {

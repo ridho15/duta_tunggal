@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Keputusan Ko Handy 10 Nov 2026 (butir 8): Laporan Stok DAN Buku Besar menilai persediaan pada HPP master produk, bukan harga PO.
- * Persediaan didebit pada HPP; akun barang diterima belum ditagih tetap pada harga PO (dibersihkan faktur pembelian pada harga PO);
- * selisih harga PO − HPP dibukukan ke Selisih Pembelian (5160).
+ * Keputusan Ko Handy: Laporan Stok DAN Buku Besar menilai persediaan pada HPP (10 Nov), dan HPP menganut AVERAGING (21 Nov).
+ * Persediaan didebit sebesar harga beli aktual (= akun barang diterima belum ditagih), tanpa baris selisih saat penerimaan;
+ * HPP produk dihitung ulang sebagai rata-rata bergerak, harga beli terakhir disimpan terpisah.
  */
 
 use App\Models\Cabang;
@@ -68,26 +68,29 @@ function hppLines(PurchaseReceiptItem $item)
     return JournalEntry::where('source_type', PurchaseReceiptItem::class)->where('source_id', $item->id)->where('journal_type', 'inventory')->get();
 }
 
-it('harga PO di atas HPP: persediaan didebit HPP, selisih didebit ke Selisih Pembelian, belum ditagih dikredit harga PO', function () {
+it('harga PO di atas HPP: persediaan didebit harga beli aktual, HPP naik ke rata-rata, harga beli terakhir tersimpan', function () {
     [$item, $inventory, $unbilled, $variance] = hppReceive(hpp: 8000, poPrice: 10000);
     $lines = hppLines($item);
 
-    expect((float) $lines->where('coa_id', $inventory->id)->sum('debit'))->toBe(80000.0)
-        ->and((float) $lines->where('coa_id', $variance->id)->sum('debit'))->toBe(20000.0)
+    expect((float) $lines->where('coa_id', $inventory->id)->sum('debit'))->toBe(100000.0)
+        ->and($lines->where('coa_id', $variance->id))->toHaveCount(0)
         ->and((float) $lines->where('coa_id', $unbilled->id)->sum('credit'))->toBe(100000.0)
         ->and((float) $lines->sum('debit'))->toBe((float) $lines->sum('credit'));
 
-    // Nilai gerakan stok = HPP, sama dengan Laporan Stok (qty × cost_price)
     $movement = StockMovement::where('type', 'purchase_in')->where('product_id', $item->product_id)->first();
-    expect((float) $movement->value)->toBe(80000.0);
+    $product = $item->product->fresh();
+    // Stok awal 0 -> HPP = harga beli pertama; Laporan Stok (10 × HPP) = Buku Besar (100.000)
+    expect((float) $movement->value)->toBe(100000.0)
+        ->and((float) $product->cost_price)->toBe(10000.0)
+        ->and((float) $product->last_purchase_price)->toBe(10000.0);
 });
 
-it('harga PO di bawah HPP: selisih dikredit ke Selisih Pembelian', function () {
+it('harga PO di bawah HPP: persediaan didebit harga beli aktual tanpa baris selisih', function () {
     [$item, $inventory, $unbilled, $variance] = hppReceive(hpp: 8000, poPrice: 7000);
     $lines = hppLines($item);
 
-    expect((float) $lines->where('coa_id', $inventory->id)->sum('debit'))->toBe(80000.0)
-        ->and((float) $lines->where('coa_id', $variance->id)->sum('credit'))->toBe(10000.0)
+    expect((float) $lines->where('coa_id', $inventory->id)->sum('debit'))->toBe(70000.0)
+        ->and($lines->where('coa_id', $variance->id))->toHaveCount(0)
         ->and((float) $lines->where('coa_id', $unbilled->id)->sum('credit'))->toBe(70000.0)
         ->and((float) $lines->sum('debit'))->toBe((float) $lines->sum('credit'));
 });

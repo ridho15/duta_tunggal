@@ -833,3 +833,46 @@ test('processCompletion mengembalikan ringkasan qty yang dipulihkan', function (
         ->and((float) $summary['repair_qty'])->toBe(0.0)
         ->and($summary['warehouse'])->toBe($result['warehouse']->name);
 });
+
+test('UAT 21 Nov: alur HTTP lengkap retur penjualan memasukkan stok ke gudang tujuan, bertanggal hari selesai', function () {
+    $data = setupCustomerReturnPrerequisites();
+    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+    $data['user']->assignRole('Super Admin');
+    test()->seed(\Database\Seeders\WarehouseSeeder::class);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '1101.01'], ['name' => 'Persediaan Barang', 'type' => 'asset', 'cabang_id' => $data['cabang']->id]);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '5100.10'], ['name' => 'HPP', 'type' => 'expense', 'cabang_id' => $data['cabang']->id]);
+    $warehouse = Warehouse::withoutGlobalScopes()->first();
+
+    $customerReturn = CustomerReturn::create([
+        'return_number' => CustomerReturn::generateReturnNumber(),
+        'invoice_id' => $data['invoice']->id,
+        'customer_id' => $data['customer']->id,
+        'cabang_id' => $data['cabang']->id,
+        'return_date' => now()->subDays(40),   // retur dibuat jauh sebelum diselesaikan
+        'reason' => 'Barang rusak',
+        'status' => CustomerReturn::STATUS_PENDING,
+    ]);
+    $item = CustomerReturnItem::create([
+        'customer_return_id' => $customerReturn->id, 'product_id' => $data['product']->id,
+        'invoice_item_id' => $data['invoiceItem']->id, 'quantity' => 3, 'problem_description' => 'pecah',
+    ]);
+    $before = (float) InventoryStock::where('product_id', $data['product']->id)->where('warehouse_id', $warehouse->id)->sum('qty_available');
+
+    $this->actingAs($data['user']);
+    $this->post(route('penjualan.returns.markReceived', $customerReturn->id))->assertRedirect();
+    $this->post(route('penjualan.returns.saveQc', $customerReturn->id), [
+        'warehouse_id' => $warehouse->id,
+        'items' => [['id' => $item->id, 'qc_result' => 'pass', 'decision' => 'replace']],
+    ])->assertRedirect();
+    $this->post(route('penjualan.returns.approve', $customerReturn->id))->assertRedirect();
+    $this->post(route('penjualan.returns.complete', $customerReturn->id))->assertRedirect()->assertSessionHas('success');
+
+    expect($customerReturn->fresh()->status)->toBe(CustomerReturn::STATUS_COMPLETED);
+    $after = (float) InventoryStock::where('product_id', $data['product']->id)->where('warehouse_id', $warehouse->id)->sum('qty_available');
+    expect($after - $before)->toBe(3.0);
+
+    $movement = StockMovement::where('from_model_type', CustomerReturn::class)->where('from_model_id', $customerReturn->id)->first();
+    expect($movement)->not->toBeNull()
+        ->and($movement->warehouse_id)->toBe($warehouse->id)
+        ->and(substr((string) $movement->date, 0, 10))->toBe(now()->toDateString()); // tampil di kartu barang periode berjalan
+});

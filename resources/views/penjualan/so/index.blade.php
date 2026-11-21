@@ -150,7 +150,7 @@
                                             Approve
                                         </a>
                                     @elseif($so->status === 'draft')
-                                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl shadow-sm transition-colors">
+                                        <a href="{{ \App\Http\Controllers\Penjualan\SaleOrderController::canEditDraftSaleOrder(auth()->user(), $so) ? route('penjualan.so.edit', $so->id) : route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl shadow-sm transition-colors">
                                             Lanjutkan
                                         </a>
                                     @elseif(in_array($so->status, ['approved', 'confirmed', 'partially_delivered']) && $available > 0)
@@ -169,6 +169,15 @@
                                         <a href="{{ route('penjualan.so.show', $so->id) }}" class="text-xs font-semibold px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl shadow-sm transition-colors">
                                             Detail
                                         </a>
+                                    @endif
+
+                                    {{-- Tombol Selesai (Ko Handy 21 Nov): transaksi selesai saat sales menekannya --}}
+                                    @if(\App\Http\Controllers\Penjualan\SaleOrderController::completionBlockReason(auth()->user(), $so) === null)
+                                        <button type="button"
+                                                @click="$dispatch('open-modal-complete-so', { action: '{{ route('penjualan.so.complete', $so->id) }}', number: '{{ $so->so_number }}' })"
+                                                class="text-xs font-bold px-3 py-1.5 bg-white border border-[#15803d] text-[#15803d] hover:bg-emerald-50 rounded-xl shadow-sm transition-colors">
+                                            Selesai
+                                        </button>
                                     @endif
 
                                     <!-- Dropdown Menu / PDF Link -->
@@ -259,4 +268,10 @@
         </div>
     </div>
 </div>
+<x-confirmation-modal name="complete-so" title="Tandai Transaksi Selesai" variant="success" confirm-text="Ya, Selesai" cancel-text="Batal" method="POST">
+    <p class="text-sm text-gray-600">
+        Tandai transaksi <span class="font-bold font-mono text-gray-900" x-text="data.number"></span> <strong>SELESAI</strong>?
+        Barang yang belum dikirim (bila ada) dianggap tidak dilanjutkan. Aksi ini tidak dapat dibatalkan.
+    </p>
+</x-confirmation-modal>
 @endsection

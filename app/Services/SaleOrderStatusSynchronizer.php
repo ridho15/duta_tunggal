@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
  *
  *   terkirim = 0                 -> approved   (hanya bila sebelumnya partially_delivered/completed)
  *   0 < terkirim < dipesan       -> partially_delivered  ("Dikirim Sebagian")
- *   terkirim >= dipesan (semua)  -> completed
+ *   terkirim >= dipesan (semua)  -> received ("Diterima"; Ko Handy 21 Nov: "Selesai" hanya lewat tombol sales)
  *
  * Aturan keselamatan:
  *  - hanya menyentuh SO berstatus SaleOrder::DELIVERY_MANAGED_STATUSES;
@@ -55,10 +55,7 @@ class SaleOrderStatusSynchronizer
             'delivered' => $summary['totals']['delivered'],
         ]);
 
-        $model->update([
-            'status' => $target,
-            'completed_at' => $target === 'completed' ? ($model->completed_at ?? now()) : null,
-        ]);
+        $model->update(['status' => $target]);
 
         return $target;
     }
@@ -87,12 +84,11 @@ class SaleOrderStatusSynchronizer
         $anyDelivered = $summary['totals']['delivered'] > 0;
 
         if ($linkedToDeliveryOrder && $allDelivered && $anyDelivered) {
-            $target = 'completed';
+            $target = 'received';
         } elseif ($linkedToDeliveryOrder && $anyDelivered) {
             $target = 'partially_delivered';
-        } elseif (! $anyDelivered && in_array($model->status, ['partially_delivered', 'completed'], true) && ($linkedToDeliveryOrder || $model->status === 'partially_delivered')) {
+        } elseif (! $anyDelivered && in_array($model->status, ['partially_delivered', 'received'], true)) {
             // Belum ada yang terkirim (DO batal/gagal/dihapus): mundur ke approved bila sebelumnya sudah bergerak.
-            // "completed" tanpa DO sama sekali (mis. Ambil Sendiri diselesaikan manual) TIDAK dimundurkan.
             $target = 'approved';
         } else {
             return null;

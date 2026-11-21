@@ -36,6 +36,8 @@
             'name' => $p->name,
             'sku' => $p->sku ?? '-',
             'cost_price' => (float)($p->cost_price ?? 0),
+            'last_purchase_price' => $p->last_purchase_price !== null ? (float) $p->last_purchase_price : null,
+            'last_purchase_at' => $p->last_purchase_at?->format('d/m/Y'),
             'tipe_pajak' => $p->tipe_pajak ?? 'inklusif',
             'uom' => $p->uom?->abbreviation ?? $p->uom?->name ?? 'Pcs',
             'cabang_id' => $p->cabang_id,
@@ -579,7 +581,14 @@
                                                                 <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-[#14532d] font-bold">Harga Rekanan: <span x-text="formatRupiah(p.supplier_price)"></span></span>
                                                             </template>
                                                             <template x-if="p.supplier_price === null">
-                                                                <span class="text-gray-500 font-medium">Beli: <span x-text="formatRupiah(p.cost_price)"></span></span>
+                                                                <span class="text-gray-500 font-medium" :title="'HPP rata-rata: ' + formatRupiah(p.cost_price)">
+                                                                    <template x-if="p.last_purchase_price">
+                                                                        <span>Beli terakhir: <span x-text="formatRupiah(p.last_purchase_price)"></span><span class="text-gray-400" x-text="p.last_purchase_at ? ' (' + p.last_purchase_at + ')' : ''"></span></span>
+                                                                    </template>
+                                                                    <template x-if="!p.last_purchase_price">
+                                                                        <span>HPP: <span x-text="formatRupiah(p.cost_price)"></span></span>
+                                                                    </template>
+                                                                </span>
                                                             </template>
                                                         </div>
                                                     </div>
@@ -988,7 +997,8 @@ function purchaseOrderForm(config) {
                 item.unitPrice = p.supplier_price;
                 item.isSupplierPriceLinked = true;
             } else {
-                item.unitPrice = p.cost_price || 0;
+                // Referensi harga beli terakhir (bukan HPP rata-rata); fallback ke HPP bila belum pernah dibeli
+                item.unitPrice = p.last_purchase_price || p.cost_price || 0;
                 item.isSupplierPriceLinked = false;
             }
 

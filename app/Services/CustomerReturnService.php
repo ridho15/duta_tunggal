@@ -158,7 +158,7 @@ class CustomerReturnService
                                 'value'           => $itemCostTotal,
                                 'type'            => 'customer_return',
                                 'reference_id'    => $customerReturn->id,
-                                'date'            => $customerReturn->return_date ?? now()->toDateString(),
+                                'date'            => now()->toDateString(), // tanggal stok benar-benar masuk (saat Selesaikan), bukan tanggal retur dibuat
                                 'notes'           => "Retur dari customer (perbaikan): {$customerReturn->return_number}",
                                 'from_model_type' => CustomerReturn::class,
                                 'from_model_id'   => $customerReturn->id,
@@ -208,7 +208,7 @@ class CustomerReturnService
                             'value'           => $itemCostTotal,
                             'type'            => 'customer_return',
                             'reference_id'    => $customerReturn->id,
-                            'date'            => $customerReturn->return_date ?? now()->toDateString(),
+                            'date'            => now()->toDateString(), // tanggal stok benar-benar masuk (saat Selesaikan), bukan tanggal retur dibuat
                             'notes'           => "Retur dari customer (penggantian): {$customerReturn->return_number}",
                             'from_model_type' => CustomerReturn::class,
                             'from_model_id'   => $customerReturn->id,
@@ -300,6 +300,13 @@ class CustomerReturnService
             ...$settings->codes('cogs'),
             ...$settings->codes('return_cogs'),
         ]);
+        // Fallback: COA HPP / persediaan milik produk (sama seperti jurnal HPP penjualan), agar penyelesaian retur
+        // tidak gagal hanya karena kode di pengaturan akuntansi tidak cocok dengan bagan akun server (UAT 21 Nov).
+        $customerReturn->loadMissing('customerReturnItems.product');
+        $firstProduct = $customerReturn->customerReturnItems->first()?->product;
+        $cogsCoa ??= $firstProduct?->resolveCogsCoaOrDefault();
+        $defaultInventoryCoa ??= $firstProduct?->resolveInventoryCoaOrDefault();
+        $wipCoa ??= $defaultInventoryCoa;
 
         if (! $defaultInventoryCoa || ! $cogsCoa) {
             Log::warning('CustomerReturnService: COA account(s) not found — cannot create inventory journal entries', [
