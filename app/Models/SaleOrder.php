@@ -24,7 +24,11 @@ class SaleOrder extends Model
     /**
      * Status SO yang dikelola otomatis dari progres pengiriman (SaleOrderStatusSynchronizer).
      */
-    public const DELIVERY_MANAGED_STATUSES = ['approved', 'confirmed', 'partially_delivered', 'completed'];
+    /**
+     * Status yang diturunkan otomatis dari progres pengiriman. Ko Handy 21 Nov 2026: semua barang terkirim -> "Diterima"
+     * (received); transaksi baru "Selesai" (completed) saat sales menekan tombol Selesai, dan tidak dimundurkan otomatis.
+     */
+    public const DELIVERY_MANAGED_STATUSES = ['approved', 'confirmed', 'partially_delivered', 'received'];
 
     /**
      * SO yang invoice-nya boleh muncul di penerimaan customer. Invoice diterbitkan PER DO,

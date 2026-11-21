@@ -34,6 +34,7 @@ it('Selesai ditolak saat DO belum ber-SJ, lalu boleh setelah SJ terbit; tampil d
     sjFor($this, $ctx, $do);
     $this->get(route('penjualan.so.index', ['tab' => 'semua']))->assertOk()->assertSee('open-modal-complete-so', false);
 
+    expect($so->fresh()->status)->toBe('received');   // semua terkirim -> Diterima, belum Selesai
     $this->post(route('penjualan.so.complete', $so))->assertSessionHas('success');
     expect($so->fresh()->status)->toBe('completed')->and($so->fresh()->completed_at)->not->toBeNull();
 });
