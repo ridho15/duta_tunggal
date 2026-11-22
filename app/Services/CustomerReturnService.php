@@ -25,12 +25,14 @@ class CustomerReturnService
      *
      * Flow:
      *  - Validates that returned quantity does not exceed returnable quantity of the invoice item.
-     *  - For items with decision = 'repair' or 'replace': goods are physically back at DT,
-     *    so inventory (qty_available) is restored using HPP (cost_price), and a stock-in movement is recorded.
+     *  - For items with decision = 'replace' or 'credit': goods are physically back at DT, so inventory (qty_available) is
+     *    restored at the HPP recognised on the sale (invoice snapshot; fallback master cost_price) with a stock-in movement.
+     *  - For items with decision = 'repair': customer-owned goods are serviced and handed back — the sale stands, so no
+     *    revenue/PPN/AR/HPP reversal, no saleable stock and no stock card entry.
      *  - For items with decision = 'reject': the claim was rejected, goods stay with the
      *    customer (or are scrapped), so no stock is added.
      *  - Journal entries are created:
-     *      1. Inventory Journal: Dr Persediaan Produk @ HPP, Cr HPP (5100.10) @ HPP.
+     *      1. Inventory Journal: Dr Persediaan Produk @ HPP, Cr HPP (5100.10) @ the same HPP.
      *      2. Financial Journal: Dr Retur Penjualan (4120.10) @ DPP, Dr PPN Keluaran (2120.06) @ PPN, Cr Piutang Dagang (1120) @ Total Retur.
      *  - AccountReceivable is reduced by the returned financial total.
      *  - stock_restored_at is set to prevent double-processing.
@@ -52,7 +54,7 @@ class CustomerReturnService
         // padahal pesan sukses menyatakan stok sudah dipulihkan (temuan UAT 11 Nov 2026).
         $customerReturn->loadMissing('customerReturnItems');
         $needsWarehouse = $customerReturn->customerReturnItems
-            ->contains(fn ($i) => $i->decision !== CustomerReturnItem::DECISION_REJECT && (float) $i->quantity > 0);
+            ->contains(fn ($i) => ! in_array($i->decision, [CustomerReturnItem::DECISION_REJECT, CustomerReturnItem::DECISION_REPAIR], true) && (float) $i->quantity > 0);
         if (! $warehouseId && $needsWarehouse) {
             throw new \Exception('Gudang penerima retur belum diisi. Isi "Gudang Penerima" pada form Inspeksi QC, simpan, lalu selesaikan retur lagi.');
         }
@@ -72,15 +74,15 @@ class CustomerReturnService
             }
 
             $totalRestoredCost = 0.0;
-            $repairCost = 0.0;
-            $replaceCost = 0.0;
+            $restoredLines = [];
 
             $totalDpp = 0.0;
             $totalPpn = 0.0;
 
+            // Produk dimuat tanpa scope cabang: barang pada invoice tetap harus terbaca HPP & akunnya walau user beda cabang.
             $lockedReturn->loadMissing([
-                'customerReturnItems.invoiceItem.product',
-                'customerReturnItems.product',
+                'customerReturnItems.invoiceItem',
+                'customerReturnItems.product' => fn ($q) => $q->withoutGlobalScopes(),
                 'invoice',
             ]);
 
@@ -112,18 +114,20 @@ class CustomerReturnService
                     continue;
                 }
 
-                // ── Cost price (HPP) for inventory restoration ─────────────────────
-                $unitCost = (float) ($item->product?->cost_price ?? $item->invoiceItem?->cost_price ?? 0);
-                if ($unitCost <= 0) {
-                    $unitCost = (float) ($item->invoiceItem?->net_unit_price ?? 0);
+                // Perbaikan (repair): barang milik customer diservis lalu dikembalikan — penjualan tetap sah. Tidak membalik
+                // pendapatan/PPN/piutang/HPP dan tidak masuk stok jual; kartu barang juga tidak dicatat agar tetap = stok fisik.
+                if ($item->decision === CustomerReturnItem::DECISION_REPAIR) {
+                    $summary['repair_qty'] += $qty;
+                    continue;
                 }
+
+                // ── HPP yang diakui saat penjualan (snapshot invoice), sumber yang sama untuk debit persediaan & kredit HPP ──
+                $unitCost = $this->recognizedUnitCost($item, $lockedReturn);
                 $itemCostTotal = round($qty * $unitCost, 2);
 
                 // ── Selling price & VAT for financial reversal ────────────────────
-                // Dihitung untuk semua item retur non-reject (replace, repair, atau credit).
                 // Jika CreditNoteService aktif dan keputusan adalah credit, Nota Kredit yang akan menjurnal sisi uang.
-                $shouldReverseFinancial = ($item->decision !== CustomerReturnItem::DECISION_REJECT)
-                    && (! CreditNoteService::enabled() || $item->decision !== CustomerReturnItem::DECISION_CREDIT);
+                $shouldReverseFinancial = ! CreditNoteService::enabled() || $item->decision !== CustomerReturnItem::DECISION_CREDIT;
 
                 if ($shouldReverseFinancial) {
                     $invItem = $item->invoiceItem;
@@ -134,47 +138,6 @@ class CustomerReturnService
                         $totalDpp += round($qty * $dppPerUnit, 2);
                         $totalPpn += round($qty * $ppnPerUnit, 2);
                     }
-                }
-
-                // For 'repair' items, goods come back for fixing but are NOT immediately
-                // returned to saleable stock — they go to a WIP/In-Repair holding account.
-                if ($item->decision === CustomerReturnItem::DECISION_REPAIR) {
-                    $summary['repair_qty'] += $qty;
-                    $repairCost += $itemCostTotal;
-                    $totalRestoredCost += $itemCostTotal;
-
-                    if ($warehouseId) {
-                        $existingMovement = StockMovement::where('from_model_type', CustomerReturn::class)
-                            ->where('from_model_id', $customerReturn->id)
-                            ->where('product_id', $item->product_id)
-                            ->where('meta->customer_return_item_id', $item->id)
-                            ->first();
-
-                        if (! $existingMovement) {
-                            StockMovement::create([
-                                'product_id'      => $item->product_id,
-                                'warehouse_id'    => $warehouseId,
-                                'quantity'        => $qty,
-                                'value'           => $itemCostTotal,
-                                'type'            => 'customer_return',
-                                'reference_id'    => $customerReturn->id,
-                                'date'            => now()->toDateString(), // tanggal stok benar-benar masuk (saat Selesaikan), bukan tanggal retur dibuat
-                                'notes'           => "Retur dari customer (perbaikan): {$customerReturn->return_number}",
-                                'from_model_type' => CustomerReturn::class,
-                                'from_model_id'   => $customerReturn->id,
-                                'meta'            => [
-                                    'customer_return_item_id' => $item->id,
-                                    'skip_stock_update' => true,
-                                ],
-                            ]);
-                        }
-                    } else {
-                        Log::warning('CustomerReturnService: warehouse_id null, repair stock movement skipped', [
-                            'return_id'  => $customerReturn->id,
-                            'product_id' => $item->product_id,
-                        ]);
-                    }
-                    continue;
                 }
 
                 // ── 1. Restore inventory stock (replace / standard return) ─────────
@@ -225,13 +188,13 @@ class CustomerReturnService
                     ]);
                 }
 
-                $replaceCost += $itemCostTotal;
+                $restoredLines[] = ['product' => $item->product, 'amount' => $itemCostTotal];
                 $totalRestoredCost += $itemCostTotal;
             }
 
             // ── 2. Create inventory journal entries ───────────────────────────────
             if ($totalRestoredCost > 0) {
-                $this->createInventoryJournalEntries($lockedReturn, $totalRestoredCost, $replaceCost, $repairCost);
+                $this->createInventoryJournalEntries($lockedReturn, $restoredLines);
             }
 
             // ── 3. Create financial journal entries & adjust AR / Customer Deposit ──
@@ -260,17 +223,13 @@ class CustomerReturnService
     }
 
     /**
-     * Create inventory journal entries for a completed customer return.
+     * Create inventory journal entries for a completed customer return (barang kembali ke stok: replace / credit).
+     *   Debit  Persediaan (COA produk, fallback akun persediaan retur) @ HPP yang diakui saat penjualan
+     *   Credit HPP (5100.10)                                           @ nilai yang sama → jurnal selalu seimbang
      *
-     * For 'replace' items (goods back to stock):
-     *   Debit  Inventory            (Product COA or fallback 1140.01 / 1140.10) — goods come back to warehouse @ HPP
-     *   Credit COGS reversal        (5100.10)                                   — cost of goods is no longer "sold" @ HPP
-     *
-     * For 'repair' items (goods in workshop/WIP, not yet back to saleable stock):
-     *   Debit  WIP / In-Repair      (1101.02 or fallback to inventory) — goods held for repair
-     *   Credit COGS reversal        (5100.10)                          — cost of goods is no longer "sold" @ HPP
+     * @param  array<int, array{product: ?\App\Models\Product, amount: float}>  $lines
      */
-    private function createInventoryJournalEntries(CustomerReturn $customerReturn, float $amount, float $replaceAmount, float $repairAmount): void
+    private function createInventoryJournalEntries(CustomerReturn $customerReturn, array $lines): void
     {
         // Prevent duplicate posting
         if (JournalEntry::where('source_type', CustomerReturn::class)
@@ -292,9 +251,6 @@ class CustomerReturnService
             ...$settings->codes('inventory'),
         ]);
 
-        // COA: WIP / In-Repair holding account
-        $wipCoa = $this->firstExistingCoa($settings->codes('return_wip')) ?? $defaultInventoryCoa;
-
         // COA: COGS reversal
         $cogsCoa = $this->firstExistingCoa([
             ...$settings->codes('cogs'),
@@ -306,65 +262,29 @@ class CustomerReturnService
         $firstProduct = $customerReturn->customerReturnItems->first()?->product;
         $cogsCoa ??= $firstProduct?->resolveCogsCoaOrDefault();
         $defaultInventoryCoa ??= $firstProduct?->resolveInventoryCoaOrDefault();
-        $wipCoa ??= $defaultInventoryCoa;
 
-        if (! $defaultInventoryCoa || ! $cogsCoa) {
-            Log::warning('CustomerReturnService: COA account(s) not found — cannot create inventory journal entries', [
-                'return_id'    => $customerReturn->id,
-                'inventory_ok' => (bool) $defaultInventoryCoa,
-                'cogs_ok'      => (bool) $cogsCoa,
-            ]);
-            throw new \Exception('Akun COA tidak ditemukan untuk jurnal persediaan retur customer. Diperlukan akun persediaan dan COGS yang valid.');
-        }
-
-        // Kelompokkan item penggantian (replace) berdasarkan COA persediaan produk masing-masing
-        $customerReturn->loadMissing('customerReturnItems.product');
-        $replaceTotalsByCoa = [];
-        $items = $customerReturn->customerReturnItems ?? $customerReturn->customerReturnItem ?? collect();
-        foreach ($items as $item) {
-            if ($item->decision !== CustomerReturnItem::DECISION_REPAIR && $item->decision !== CustomerReturnItem::DECISION_REJECT) {
-                $itemQty = (float) ($item->quantity ?? 0);
-                $cost = (float) ($item->product?->cost_price ?? 0);
-                $lineCost = round($itemQty * $cost, 2);
-                if ($lineCost <= 0) {
-                    continue;
-                }
-                $invCoa = $item->product?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
-                $coaId = $invCoa->id;
-                if (! isset($replaceTotalsByCoa[$coaId])) {
-                    $replaceTotalsByCoa[$coaId] = [
-                        'coa' => $invCoa,
-                        'amount' => 0.0,
-                    ];
-                }
-                $replaceTotalsByCoa[$coaId]['amount'] += $lineCost;
+        $totalsByCoa = [];
+        $total = 0.0;
+        foreach ($lines as $line) {
+            $invCoa = $line['product']?->resolveInventoryCoaOrDefault() ?? $defaultInventoryCoa;
+            if (! $invCoa || ! $cogsCoa) {
+                throw new \Exception(sprintf(
+                    'Akun %s untuk jurnal persediaan retur customer tidak ditemukan. Tambahkan akun tersebut di Bagan Akun (COA) atau atur di Pengaturan Akuntansi, lalu selesaikan retur lagi.',
+                    ! $invCoa ? 'Persediaan (kode '.implode('/', array_filter([...$settings->codes('return_inventory'), config('coa.inventory'), ...$settings->codes('inventory')])).')' : 'HPP (kode '.implode('/', array_filter([...$settings->codes('cogs'), ...$settings->codes('return_cogs')])).')'
+                ));
             }
+            $totalsByCoa[$invCoa->id] = ['coa' => $invCoa, 'amount' => ($totalsByCoa[$invCoa->id]['amount'] ?? 0.0) + $line['amount']];
+            $total += $line['amount'];
         }
 
-        // Debit Inventory per COA (replace items) – barang kembali ke stok fisik
-        foreach ($replaceTotalsByCoa as $data) {
+        // Debit Inventory per COA – barang kembali ke stok fisik
+        foreach ($totalsByCoa as $data) {
             JournalEntry::create([
                 'coa_id'       => $data['coa']->id,
                 'date'         => $date,
                 'reference'    => $reference,
                 'description'  => $desc . ' - Restore inventory value (penggantian)',
                 'debit'        => round($data['amount'], 2),
-                'credit'       => 0,
-                'journal_type' => 'customer_return',
-                'source_type'  => CustomerReturn::class,
-                'source_id'    => $customerReturn->id,
-                'cabang_id'    => $customerReturn->cabang_id,
-            ]);
-        }
-
-        // Debit WIP (repair items) – barang dalam perbaikan, belum siap jual
-        if ($repairAmount > 0) {
-            JournalEntry::create([
-                'coa_id'       => $wipCoa->id,
-                'date'         => $date,
-                'reference'    => $reference,
-                'description'  => $desc . ' - Goods in repair (perbaikan)',
-                'debit'        => $repairAmount,
                 'credit'       => 0,
                 'journal_type' => 'customer_return',
                 'source_type'  => CustomerReturn::class,
@@ -380,12 +300,35 @@ class CustomerReturnService
             'reference'    => $reference,
             'description'  => $desc . ' - COGS reversal',
             'debit'        => 0,
-            'credit'       => $amount,
+            'credit'       => round($total, 2),
             'journal_type' => 'customer_return',
             'source_type'  => CustomerReturn::class,
             'source_id'    => $customerReturn->id,
             'cabang_id'    => $customerReturn->cabang_id,
         ]);
+    }
+
+    /**
+     * HPP per unit yang diakui saat penjualan: snapshot invoice (cost_price, atau cogs_amount ÷ qty); bila tidak tersedia,
+     * HPP rata-rata master produk. Tanpa HPP sama sekali retur ditolak — persediaan tidak boleh dinilai dengan harga jual.
+     */
+    private function recognizedUnitCost(CustomerReturnItem $item, CustomerReturn $customerReturn): float
+    {
+        $invoiceItem = $item->invoiceItem;
+        $unitCost = (float) ($invoiceItem?->cost_price ?? 0);
+        if ($unitCost <= 0 && $invoiceItem && (float) $invoiceItem->quantity > 0) {
+            $unitCost = (float) ($invoiceItem->cogs_amount ?? 0) / (float) $invoiceItem->quantity;
+        }
+        if ($unitCost <= 0) {
+            $unitCost = (float) ($item->product?->cost_price ?? 0);
+        }
+
+        if ($unitCost <= 0) {
+            $productName = $item->product?->name ?? ('Produk #'.$item->product_id);
+            throw new \Exception("HPP produk {$productName} tidak tersedia (HPP invoice dan HPP rata-rata master produk = 0), sehingga nilai persediaan retur {$customerReturn->return_number} tidak dapat dihitung. Isi HPP produk di Master Produk (atau lengkapi HPP pada invoice asal), lalu selesaikan retur lagi.");
+        }
+
+        return round($unitCost, 4);
     }
 
     /**
@@ -432,14 +375,6 @@ class CustomerReturnService
             ...$settings->codes('return_deposit'),
         ], 'Deposit Konsumen');
 
-        if (! $salesReturnCoa || ! $arCoa) {
-            Log::warning('CustomerReturnService: COA account(s) not found for financial journal', [
-                'return_id'        => $customerReturn->id,
-                'sales_return_ok'  => (bool) $salesReturnCoa,
-                'ar_ok'            => (bool) $arCoa,
-            ]);
-            return;
-        }
 
         // Determine AR remaining vs to deposit
         $invoice = $customerReturn->invoice;
@@ -454,6 +389,25 @@ class CustomerReturnService
         } else {
             $applyToAr = min($totalReturnFin, $remainingAr);
             $toDeposit = round($totalReturnFin - $applyToAr, 2);
+        }
+
+        // Setiap sisi jurnal wajib punya akun; tanpa itu jurnal timpang atau piutang/deposit tidak sinkron dengan GL.
+        $missing = [];
+        if ($dpp > 0 && ! $salesReturnCoa) {
+            $missing[] = 'Retur Penjualan (kode '.$this->codeList([...$settings->codes('sales_returns'), ...$settings->codes('return_sales_returns')]).')';
+        }
+        if ($ppn > 0 && ! $vatCoa) {
+            $missing[] = 'PPN Keluaran (kode '.$this->codeList([...$settings->codes('sales_output_vat'), ...$settings->codes('return_output_vat')]).')';
+        }
+        if ($applyToAr > 0 && ! $arCoa) {
+            $missing[] = 'Piutang Dagang (kode '.$this->codeList($settings->codes('accounts_receivable')).')';
+        }
+        if ($toDeposit > 0 && ! $depositCoa) {
+            $missing[] = 'Deposit Konsumen (kode '.$this->codeList([...$settings->codes('customer_deposit'), ...$settings->codes('return_deposit')]).')';
+        }
+        if ($missing !== []) {
+            throw new \Exception('Retur '.$customerReturn->return_number.' tidak dapat dijurnal karena akun berikut tidak ditemukan: '.implode(', ', $missing)
+                .'. Tambahkan akun tersebut di Bagan Akun (COA) atau atur di Pengaturan Akuntansi, lalu selesaikan retur lagi.');
         }
 
         if (! $hasFinancialJournal) {
@@ -474,7 +428,7 @@ class CustomerReturnService
             }
 
             // Debit PPN Keluaran
-            if ($ppn > 0 && $vatCoa) {
+            if ($ppn > 0) {
                 JournalEntry::create([
                     'coa_id'       => $vatCoa->id,
                     'date'         => $date,
@@ -506,7 +460,7 @@ class CustomerReturnService
             }
 
             // Credit Deposit Pelanggan (jika invoice sudah lunas atau retur melebihi sisa piutang)
-            if ($toDeposit > 0 && $depositCoa) {
+            if ($toDeposit > 0) {
                 JournalEntry::create([
                     'coa_id'       => $depositCoa->id,
                     'date'         => $date,
@@ -599,6 +553,12 @@ class CustomerReturnService
             }
             $invoice->saveQuietly();
         }
+    }
+
+    /** @param  array<int, ?string>  $codes */
+    private function codeList(array $codes): string
+    {
+        return implode('/', array_values(array_unique(array_filter($codes)))) ?: '-';
     }
 
     protected function firstExistingCoa(array $codes, ?string $fallbackNameLike = null, ?string $fallbackType = null): ?ChartOfAccount

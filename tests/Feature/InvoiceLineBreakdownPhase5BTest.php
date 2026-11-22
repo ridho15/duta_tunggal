@@ -431,6 +431,9 @@ it('Isu 10: retur customer memakai harga bersih (setelah diskon), bukan harga gr
     // retur invoice berdiskon dikreditkan terlalu besar.
     $source = file_get_contents(app_path('Services/CustomerReturnService.php'));
 
-    expect($source)->toContain('invoiceItem?->net_unit_price')->not->toContain('invoiceItem?->price');
+    // Nilai keuangan retur = DPP baris invoice per unit (sudah bersih diskon). Harga jual juga tidak boleh lagi dipakai sebagai
+    // pengganti HPP (audit retur: HPP 0 → jurnal timpang), jadi net_unit_price tidak muncul di jalur HPP.
+    expect($source)->toContain('(float) $invItem->subtotal / $invQty')->not->toContain('invoiceItem?->price')
+        ->not->toContain('invoiceItem?->net_unit_price');
 });
 

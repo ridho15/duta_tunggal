@@ -130,7 +130,7 @@ it('draft dapat diubah, ditolak (stok tetap), lalu dihapus', function () {
         ->assertRedirect(route('gudang.adjustment.show', $adjustment));
     $item = $adjustment->fresh()->items()->firstOrFail();
     expect($adjustment->fresh()->reason)->toBe('Diubah')->and($adjustment->items()->count())->toBe(1)
-        ->and((float) $item->difference_value)->toBe(20000.0);
+        ->and((float) $item->difference_value)->toBe(10000.0);   // #4B: selisih 10 × HPP produk 1.000, harga isian user (2.000) diabaikan
 
     $this->actingAs($user)->post(route('gudang.adjustment.reject', $adjustment))->assertSessionHas('success');
     expect($adjustment->fresh()->status)->toBe('rejected')->and((float) $stock->fresh()->qty_available)->toBe(10.0);

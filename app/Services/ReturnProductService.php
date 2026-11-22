@@ -196,6 +196,16 @@ class ReturnProductService
             $deliveryOrder = $returnProduct->fromModel;
             $isInvoiced = ($deliveryOrder instanceof DeliveryOrder) && $this->isDeliveryOrderInvoiced($deliveryOrder);
 
+            // Retur by DO sebelum Surat Jalan: DO hanya mengunci stok dan belum pernah dijurnal (Dr Barang Terkirim / Cr Persediaan
+            // baru terbentuk saat barang berangkat). Tidak ada yang perlu dibalik — gerakan stok (termasuk ke karantina) sudah cukup.
+            // Jurnal pembalik di sini justru membuat persediaan lebih saji dan Barang Terkirim bersaldo kredit.
+            $deliveryJournaled = ($deliveryOrder instanceof DeliveryOrder) && JournalEntry::withoutGlobalScopes()->where('source_type', DeliveryOrder::class)
+                ->where('source_id', $deliveryOrder->id)
+                ->exists();
+            if (! $deliveryJournaled && ! $isInvoiced) {
+                return;
+            }
+
             foreach ($returnProduct->returnProductItem as $item) {
                 $qty = max(0, (float) ($item->quantity ?? 0));
                 $product = $item->product;

@@ -13,16 +13,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('invoices', function (Blueprint $table) {
+        // Kolom dpp_nilai_lain bisa sudah dibuat migrasi 2026_11_22_100002 (siklus pembelian): samakan definisinya saja.
+        $exists = Schema::hasColumn('invoices', 'dpp_nilai_lain');
+        Schema::table('invoices', function (Blueprint $table) use ($exists) {
             $table->decimal('tax', 18, 2)->default(0)->change();
-            $table->decimal('dpp_nilai_lain', 18, 2)->default(0)->after('dpp');
+            $column = $table->decimal('dpp_nilai_lain', 18, 2)->default(0);
+            $exists ? $column->change() : $column->after('dpp');
         });
     }
 
     public function down(): void
     {
         Schema::table('invoices', function (Blueprint $table) {
-            $table->dropColumn('dpp_nilai_lain');
             $table->integer('tax')->default(0)->change();
         });
     }
