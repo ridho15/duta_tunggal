@@ -22,7 +22,9 @@ use Illuminate\Validation\ValidationException;
  *
  * Jurnal saat terbit = cermin bagian yang dikreditkan: Dr Retur Penjualan (akun produk) + Dr PPN Keluaran (+ Dr Biaya Pengiriman),
  * Cr Piutang (bagian yang masih terutang) dan Cr Deposit Customer (bagian yang sudah dibayar customer). Piutang tidak pernah negatif.
- * Stok/HPP TIDAK disentuh di sini (retur fisik sudah dijurnal CustomerReturnService).
+ * Stok/HPP TIDAK disentuh di sini (retur fisik sudah dijurnal CustomerReturnService) — KECUALI Nota Kredit PEMBATALAN: barang tetap
+ * di customer dan Surat Jalannya kembali dapat difaktur, sehingga HPP invoice dibalik ke Barang Terkirim (Dr 1140.20 / Cr HPP) dan
+ * diakui lagi oleh invoice pengganti. HPP per DO/SJ hanya diakui sekali.
  */
 class CreditNoteService
 {
@@ -536,6 +538,10 @@ class CreditNoteService
         $rate = (float) ($invoice->exchange_rate ?: 1);
         $rate = $rate > 0 ? $rate : 1.0;
 
+        if ($creditNote->type === CreditNote::TYPE_CANCELLATION) {
+            $entries = array_merge($entries, $this->cogsReversalPlan($invoice));
+        }
+
         foreach ($entries as $entry) {
             JournalEntry::create($entry + [
                 'date' => $creditNote->credit_date?->toDateString() ?? now()->toDateString(), 'reference' => $creditNote->credit_note_number, 'journal_type' => 'credit_note',
@@ -543,6 +549,31 @@ class CreditNoteService
                 'currency_id' => $currencyId, 'exchange_rate' => $rate, 'amount_original_currency' => round(max($entry['debit'], $entry['credit']) / $rate, 4),
             ]);
         }
+    }
+
+    /**
+     * Cermin jurnal HPP invoice (Dr HPP / Cr Barang Terkirim) per akun → Dr Barang Terkirim / Cr HPP. Nilainya persis yang dijurnal invoice
+     * sehingga 1140.20 kembali memuat nilai SJ dan invoice pengganti melepasnya lagi tanpa HPP ganda.
+     *
+     * @return array<int, array{coa_id: int, description: string, debit: float, credit: float}>
+     */
+    private function cogsReversalPlan(Invoice $invoice): array
+    {
+        $lines = JournalEntry::query()
+            ->where('source_type', Invoice::class)->where('source_id', $invoice->id)
+            ->where('is_reversal', false)->whereNull('reversal_of_transaction_id')
+            ->where(fn ($q) => $q->where('description', 'like', 'Sales Invoice - Cost of Goods Sold%')
+                ->orWhere('description', 'like', 'Sales Invoice - Release Barang Terkirim%'))
+            ->selectRaw('coa_id, SUM(debit) as debit, SUM(credit) as credit')
+            ->groupBy('coa_id')
+            ->get();
+
+        return $lines->map(fn ($line) => [
+            'coa_id' => (int) $line->coa_id,
+            'description' => 'Nota Kredit Pembatalan - Pembalikan HPP ke Barang Terkirim',
+            'debit' => round((float) $line->credit, 2),
+            'credit' => round((float) $line->debit, 2),
+        ])->filter(fn ($entry) => $entry['debit'] > 0 || $entry['credit'] > 0)->values()->all();
     }
 
     private function depositCoa(Invoice $invoice): ?ChartOfAccount

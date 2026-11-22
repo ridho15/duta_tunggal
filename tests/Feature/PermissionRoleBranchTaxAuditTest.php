@@ -423,9 +423,9 @@ test('TaxService::compute with zero rate returns no PPN', function () {
 
 test('hitungSubtotal with Exclusive tax calculates correct total', function () {
     // qty=2, price=100000, discount=0%, tax=12%, Exclusive
-    // subtotal = 200000, after discount = 200000, +12% = 224000
+    // subtotal = 200000, PPN 12% × DPP Nilai Lain (11/12) = 22000 → 222000 (PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif)
     $result = HelperController::hitungSubtotal(2, 100000, 0, 12, 'Exclusive');
-    expect($result)->toBe(224000.0);
+    expect($result)->toBe(222000.0);
 });
 
 test('hitungSubtotal with Inclusive tax returns gross unchanged', function () {
@@ -437,9 +437,9 @@ test('hitungSubtotal with Inclusive tax returns gross unchanged', function () {
 
 test('hitungSubtotal applies discount before tax', function () {
     // qty=10, price=100000, discount=10%, tax=12%, Exclusive
-    // base = 1000000, after 10% discount = 900000, +12% = 1008000
+    // base = 1000000, after 10% discount = 900000, + 12% × DPP Nilai Lain = 999000
     $result = HelperController::hitungSubtotal(10, 100000, 10, 12, 'Exclusive');
-    expect($result)->toBe(1008000.0);
+    expect($result)->toBe(999000.0);
 });
 
 test('hitungSubtotal defaults to Inklusif when null taxType passed', function () {
@@ -509,7 +509,7 @@ test('QuotationService updateTotalAmount uses Exclusive tax_type', function () {
     $service->updateTotalAmount($quotation);
     $quotation->refresh();
 
-    expect((float) $quotation->total_amount)->toBe(1120000.0);
+    expect((float) $quotation->total_amount)->toBe(1110000.0);  // PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
 });
 
 test('QuotationService updateTotalAmount uses Inclusive tax_type', function () {
@@ -564,8 +564,8 @@ test('QuotationService updateTotalAmount handles multiple items with mixed tax t
     $service->updateTotalAmount($quotation);
     $quotation->refresh();
 
-    // 1,120,000 + 200,000 = 1,320,000
-    expect((float) $quotation->total_amount)->toBe(1320000.0);
+    // 1,110,000 (12% × DPP Nilai Lain) + 200,000 = 1,310,000
+    expect((float) $quotation->total_amount)->toBe(1310000.0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -667,7 +667,7 @@ test('SalesOrderService updateTotalAmount uses per-item tipe_pajak (Exclusive)',
     $service->updateTotalAmount($so);
     $so->refresh();
 
-    expect((float) $so->total_amount)->toBe(2240000.0);
+    expect((float) $so->total_amount)->toBe(2220000.0);  // PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
 });
 
 test('SalesOrderService updateTotalAmount uses per-item tipe_pajak (Inclusive)', function () {

@@ -363,6 +363,8 @@ class DataIntegrityTest extends TestCase
         $supplier = Supplier::factory()->create();
         $product = Product::factory()->create();
         $coa = ChartOfAccount::factory()->create();
+        // Pemakaian deposit customer didebit dari akun Deposit Pelanggan resmi (audit penjualan #1)
+        ChartOfAccount::firstOrCreate(['code' => config('coa.customer_deposit')], ['name' => 'Deposit Pelanggan', 'type' => 'Liability', 'is_active' => true]);
         $branch = Cabang::factory()->create();
         $warehouse = Warehouse::factory()->create(['cabang_id' => $branch->id]);
 

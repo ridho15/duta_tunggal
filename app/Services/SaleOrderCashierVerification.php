@@ -2,10 +2,20 @@
 
 namespace App\Services;
 
+use App\Enums\PaymentStatus;
+use App\Models\AccountReceivable;
 use App\Models\ApprovalOverride;
+use App\Models\Customer;
+use App\Models\CustomerReceipt;
+use App\Models\CustomerReceiptItem;
 use App\Models\Deposit;
+use App\Models\DepositLog;
+use App\Models\Invoice;
 use App\Models\SaleOrder;
+use App\Models\SuratJalan;
 use App\Models\User;
+use App\Observers\CustomerReceiptObserver;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,11 +26,14 @@ use Illuminate\Validation\ValidationException;
  * Dulu verifikasi hanya catatan (opsional memakai saldo). Sekarang:
  *  - saldo titip customer WAJIB cukup menutup total SO (barang + ongkos kirim) — kurang → ditolak dengan selisih yang jelas
  *    (arahkan kasir menambah Saldo Titip Customer lebih dulu);
- *  - total SO otomatis dipotong dari saldo dalam satu transaksi dengan baris saldo dikunci (tidak ada dua verifikasi yang
- *    memakai saldo yang sama) dan tercatat di log saldo (tipe `use`, bereferensi SO);
+ *  - total SO DICADANGKAN dari saldo (log `reserve`, bereferensi SO) dalam satu transaksi dengan baris saldo dikunci (tidak ada
+ *    dua verifikasi yang memakai saldo yang sama). Belum ada jurnal dan saldo deposit belum berkurang: uang titipan masih utang
+ *    kepada customer (2160.04) sampai invoice SO terbit;
+ *  - saat invoice SO tersebut terbit, cadangan direalisasi menjadi Penerimaan Customer metode Deposit (Dr 2160.04 / Cr Piutang)
+ *    yang melunasi piutang invoice (settleInvoice) — subledger deposit tetap = GL 2160.04, subledger piutang = GL 1120;
  *  - Owner / Super Admin / Finance Manager dapat mengecualikan saldo kurang dengan alasan >= 10 karakter (tercatat di ApprovalOverride);
- *    pada pengecualian saldo yang ada dipakai sebesar yang tersedia (sisanya dibayar saat pengiriman);
- *  - pembatalan SO mengembalikan saldo yang dipakai (tipe `return`).
+ *    pada pengecualian saldo yang ada dicadangkan sebesar yang tersedia (sisanya dibayar saat pengiriman);
+ *  - pembatalan SO melepas cadangan (log `release`).
  */
 class SaleOrderCashierVerification
 {
@@ -46,9 +59,9 @@ class SaleOrderCashierVerification
             }
 
             $required = $locked->grandTotal();
-            // Saldo titip = Σ semua deposit aktif customer (setiap setoran / kelebihan bayar adalah baris deposit sendiri).
+            // Saldo titip bebas = Σ deposit aktif customer − cadangan COD SO lain yang belum direalisasi.
             $deposits = $this->activeDeposits($locked);
-            $balance = (float) $deposits->sum('remaining_amount');
+            $balance = $locked->customer_id ? Deposit::availableForCustomer((int) $locked->customer_id) : 0.0;
             $shortfall = max(0.0, round($required - $balance, 2));
             $overridden = false;
 
@@ -82,29 +95,17 @@ class SaleOrderCashierVerification
                 $overridden = true;
             }
 
+            // Cadangan dicatat pada deposit terlama yang masih bersaldo (log wajib menunjuk satu baris deposit); jumlahnya yang mengikat.
             $use = round(min($required, $balance), 2);
-            $left = $use;
-            foreach ($deposits as $deposit) {   // setoran terlama dipakai lebih dulu
-                if ($left <= 0.005) {
-                    break;
-                }
-                $take = round(min($left, (float) $deposit->remaining_amount), 2);
-                if ($take <= 0.005) {
-                    continue;
-                }
-                $deposit->update([
-                    'used_amount' => (float) $deposit->used_amount + $take,
-                    'remaining_amount' => round((float) $deposit->remaining_amount - $take, 2),
-                ]);
-                $deposit->depositLog()->create([
-                    'type' => 'use',
+            if ($use > 0.005) {
+                $deposits->first()->depositLog()->create([
+                    'type' => 'reserve',
                     'reference_type' => SaleOrder::class,
                     'reference_id' => $locked->id,
-                    'amount' => $take,
-                    'note' => "Dipakai untuk verifikasi kasir COD SO {$locked->so_number}".($overridden ? ' (PENGECUALIAN saldo kurang)' : '').(filled($note) ? " ({$note})" : ''),
-                    'created_by' => $actor?->getKey(),
+                    'amount' => $use,
+                    'note' => "Dicadangkan untuk verifikasi kasir COD SO {$locked->so_number}".($overridden ? ' (PENGECUALIAN saldo kurang)' : '').(filled($note) ? " ({$note})" : ''),
+                    'created_by' => $actor?->getKey() ?? $deposits->first()->created_by,
                 ]);
-                $left = round($left - $take, 2);
             }
 
             $locked->update([
@@ -131,7 +132,9 @@ class SaleOrderCashierVerification
     }
 
     /**
-     * Kembalikan saldo titip yang dipakai SO ini (dipanggil saat SO dibatalkan). Idempoten: hanya sisa (use − return) yang dikembalikan.
+     * Kembalikan saldo titip SO ini (dipanggil saat SO dibatalkan). Idempoten:
+     *  - cadangan yang belum direalisasi (reserve − release) dilepas;
+     *  - data lama (sebelum cadangan) yang sudah memotong saldo (use − return) dikembalikan ke baris depositnya.
      */
     public function refund(SaleOrder $saleOrder, ?User $actor = null): float
     {
@@ -142,7 +145,10 @@ class SaleOrderCashierVerification
                 return 0.0;
             }
 
-            // Kembalikan ke tiap baris deposit sebesar yang dipakai SO ini dari baris itu (use − return).
+            $released = $this->release($saleOrder, Deposit::reservedForCustomer((int) $saleOrder->customer_id, (int) $saleOrder->id),
+                "Dilepas: SO {$saleOrder->so_number} dibatalkan", $actor);
+
+            // Data lama: kembalikan ke tiap baris deposit sebesar yang dipakai SO ini dari baris itu (use − return).
             $deposits = Deposit::query()->where('from_model_type', $saleOrder->customer::class)->where('from_model_id', $saleOrder->customer_id)
                 ->orderBy('id')->lockForUpdate()->get();
             $total = 0.0;
@@ -170,7 +176,134 @@ class SaleOrderCashierVerification
                 $total += $refundable;
             }
 
-            return round($total, 2);
+            return round($total + $released, 2);
         });
+    }
+
+    /**
+     * Invoice SO COD terbit: realisasikan cadangan saldo titip SO menjadi Penerimaan Customer metode Deposit
+     * (Dr Deposit Pelanggan / Cr Piutang) sebesar min(cadangan, sisa piutang). Idempoten — cadangan yang sudah dilepas tidak dipakai lagi.
+     *
+     * @return float nominal piutang yang dilunasi dari deposit
+     *
+     * @throws \RuntimeException akun Deposit Pelanggan belum ada (invoice dibatalkan bersama transaksi pemanggil)
+     */
+    public function settleInvoice(Invoice $invoice): float
+    {
+        $saleOrder = $this->saleOrderOf($invoice);
+        if (! $saleOrder || ! $saleOrder->customer_id || ! $saleOrder->isCashierApproved()) {
+            return 0.0;
+        }
+
+        return DB::transaction(function () use ($invoice, $saleOrder) {
+            Deposit::query()->where('from_model_type', Customer::class)->where('from_model_id', $saleOrder->customer_id)->lockForUpdate()->get();
+            $reserved = Deposit::reservedForCustomer((int) $saleOrder->customer_id, (int) $saleOrder->id);
+            $ar = AccountReceivable::query()->where('invoice_id', $invoice->id)->lockForUpdate()->first();
+            $amount = round(min($reserved, (float) ($ar?->remaining ?? 0)), 2);
+            if ($amount <= 0.005) {
+                return 0.0;
+            }
+
+            $depositAccount = Deposit::customerDepositAccount();
+            if (! $depositAccount) {
+                throw new \RuntimeException('Akun Deposit Pelanggan ('.config('coa.customer_deposit').") belum ada; saldo titip COD SO {$saleOrder->so_number} tidak dapat melunasi invoice {$invoice->invoice_number}. Tambahkan akun tersebut lalu ulangi.");
+            }
+
+            $this->release($saleOrder, $amount, "Direalisasi: melunasi invoice {$invoice->invoice_number}", Auth::user());
+
+            $date = $invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->toDateString() : now()->toDateString();
+            $receipt = CustomerReceipt::create([
+                'customer_id' => (int) $saleOrder->customer_id,
+                'cabang_id' => $invoice->cabang_id,
+                'invoice_id' => $invoice->id,
+                'selected_invoices' => [$invoice->id],
+                'invoice_receipts' => [$invoice->id => $amount],
+                'payment_date' => $date,
+                'payment_method' => 'Deposit',
+                'coa_id' => $depositAccount->id,
+                'total_payment' => $amount,
+                'total_payment_idr' => $amount,
+                'notes' => "Otomatis: saldo titip COD SO {$saleOrder->so_number} (verifikasi kasir) melunasi invoice {$invoice->invoice_number}",
+                'status' => 'Draft',
+                'created_by' => Auth::id() ?? $saleOrder->cashier_approved_by,
+                'currency_id' => $invoice->currency_id,
+                'exchange_rate' => (float) ($invoice->exchange_rate ?: 1),
+            ]);
+            CustomerReceiptObserver::markArUpdatedInCreate($receipt->id);
+
+            CustomerReceiptItem::create([
+                'customer_receipt_id' => $receipt->id,
+                'invoice_id' => $invoice->id,
+                'method' => 'Deposit',
+                'amount' => $amount,
+                'amount_idr' => $amount,
+                'coa_id' => $depositAccount->id,
+                'payment_date' => $date,
+                'selected_invoices' => [$invoice->id],
+            ]);
+
+            $remaining = round(max(0.0, (float) $ar->remaining - $amount), 2);
+            $rate = (float) ($ar->exchange_rate ?: 1) ?: 1.0;
+            $paid = round((float) $ar->paid + $amount, 2);
+            $ar->update([
+                'paid' => $paid,
+                'remaining' => $remaining,
+                'paid_original' => round($paid / $rate, 4),
+                'remaining_original' => round($remaining / $rate, 4),
+                'status' => $remaining <= 0.005 ? PaymentStatus::PAID->value : $ar->status,
+            ]);
+            if ($remaining <= 0.005) {
+                $ar->ageingSchedule?->delete();
+            }
+
+            $invoice->forceFill(['status' => $remaining <= 0.005 ? Invoice::STATUS_PAID : Invoice::STATUS_PARTIALLY_PAID])->saveQuietly();
+            $receipt->update(['status' => $remaining <= 0.005 ? 'Paid' : 'Partial']);
+            app(LedgerPostingService::class)->postCustomerReceipt($receipt->fresh());
+
+            return $amount;
+        });
+    }
+
+    /** Lepas cadangan SO sebesar $amount (log `release` pada baris deposit tempat cadangan dicatat). */
+    private function release(SaleOrder $saleOrder, float $amount, string $note, ?User $actor): float
+    {
+        $amount = round($amount, 2);
+        if ($amount <= 0.005) {
+            return 0.0;
+        }
+
+        $reserveLog = DepositLog::query()->where('type', 'reserve')->where('reference_type', SaleOrder::class)
+            ->where('reference_id', $saleOrder->id)->orderBy('id')->firstOrFail();
+
+        DepositLog::create([
+            'deposit_id' => $reserveLog->deposit_id,
+            'type' => 'release',
+            'reference_type' => SaleOrder::class,
+            'reference_id' => $saleOrder->id,
+            'amount' => $amount,
+            'note' => $note,
+            'created_by' => $actor?->getKey() ?? $reserveLog->created_by,
+        ]);
+
+        return $amount;
+    }
+
+    /** SO sumber invoice penjualan: langsung (from_model SO) atau lewat Surat Jalan → DO → SO. */
+    private function saleOrderOf(Invoice $invoice): ?SaleOrder
+    {
+        if ($invoice->from_model_type === SaleOrder::class) {
+            return SaleOrder::withoutGlobalScopes()->find($invoice->from_model_id);
+        }
+
+        $sjIds = array_filter((array) ($invoice->surat_jalan_ids ?? []));
+        if ($sjIds === [] && $invoice->from_model_type === SuratJalan::class) {
+            $sjIds = [$invoice->from_model_id];
+        }
+        if ($sjIds === []) {
+            return null;
+        }
+
+        return SuratJalan::withoutGlobalScopes()->with('deliveryOrder.salesOrders')->whereIn('id', $sjIds)->get()
+            ->flatMap(fn (SuratJalan $sj) => $sj->deliveryOrder)->flatMap(fn ($do) => $do->salesOrders)->first();
     }
 }
