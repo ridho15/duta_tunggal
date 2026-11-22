@@ -461,8 +461,9 @@ class PurchaseReceiptService
 
         if (! $existingMovement) {
             $qtyAccepted = max(0, $item->qty_accepted ?? 0);
-            $unitPrice = (float) ($item->purchaseOrderItem?->unit_price ?? 0);
-            // Nilai gerakan stok = harga beli aktual; HPP rata-rata diperbarui dari gerakan ini (Ko Handy 21 Nov: averaging)
+            // Nilai gerakan stok = biaya perolehan (harga PO neto diskon, tanpa PPN, IDR) — sama dengan jurnal penerimaan;
+            // HPP rata-rata diperbarui dari gerakan ini (Ko Handy 21 Nov: averaging)
+            $unitPrice = (float) $this->resolveReceiptItemUnitCostInIdr($item)['unit_price_idr'];
             $amount = round($qtyAccepted * $unitPrice, 2);
 
             if ($qtyAccepted <= 0 || $unitPrice <= 0 || $amount <= 0) {
@@ -962,7 +963,8 @@ class PurchaseReceiptService
                 if ($qc->status == 1 && $receiptItem->qty_accepted > 0) {
                     $productService = app(\App\Services\ProductService::class);
 
-                    $unitCost = $poItem->unit_price ?? (float) ($receiptItem->product->cost_price ?? 0);
+                    // Biaya perolehan IDR (neto diskon, tanpa PPN) — konsisten dengan jurnal penerimaan.
+                    $unitCost = (float) $this->resolveReceiptItemUnitCostInIdr($receiptItem)['unit_price_idr'];
                     $value = round($unitCost * $receiptItem->qty_accepted, 2);
 
                     $meta = [

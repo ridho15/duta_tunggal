@@ -51,7 +51,7 @@ class Product extends Model
         'is_manufacture' => 'boolean',
         'is_raw_material' => 'boolean',
         'is_active' => 'boolean',
-        'cost_price' => 'decimal:2',
+        'cost_price' => 'decimal:4',
         'last_purchase_price' => 'decimal:2',
         'last_purchase_at' => 'date',
         'sell_price' => 'decimal:2',

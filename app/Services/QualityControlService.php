@@ -413,8 +413,9 @@ class QualityControlService
         // Get unit price in IDR based on model type
         if ($qualityControl->from_model_type === 'App\Models\PurchaseOrderItem') {
             $purchaseOrderCurrency = $fromModel?->purchaseOrder?->purchaseOrderCurrency?->firstWhere('currency_id', $fromModel?->currency_id);
+            // Biaya perolehan = harga PO neto diskon, tanpa PPN (DPP) — sama dengan baris faktur pembelian.
             $resolved = $this->resolveQcJournalUnitPriceIdr(
-                $fromModel?->unit_price ?? 0,
+                $fromModel ? JournalCurrencyAmountResolver::purchaseOrderItemDppUnitPrice($fromModel) : 0,
                 is_numeric($fromModel?->currency_id ?? null) ? (int) $fromModel->currency_id : null,
                 is_numeric($purchaseOrderCurrency?->nominal ?? null)
                     ? (float) $purchaseOrderCurrency->nominal
