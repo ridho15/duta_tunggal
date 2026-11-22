@@ -171,9 +171,9 @@ class VendorPaymentObserver
             $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($accountPayable->invoice);
             $totalReturnOriginal = round($totalReturnGrossIdr / $exchangeRate, 2);
 
-            // Tanpa min()/max(0): kelebihan retur atas hutang lunas tetap tercatat sebagai saldo debit (nota debit supplier),
-            // sama dengan saldo GL Hutang Dagang.
-            $newPaidOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
+            // Pembayaran tetap dibatasi total faktur (lebih bayar ditolak saat input), tetapi kredit RETUR tidak dibatasi:
+            // kelebihan retur atas hutang lunas tercatat sebagai saldo debit (nota debit supplier) = saldo GL Hutang Dagang.
+            $newPaidOriginal = min((float) $totalPaidOriginalForInvoice, $totalOriginal) + $totalReturnOriginal;
             $newRemainingOriginal = round($totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice, 4);
 
             $accountPayable->paid_original = $newPaidOriginal;
@@ -240,9 +240,9 @@ class VendorPaymentObserver
             $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($accountPayable->invoice);
             $totalReturnOriginal = round($totalReturnGrossIdr / $exchangeRate, 2);
 
-            // Tanpa min()/max(0): kelebihan retur atas hutang lunas tetap tercatat sebagai saldo debit (nota debit supplier),
-            // sama dengan saldo GL Hutang Dagang.
-            $newPaidOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
+            // Pembayaran tetap dibatasi total faktur (lebih bayar ditolak saat input), tetapi kredit RETUR tidak dibatasi:
+            // kelebihan retur atas hutang lunas tercatat sebagai saldo debit (nota debit supplier) = saldo GL Hutang Dagang.
+            $newPaidOriginal = min((float) $totalPaidOriginalForInvoice, $totalOriginal) + $totalReturnOriginal;
             $newRemainingOriginal = round($totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice, 4);
 
             $accountPayable->paid_original = $newPaidOriginal;

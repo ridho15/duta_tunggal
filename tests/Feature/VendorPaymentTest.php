@@ -97,6 +97,15 @@ class VendorPaymentTest extends TestCase
             'is_current' => true,
         ]);
 
+        // PPN Masukan: tanpa akun ini PPN faktur dulu terbaca sebagai "biaya lain" dan diposting ke COA id 1; kini posting
+        // biaya lain tanpa akun beban ditolak, jadi fixture wajib menyediakan akun PPN yang memang dipakai faktur.
+        ChartOfAccount::factory()->create([
+            'code' => '1170.06',
+            'name' => 'PPN Masukan',
+            'type' => 'Asset',
+            'is_current' => true,
+        ]);
+
         $this->depositCoa = ChartOfAccount::factory()->create([
             'code' => '1150.01',
             'name' => 'Uang Muka Pembelian',
