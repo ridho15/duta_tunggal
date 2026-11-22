@@ -491,3 +491,13 @@ it('K. rekonsiliasi akhir multi-dokumen: GL 1140.10 = nilai stok, GL 2110 = Σ A
         ->and(audUnbalanced())->toBe([]);
     expect(audStockValue($ctx))->toBe(audGl('1140.10'));
 });
+
+it('L. Laporan Stok tidak boleh mengecualikan stok yang dipesan (reserved) dari nilai persediaan', function () {
+    $ctx = audCtx();
+    [$po] = audPo($ctx, 10, 50000);
+    audReceive($ctx, $po, 10);
+    \App\Models\StockReservation::create(['product_id' => $ctx['product']->id, 'warehouse_id' => $ctx['warehouse']->id, 'quantity' => 3]);
+    audLog('L reserved', ['qty_available' => (float) \App\Models\InventoryStock::where('product_id', $ctx['product']->id)->sum('qty_available'),
+        'qty_reserved' => (float) \App\Models\InventoryStock::where('product_id', $ctx['product']->id)->sum('qty_reserved'), 'stock_value' => audStockValue($ctx), 'gl_1140.10' => audGl('1140.10')]);
+    expect(audStockValue($ctx))->toBe(audGl('1140.10'));
+});

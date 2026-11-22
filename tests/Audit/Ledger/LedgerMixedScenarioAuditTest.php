@@ -238,11 +238,21 @@ class LedgerMixedScenarioAuditTest extends TestCase
         fwrite(STDERR, '[AUDIT-7] Arus kas tidak langsung: '.json_encode($isec)." net={$cfi['net_change']} awal={$cfi['opening_balance']} akhir={$cfi['closing_balance']}\n");
 
         $glCashEnd = $gl['bank'] + $gl['kas'];
-        $this->assertEqualsWithDelta(4495000, $sec['operating'], 0.01, 'Arus kas operasi seharusnya +4.495.000');
-        $this->assertEqualsWithDelta(0, $sec['financing'], 0.01, 'Pembayaran hutang dagang bukan aktivitas pendanaan');
-        $this->assertEqualsWithDelta(4495000, $cf['net_change'], 0.01, 'Kenaikan kas = mutasi GL kas/bank');
-        $this->assertEqualsWithDelta(100000000, $cf['opening_balance'], 0.01, 'Kas awal = saldo awal GL kas/bank');
-        $this->assertEqualsWithDelta($glCashEnd, $cf['closing_balance'], 0.01, 'Kas akhir = saldo GL kas/bank');
-        $this->assertEqualsWithDelta($glCashEnd, $cfi['closing_balance'], 0.01, 'Kas akhir metode tidak langsung = saldo GL kas/bank');
+        $checks = [
+            'Arus kas operasi (seharusnya 4.495.000)' => [4495000, $sec['operating']],
+            'Arus kas pendanaan (bayar hutang dagang bukan pendanaan; seharusnya 0)' => [0, $sec['financing']],
+            'Kenaikan kas bersih metode langsung = mutasi GL kas/bank (4.495.000)' => [4495000, $cf['net_change']],
+            'Kas awal = saldo awal GL kas/bank (100.000.000)' => [100000000, $cf['opening_balance']],
+            'Kas akhir metode langsung = saldo GL kas/bank' => [$glCashEnd, $cf['closing_balance']],
+            'Kas akhir metode tidak langsung = saldo GL kas/bank' => [$glCashEnd, $cfi['closing_balance']],
+        ];
+        $mismatch = [];
+        foreach ($checks as $label => [$expected, $actual]) {
+            if (abs($expected - $actual) > 0.01) {
+                $mismatch[] = "{$label}: aktual={$actual} seharusnya={$expected}";
+            }
+        }
+        fwrite(STDERR, "[AUDIT-7] Selisih arus kas:\n  - ".implode("\n  - ", $mismatch)."\n");
+        $this->assertSame([], $mismatch, 'Laporan arus kas tidak cocok dengan buku besar kas/bank');
     }
 }
