@@ -117,8 +117,11 @@ test('CBT-BV-04: Mutation of transaction header amount auto-regenerates journals
     expect((float)$updatedEntries->sum('debit'))->toBe(275000.0);
     expect((float)$updatedEntries->sum('credit'))->toBe(275000.0);
 
-    // Hapus transaksi (soft delete) -> jurnal harus ikut terhapus via deleting hook
+    // Hapus transaksi (soft delete) -> VOID: jurnal asal dipertahankan + jurnal pembalik (kunci periode
+    // tidak boleh dilewati dengan menghapus jurnal massal), saldo bersih tiap akun = 0.
     $trx->delete();
-    expect(JournalEntry::where('source_type', CashBankTransaction::class)
-        ->where('source_id', $trx->id)->count())->toBe(0);
+    $afterVoid = JournalEntry::where('source_type', CashBankTransaction::class)->where('source_id', $trx->id)->get();
+    expect($afterVoid)->toHaveCount(4);
+    expect($afterVoid->where('is_reversal', true))->toHaveCount(2);
+    $afterVoid->groupBy('coa_id')->each(fn ($lines) => expect(round((float) $lines->sum('debit') - (float) $lines->sum('credit'), 2))->toBe(0.0));
 });

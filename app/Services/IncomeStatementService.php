@@ -165,6 +165,15 @@ class IncomeStatementService
     }
 
     /**
+     * Jurnal penutup (journal_type = closing) memindahkan saldo nominal ke Laba Ditahan; bukan pendapatan/beban
+     * periode. Bila ikut dihitung, L/R periode yang sudah ditutup menjadi 0. NULL journal_type tetap disertakan.
+     */
+    protected function excludeClosingEntries($query)
+    {
+        return $query->whereNull('journal_type')->orWhere('journal_type', '!=', 'closing');
+    }
+
+    /**
      * Get accounts by code prefix and type with calculated balances
      * 
      * @param string $codePrefix e.g., '4-', '5-1', '6-', '7-', '8-'
@@ -199,6 +208,7 @@ class IncomeStatementService
                 ->where('date', '>=', $startDate)
                 ->where('date', '<=', $endDate)
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->where(fn ($q) => $this->excludeClosingEntries($q))
                 ->groupBy('coa_id')
                 ->selectRaw('coa_id, SUM(debit) as total_debit, SUM(credit) as total_credit, COUNT(*) as entries_count')
                 ->get()
@@ -290,6 +300,7 @@ class IncomeStatementService
                 ->where('date', '>=', $startDate)
                 ->where('date', '<=', $endDate)
                 ->when($cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
+                ->where(fn ($q) => $this->excludeClosingEntries($q))
                 ->groupBy('coa_id')
                 ->selectRaw('coa_id, SUM(debit) as total_debit, SUM(credit) as total_credit, COUNT(*) as entries_count')
                 ->get()
@@ -673,6 +684,7 @@ class IncomeStatementService
         $query = JournalEntry::where('coa_id', $accountId)
             ->where('date', '>=', $startDate)
             ->where('date', '<=', $endDate)
+            ->where(fn ($q) => $this->excludeClosingEntries($q))
             ->with(['cabang', 'coa']);
 
         if ($cabangId) {

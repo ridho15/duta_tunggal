@@ -409,8 +409,12 @@ class OperationalAuditStage4Test extends TestCase
         $this->assertEquals('Teller bank tutup sebelum setoran masuk, uang kas kembali ke brankas', $transfer->cancel_reason);
         $this->assertEquals($this->superAdmin->id, $transfer->cancelled_by);
 
-        // Journal entries cleanly removed
-        $this->assertEquals(0, $transfer->journalEntries()->count());
+        // Pembatalan = VOID: jurnal asal dipertahankan + jurnal pembalik, saldo bersih tiap akun = 0.
+        $lines = $transfer->journalEntries()->get();
+        $this->assertTrue($lines->where('is_reversal', true)->isNotEmpty());
+        foreach ($lines->groupBy('coa_id') as $coaLines) {
+            $this->assertEqualsWithDelta(0, (float) $coaLines->sum('debit') - (float) $coaLines->sum('credit'), 0.01);
+        }
     }
 
     public function test_accounting_period_reopen_cleans_closing_entries_and_shows_accurate_message(): void

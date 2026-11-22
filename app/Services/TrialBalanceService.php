@@ -64,8 +64,10 @@ class TrialBalanceService
                 ->keyBy('coa_id');
 
         // Build enriched account rows
-        $rows = $accounts->map(function (ChartOfAccount $account) use ($beginningMap, $periodMap) {
-            $opening = (float) ($account->opening_balance ?? 0);
+        // Saldo awal COA (opening_balance) tidak berdimensi cabang → hanya di konsolidasi & cabang atribusinya.
+        $includeOpening = BalanceSheetService::includesOpeningBalance($cabangId);
+        $rows = $accounts->map(function (ChartOfAccount $account) use ($beginningMap, $periodMap, $includeOpening) {
+            $opening = $includeOpening ? (float) ($account->opening_balance ?? 0) : 0.0;
 
             $bRow = $beginningMap->get($account->id);
             $preBegDebit  = (float) ($bRow->total_debit  ?? 0);
@@ -96,6 +98,8 @@ class TrialBalanceService
                 'type'              => $account->type,
                 'normal_balance'    => $isDebitNormal ? 'D' : 'C',
                 'beginning_balance' => $beginningBalance,
+                // Saldo awal dalam sisi debit (+) / kredit (−) untuk cek keseimbangan saldo awal.
+                'beginning_signed'  => $isDebitNormal ? $beginningBalance : -$beginningBalance,
                 'period_debit'      => $periodDebit,
                 'period_credit'     => $periodCredit,
                 'ending_balance'    => $endingBalance,
@@ -130,7 +134,10 @@ class TrialBalanceService
         $grandEnding    = $ordered->sum('ending_balance');
 
         $difference = round($grandDebit - $grandCredit, 2);
-        $isBalanced = abs($difference) < 0.01;
+        // Saldo awal (opening_balance + mutasi sebelum periode) juga harus seimbang: Σ debit = Σ kredit.
+        // Dihitung dari SEMUA baris (bukan hanya yang ditampilkan) agar filter saldo nol tidak menyamarkan selisih.
+        $openingDifference = round((float) $rows->sum('beginning_signed'), 2);
+        $isBalanced = abs($difference) < 0.01 && abs($openingDifference) < 0.01;
 
         return [
             'period' => [
@@ -140,6 +147,7 @@ class TrialBalanceService
             'rows'          => $ordered->values(),
             'is_balanced'   => $isBalanced,
             'difference'    => $difference,
+            'opening_difference' => $openingDifference,
             'grand_totals'  => [
                 'beginning_balance' => $grandBeginning,
                 'period_debit'      => $grandDebit,
@@ -147,6 +155,7 @@ class TrialBalanceService
                 'ending_balance'    => $grandEnding,
                 'is_balanced'       => $isBalanced,
                 'difference'        => $difference,
+                'opening_difference' => $openingDifference,
             ],
         ];
     }

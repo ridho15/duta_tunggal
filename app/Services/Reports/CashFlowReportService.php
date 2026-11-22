@@ -2,20 +2,49 @@
 
 namespace App\Services\Reports;
 
-use App\Models\Asset;
-use App\Models\CashBankTransaction;
-use App\Models\CustomerReceiptItem;
+use App\Models\ChartOfAccount;
+use App\Models\Customer;
+use App\Models\Deposit;
+use App\Models\JournalEntry;
 use App\Models\Reports\CashFlowCashAccount;
-use App\Models\Reports\CashFlowItem;
 use App\Models\Reports\CashFlowSection;
+use App\Models\Supplier;
+use App\Services\BalanceSheetService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
+/**
+ * Laporan Arus Kas (PSAK 2) yang DIREKONSILIASI ke Buku Besar.
+ *
+ *  - Kas & setara kas = COA bertanda is_cash_bank ∪ COA berawalan prefix report_cash_flow_cash_accounts
+ *    (fallback 1111/1112 bila keduanya kosong).
+ *  - Kas awal  = opening_balance COA kas (konsolidasi / cabang atribusi saldo awal, lihat
+ *                BalanceSheetService::openingBalanceCabangId)
+ *                + Σ(debit − kredit) jurnal kas sebelum tanggal awal.
+ *  - Kas akhir = kas awal + Σ(debit − kredit) jurnal kas dalam periode → kenaikan bersih kas = Δ saldo GL kas.
+ *  - Metode langsung: tiap voucher jurnal yang menyentuh kas diklasifikasikan berdasarkan AKUN LAWAN-nya
+ *    (operasi / investasi / pendanaan) memakai konfigurasi report_cash_flow_* (prefix terpanjang menang),
+ *    lalu sifat akun (ekuitas → pendanaan, aset tidak lancar → investasi, kewajiban jangka panjang → pendanaan,
+ *    selebihnya → operasi). Transfer antar akun kas tidak menghasilkan arus kas (kecuali biayanya).
+ *  - Metode tidak langsung: laba bersih + penyesuaian non-kas + perubahan modal kerja; investasi & pendanaan
+ *    dihitung dari GL dengan klasifikasi yang sama dengan metode langsung.
+ */
 class CashFlowReportService
 {
-    private const CASH_IN_TYPES = ['cash_in', 'bank_in'];
-    private const CASH_OUT_TYPES = ['cash_out', 'bank_out'];
+    private const SECTION_LABELS = [
+        'operating' => 'Aktivitas Operasi',
+        'investing' => 'Aktivitas Investasi',
+        'financing' => 'Aktivitas Pendanaan',
+    ];
+
+    private const FALLBACK_ITEMS = [
+        'operating' => ['key' => 'other_operating', 'label' => 'Arus Kas Operasi Lainnya'],
+        'investing' => ['key' => 'other_investing', 'label' => 'Arus Kas Investasi Lainnya'],
+        'financing' => ['key' => 'other_financing', 'label' => 'Arus Kas Pendanaan Lainnya'],
+    ];
+
+    private const DEPRECIATION_PREFIXES = ['631', '632'];
 
     /**
      * Runtime filters injected from the report UI.
@@ -23,6 +52,8 @@ class CashFlowReportService
     private array $filters = [];
 
     private ?array $cashAccountPrefixes = null;
+
+    private ?array $cashCoaIds = null;
 
     /**
      * Generate cash flow data for a period using the direct or indirect method.
@@ -33,118 +64,431 @@ class CashFlowReportService
         $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->startOfMonth();
         $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfMonth();
         $this->filters = $filters;
+        $this->cashAccountPrefixes = null;
+        $this->cashCoaIds = null;
 
         if ($method === 'indirect') {
             return $this->generateIndirectMethod($start, $end);
         }
 
-        // Default to direct method
         return $this->generateDirectMethod($start, $end);
     }
 
-    /**
-     * Generate cash flow data using the direct method.
-     */
     private function generateDirectMethod(Carbon $start, Carbon $end): array
     {
-        $sections = CashFlowSection::query()
-            ->with(['items' => function ($query) {
-                $query->with(['prefixes', 'sources'])
-                    ->orderBy('sort_order');
-            }])
-            ->orderBy('sort_order')
-            ->get()
-            ->map(function (CashFlowSection $section) use ($start, $end) {
-                return $this->buildSection($section, $start, $end);
-            })
-            ->values();
+        $sections = $this->buildDirectSections($start, $end);
 
-        $netChange = round($sections->sum('total'), 2);
-        $openingBalance = $this->getOpeningBalance($start);
-        $closingBalance = round($openingBalance + $netChange, 2);
+        return $this->buildReport('direct', $sections, $start, $end);
+    }
+
+    private function generateIndirectMethod(Carbon $start, Carbon $end): array
+    {
+        $branches = array_values(array_filter((array) ($this->filters['branches'] ?? [])));
+        $incomeStatement = app(\App\Services\IncomeStatementService::class)->generate([
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'cabang_id' => count($branches) === 1 ? (int) $branches[0] : null,
+        ]);
+
+        $netIncome = round((float) ($incomeStatement['net_profit'] ?? 0), 2);
+        $direct = collect($this->buildDirectSections($start, $end))->keyBy('key');
+
+        $items = [[
+            'key' => 'net_income',
+            'label' => 'Laba Bersih',
+            'amount' => $netIncome,
+            'metadata' => [],
+        ]];
+        foreach ($this->calculateIndirectAdjustments($start, $end) as $adjustment) {
+            $items[] = $adjustment;
+        }
+
+        // Selisih antara arus kas operasi menurut GL dan (laba bersih + penyesuaian yang dirinci) adalah
+        // perubahan akun operasi lain (uang muka, pajak, biaya YMH dibayar, akrual non-kas, dsb.).
+        $operatingGl = (float) ($direct->get('operating')['total'] ?? 0);
+        $other = round($operatingGl - collect($items)->sum('amount'), 2);
+        if (abs($other) >= 0.01) {
+            $items[] = [
+                'key' => 'other_operating_adjustments',
+                'label' => 'Penyesuaian Non-Kas & Perubahan Aset/Kewajiban Operasi Lainnya',
+                'amount' => $other,
+                'metadata' => [],
+            ];
+        }
+
+        $sections = [[
+            'key' => 'operating',
+            'label' => self::SECTION_LABELS['operating'],
+            'items' => $items,
+            'total' => round(collect($items)->sum('amount'), 2),
+        ]];
+
+        foreach ($direct as $key => $section) {
+            if ($key !== 'operating') {
+                $sections[] = $section;
+            }
+        }
+
+        return $this->buildReport('indirect', $sections, $start, $end);
+    }
+
+    private function buildReport(string $method, array $sections, Carbon $start, Carbon $end): array
+    {
+        [$opening, $closing] = $this->cashBalances($start, $end);
+        $netChange = round($closing - $opening, 2);
+        $sectionsTotal = round(collect($sections)->sum('total'), 2);
 
         return [
             'period' => [
                 'start' => $start->toDateString(),
                 'end' => $end->toDateString(),
             ],
-            'method' => 'direct',
-            'sections' => $sections->toArray(),
+            'method' => $method,
+            'sections' => array_values($sections),
             'net_change' => $netChange,
-            'opening_balance' => round($openingBalance, 2),
-            'closing_balance' => $closingBalance,
+            'opening_balance' => $opening,
+            'closing_balance' => $closing,
+            'reconciliation' => [
+                'gl_net_change' => $netChange,
+                'sections_total' => $sectionsTotal,
+                'difference' => round($netChange - $sectionsTotal, 2),
+            ],
         ];
     }
 
     /**
-     * Generate cash flow data using the indirect method.
+     * Saldo kas awal & akhir dari buku besar kas/bank.
+     *
+     * @return array{0: float, 1: float}
      */
-    private function generateIndirectMethod(Carbon $start, Carbon $end): array
+    private function cashBalances(Carbon $start, Carbon $end): array
     {
-        // Get net income from income statement
-        $incomeStatement = app(\App\Services\IncomeStatementService::class)->generate([
-            'start_date' => $start->toDateString(),
-            'end_date' => $end->toDateString(),
-            'cabang_id' => $this->filters['branches'] ?? null,
-        ]);
-
-        $netIncome = $incomeStatement['net_profit'] ?? 0;
-
-        // Operating Activities Section (Indirect Method)
-        $operatingActivities = [
-            'key' => 'operating',
-            'label' => 'Aktivitas Operasi',
-            'items' => [
-                [
-                    'key' => 'net_income',
-                    'label' => 'Laba Bersih',
-                    'amount' => round($netIncome, 2),
-                    'metadata' => [],
-                ],
-            ],
-            'total' => round($netIncome, 2),
-        ];
-
-        // Add back non-cash expenses and adjust for working capital changes
-        $adjustments = $this->calculateIndirectAdjustments($start, $end);
-        foreach ($adjustments as $adjustment) {
-            $operatingActivities['items'][] = $adjustment;
-            $operatingActivities['total'] += $adjustment['amount'];
+        $cashIds = $this->cashCoaIds();
+        if (empty($cashIds)) {
+            return [0.0, 0.0];
         }
 
-        $operatingActivities['total'] = round($operatingActivities['total'], 2);
+        $openingBalance = BalanceSheetService::includesOpeningBalance($this->filters['branches'] ?? null)
+            ? (float) ChartOfAccount::whereIn('id', $cashIds)->sum('opening_balance')
+            : 0.0;
 
-        // For now, keep investing and financing sections simple (could be enhanced later)
-        $investingActivities = [
-            'key' => 'investing',
-            'label' => 'Aktivitas Investasi',
-            'items' => [],
-            'total' => 0,
-        ];
+        $before = $this->journalQuery()
+            ->whereIn('journal_entries.coa_id', $cashIds)
+            ->where('journal_entries.date', '<', $start->toDateString())
+            ->selectRaw('COALESCE(SUM(journal_entries.debit), 0) - COALESCE(SUM(journal_entries.credit), 0) as net')
+            ->value('net');
 
-        $financingActivities = [
-            'key' => 'financing',
-            'label' => 'Aktivitas Pendanaan',
-            'items' => [],
-            'total' => 0,
-        ];
+        $during = $this->journalQuery()
+            ->whereIn('journal_entries.coa_id', $cashIds)
+            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('COALESCE(SUM(journal_entries.debit), 0) - COALESCE(SUM(journal_entries.credit), 0) as net')
+            ->value('net');
 
-        $sections = [$operatingActivities, $investingActivities, $financingActivities];
-        $netChange = round($sections[0]['total'] + $sections[1]['total'] + $sections[2]['total'], 2);
-        $openingBalance = $this->getOpeningBalance($start);
-        $closingBalance = round($openingBalance + $netChange, 2);
+        $opening = round($openingBalance + (float) $before, 2);
 
-        return [
-            'period' => [
-                'start' => $start->toDateString(),
-                'end' => $end->toDateString(),
-            ],
-            'method' => 'indirect',
-            'sections' => $sections,
-            'net_change' => $netChange,
-            'opening_balance' => round($openingBalance, 2),
-            'closing_balance' => $closingBalance,
-        ];
+        return [$opening, round($opening + (float) $during, 2)];
+    }
+
+    /**
+     * Seksi metode langsung: mutasi kas per voucher dialokasikan ke akun lawannya.
+     */
+    private function buildDirectSections(Carbon $start, Carbon $end): array
+    {
+        $config = CashFlowSection::query()
+            ->with(['items' => fn ($q) => $q->with(['prefixes', 'sources'])->orderBy('sort_order')])
+            ->orderBy('sort_order')
+            ->get();
+
+        $sections = [];
+        $prefixRules = [];
+        $resolverRules = [];
+
+        foreach ($config as $section) {
+            $sections[$section->key] = ['key' => $section->key, 'label' => $section->label, 'items' => []];
+
+            foreach ($section->items as $item) {
+                $sections[$section->key]['items'][$item->key] = [
+                    'key' => $item->key,
+                    'label' => $item->label,
+                    'amount' => 0.0,
+                    'metadata' => [
+                        'sources' => $item->sources->sortBy('sort_order')->pluck('label')->values()->toArray(),
+                        'period' => ['start' => $start->toDateString(), 'end' => $end->toDateString()],
+                    ],
+                    'coa' => [],
+                ];
+
+                foreach ($item->prefixes->where('is_asset', false) as $prefix) {
+                    $prefixRules[] = [(string) $prefix->prefix, $section->key, $item->key];
+                }
+
+                if ($item->resolver) {
+                    $resolverRules[$item->resolver] = [$section->key, $item->key];
+                }
+            }
+        }
+
+        foreach (self::SECTION_LABELS as $key => $label) {
+            $sections[$key] ??= ['key' => $key, 'label' => $label, 'items' => []];
+        }
+
+        usort($prefixRules, fn ($a, $b) => strlen($b[0]) <=> strlen($a[0]));
+
+        $allocations = $this->allocateCashMovements($start, $end);
+        $coas = ChartOfAccount::withTrashed()
+            ->whereIn('id', collect($allocations)->pluck('coa_id')->filter()->unique()->all())
+            ->get()
+            ->keyBy('id');
+        $depositParties = $this->depositParties(collect($allocations));
+
+        foreach ($allocations as $allocation) {
+            $coa = $allocation['coa_id'] ? $coas->get($allocation['coa_id']) : null;
+            $party = $allocation['source_type'] === Deposit::class ? ($depositParties[$allocation['source_id']] ?? null) : null;
+            [$sectionKey, $itemKey] = $this->classify($coa, $party, $prefixRules, $resolverRules);
+
+            if (! isset($sections[$sectionKey]['items'][$itemKey])) {
+                $fallback = self::FALLBACK_ITEMS[$sectionKey];
+                $sections[$sectionKey]['items'][$itemKey] = [
+                    'key' => $fallback['key'],
+                    'label' => $fallback['label'],
+                    'amount' => 0.0,
+                    'metadata' => [
+                        'sources' => ['Buku Besar Kas & Bank'],
+                        'period' => ['start' => $start->toDateString(), 'end' => $end->toDateString()],
+                    ],
+                    'coa' => [],
+                    'is_fallback' => true,
+                ];
+            }
+
+            $sections[$sectionKey]['items'][$itemKey]['amount'] += $allocation['amount'];
+            $coaKey = $coa?->id ?? 0;
+            $sections[$sectionKey]['items'][$itemKey]['coa'][$coaKey] ??= [
+                'coa_code' => $coa?->code,
+                'coa_name' => $coa?->name ?? 'Tanpa akun lawan',
+                'inflow' => 0.0,
+                'outflow' => 0.0,
+            ];
+            $sections[$sectionKey]['items'][$itemKey]['coa'][$coaKey][$allocation['amount'] >= 0 ? 'inflow' : 'outflow'] += $allocation['amount'];
+        }
+
+        $result = [];
+        foreach ($sections as $section) {
+            $items = [];
+            foreach ($section['items'] as $item) {
+                $amount = round($item['amount'], 2);
+                if (! empty($item['is_fallback']) && abs($amount) < 0.01) {
+                    continue;
+                }
+
+                $coaRows = collect($item['coa']);
+                $item['metadata']['breakdown'] = [
+                    'inflow' => $coaRows->filter(fn ($r) => abs($r['inflow']) >= 0.005)
+                        ->map(fn ($r) => ['coa_code' => $r['coa_code'], 'coa_name' => $r['coa_name'], 'amount' => round($r['inflow'], 2)])
+                        ->values()->toArray(),
+                    'outflow' => $coaRows->filter(fn ($r) => abs($r['outflow']) >= 0.005)
+                        ->map(fn ($r) => ['coa_code' => $r['coa_code'], 'coa_name' => $r['coa_name'], 'amount' => round($r['outflow'], 2)])
+                        ->values()->toArray(),
+                ];
+
+                $items[] = [
+                    'key' => $item['key'],
+                    'label' => $item['label'],
+                    'amount' => $amount,
+                    'metadata' => $item['metadata'],
+                ];
+            }
+
+            $result[] = [
+                'key' => $section['key'],
+                'label' => $section['label'],
+                'items' => $items,
+                'total' => round(collect($items)->sum('amount'), 2),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Alokasikan mutasi kas tiap voucher ke baris akun lawannya (proporsional terhadap sisi lawan).
+     *
+     * @return array<int, array{coa_id: ?int, source_type: ?string, source_id: ?int, amount: float}>
+     */
+    private function allocateCashMovements(Carbon $start, Carbon $end): array
+    {
+        $cashIds = $this->cashCoaIds();
+        if (empty($cashIds)) {
+            return [];
+        }
+
+        $range = [$start->toDateString(), $end->toDateString()];
+        $columns = ['journal_entries.id', 'journal_entries.coa_id', 'journal_entries.date', 'journal_entries.reference',
+            'journal_entries.source_type', 'journal_entries.source_id', 'journal_entries.debit', 'journal_entries.credit'];
+
+        $cashLines = $this->journalQuery()
+            ->whereIn('journal_entries.coa_id', $cashIds)
+            ->whereBetween('journal_entries.date', $range)
+            ->get($columns);
+
+        if ($cashLines->isEmpty()) {
+            return [];
+        }
+
+        $references = $cashLines->whereNull('source_type')->pluck('reference')->filter()->unique()->values();
+        $sources = $cashLines->whereNotNull('source_type')->groupBy('source_type')
+            ->map(fn (Collection $lines) => $lines->pluck('source_id')->filter()->unique()->values());
+
+        $counterLines = collect();
+        foreach ($references->chunk(1000) as $chunk) {
+            $counterLines = $counterLines->merge($this->journalQuery()
+                ->whereNotIn('journal_entries.coa_id', $cashIds)
+                ->whereBetween('journal_entries.date', $range)
+                ->whereNull('journal_entries.source_type')
+                ->whereIn('journal_entries.reference', $chunk->all())
+                ->get($columns));
+        }
+        foreach ($sources as $sourceType => $ids) {
+            foreach ($ids->chunk(1000) as $chunk) {
+                $counterLines = $counterLines->merge($this->journalQuery()
+                    ->whereNotIn('journal_entries.coa_id', $cashIds)
+                    ->whereBetween('journal_entries.date', $range)
+                    ->where('journal_entries.source_type', $sourceType)
+                    ->whereIn('journal_entries.source_id', $chunk->all())
+                    ->get($columns));
+            }
+        }
+
+        $counterByVoucher = $counterLines->groupBy(fn ($line) => $this->voucherKey($line));
+        $allocations = [];
+
+        foreach ($cashLines->groupBy(fn ($line) => $this->voucherKey($line)) as $key => $lines) {
+            $cashNet = (float) $lines->sum('debit') - (float) $lines->sum('credit');
+            if (abs($cashNet) < 0.005) {
+                continue; // transfer antar akun kas / voucher kas yang saling meniadakan
+            }
+
+            $counters = $counterByVoucher->get($key, collect());
+            $counterNet = (float) $counters->sum('credit') - (float) $counters->sum('debit');
+
+            if ($counters->isEmpty() || abs($counterNet) < 0.005) {
+                $allocations[] = ['coa_id' => null, 'source_type' => $lines->first()->source_type, 'source_id' => $lines->first()->source_id, 'amount' => $cashNet];
+
+                continue;
+            }
+
+            $ratio = $cashNet / $counterNet;
+            foreach ($counters as $counter) {
+                $contribution = ((float) $counter->credit - (float) $counter->debit) * $ratio;
+                if (abs($contribution) < 0.000001) {
+                    continue;
+                }
+                $allocations[] = [
+                    'coa_id' => (int) $counter->coa_id,
+                    'source_type' => $counter->source_type,
+                    'source_id' => $counter->source_id,
+                    'amount' => $contribution,
+                ];
+            }
+        }
+
+        return $allocations;
+    }
+
+    /**
+     * Satu voucher = satu dokumen sumber pada satu tanggal; jurnal manual = referensi + tanggal.
+     */
+    private function voucherKey(JournalEntry $line): string
+    {
+        $date = Carbon::parse($line->date)->toDateString();
+
+        if ($line->source_type && $line->source_id) {
+            return "S|{$line->source_type}|{$line->source_id}|{$date}";
+        }
+
+        return $line->reference ? "R|{$line->reference}|{$date}" : "L|{$line->id}";
+    }
+
+    /**
+     * @return array{0: string, 1: string} [section key, item key]
+     */
+    private function classify(?ChartOfAccount $coa, ?string $depositParty, array $prefixRules, array $resolverRules): array
+    {
+        if ($depositParty === 'customer' && isset($resolverRules['customerDeposits'])) {
+            return $resolverRules['customerDeposits'];
+        }
+        if ($depositParty === 'supplier' && isset($resolverRules['supplierDeposits'])) {
+            return $resolverRules['supplierDeposits'];
+        }
+
+        if (! $coa) {
+            return ['operating', self::FALLBACK_ITEMS['operating']['key']];
+        }
+
+        $code = (string) $coa->code;
+        foreach ($prefixRules as [$prefix, $sectionKey, $itemKey]) {
+            if ($prefix !== '' && str_starts_with($code, $prefix)) {
+                return [$sectionKey, $itemKey];
+            }
+        }
+
+        if (isset($resolverRules['salesReceipts']) && ($coa->type === 'Revenue' || $this->isReceivable($code))) {
+            return $resolverRules['salesReceipts'];
+        }
+
+        $section = $this->sectionByNature($coa);
+
+        return [$section, self::FALLBACK_ITEMS[$section]['key']];
+    }
+
+    /**
+     * Klasifikasi bawaan berdasarkan sifat akun lawan bila tidak ada konfigurasi yang cocok.
+     */
+    private function sectionByNature(ChartOfAccount $coa): string
+    {
+        $isCurrent = $coa->is_current;
+        if ($isCurrent === null && in_array($coa->type, ['Asset', 'Liability'], true)) {
+            $isCurrent = BalanceSheetService::inferIsCurrent((string) $coa->code, $coa->type);
+        }
+
+        return match ($coa->type) {
+            'Equity' => 'financing',
+            'Contra Asset' => 'investing',
+            'Asset' => $isCurrent !== null && ! (bool) $isCurrent ? 'investing' : 'operating',
+            'Liability' => $isCurrent !== null && ! (bool) $isCurrent ? 'financing' : 'operating',
+            default => 'operating',
+        };
+    }
+
+    private function isReceivable(string $code): bool
+    {
+        foreach ($this->getConfiguredAccountPrefixes('accounts_receivable', ['1120', '1121', '1122']) as $prefix) {
+            if (str_starts_with($code, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string> deposit id → 'customer' | 'supplier'
+     */
+    private function depositParties(Collection $allocations): array
+    {
+        $ids = $allocations->where('source_type', Deposit::class)->pluck('source_id')->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return Deposit::withoutGlobalScopes()->whereIn('id', $ids->all())->pluck('from_model_type', 'id')
+            ->map(fn ($type) => match ($type) {
+                Customer::class => 'customer',
+                Supplier::class => 'supplier',
+                default => null,
+            })
+            ->filter()
+            ->toArray();
     }
 
     /**
@@ -154,67 +498,34 @@ class CashFlowReportService
     {
         $adjustments = [];
 
-        // Add back depreciation expense (non-cash)
-        $depreciationExpense = $this->sumJournalByPrefixes(['6311', '6312', '6313', '6314'], $start, $end, 'debit');
-        if ($depreciationExpense > 0) {
+        // Beban penyusutan & amortisasi (non-kas) ditambahkan kembali.
+        $depreciation = $this->sumMovementByPrefixes(self::DEPRECIATION_PREFIXES, $start, $end);
+        if (abs($depreciation) >= 0.01) {
             $adjustments[] = [
                 'key' => 'add_depreciation',
                 'label' => 'Penambahan Beban Penyusutan',
-                'amount' => round($depreciationExpense, 2),
+                'amount' => round($depreciation, 2),
                 'metadata' => [],
             ];
         }
 
-        // Adjust for changes in accounts receivable (working capital)
-        $arChange = $this->calculateWorkingCapitalChange(
-            $this->getConfiguredAccountPrefixes('accounts_receivable', ['1120']),
-            $start,
-            $end
-        );
-        if ($arChange !== 0) {
-            $adjustments[] = [
-                'key' => 'ar_change',
-                'label' => 'Penurunan/Penambahan Piutang',
-                'amount' => round($arChange, 2),
-                'metadata' => [],
-            ];
-        }
-
-        // Adjust for changes in inventory (working capital)
-        $inventoryChange = $this->calculateWorkingCapitalChange(
-            $this->getConfiguredAccountPrefixes('inventory', ['1140', '1140.01']),
-            $start,
-            $end
-        );
-        if ($inventoryChange !== 0) {
-            $adjustments[] = [
-                'key' => 'inventory_change',
-                'label' => 'Penurunan/Penambahan Persediaan',
-                'amount' => round($inventoryChange, 2),
-                'metadata' => [],
-            ];
-        }
-
-        // Adjust for changes in accounts payable (working capital)
-        $apChange = $this->calculateWorkingCapitalChange(
-            $this->getConfiguredAccountPrefixes('accounts_payable', ['2110']),
-            $start,
-            $end
-        );
-        if ($apChange !== 0) {
-            $adjustments[] = [
-                'key' => 'ap_change',
-                'label' => 'Kenaikan/Penurunan Hutang',
-                'amount' => round($apChange, 2),
-                'metadata' => [],
-            ];
+        foreach ([
+            ['ar_change', 'Penurunan/Penambahan Piutang', 'accounts_receivable', ['1120']],
+            ['inventory_change', 'Penurunan/Penambahan Persediaan', 'inventory', ['1140', '1140.01']],
+            ['ap_change', 'Kenaikan/Penurunan Hutang', 'accounts_payable', ['2110']],
+        ] as [$key, $label, $configKey, $fallbacks]) {
+            $change = $this->calculateWorkingCapitalChange($this->getConfiguredAccountPrefixes($configKey, $fallbacks), $start, $end);
+            if (abs($change) >= 0.01) {
+                $adjustments[] = ['key' => $key, 'label' => $label, 'amount' => round($change, 2), 'metadata' => []];
+            }
         }
 
         return $adjustments;
     }
 
     /**
-     * Calculate working capital change for a COA prefix.
+     * Perubahan modal kerja: saldo awal − saldo akhir (sisi debit). Kenaikan aset = kas berkurang,
+     * kenaikan kewajiban = kas bertambah.
      */
     private function calculateWorkingCapitalChange(array $prefixes, Carbon $start, Carbon $end): float
     {
@@ -222,430 +533,85 @@ class CashFlowReportService
             return 0.0;
         }
 
-        // Get beginning balance (end of previous period)
-        $beginningBalance = $this->getAccountBalanceAtDate($prefixes, $start->copy()->subDay());
-
-        // Get ending balance
-        $endingBalance = $this->getAccountBalanceAtDate($prefixes, $end);
-
-        // Change = Ending - Beginning
-        // For cash flow, we want to see how this affects cash:
-        // - Decrease in AR/AP = +cash (collected more receivables, paid more payables)
-        // - Increase in AR/AP = -cash (extended more credit, received less payment)
-        return $beginningBalance - $endingBalance;
+        return -1 * $this->sumMovementByPrefixes($prefixes, $start, $end);
     }
 
     /**
-     * Get account balance at a specific date for given prefix.
+     * Σ(debit − kredit) jurnal non-penutup dalam periode untuk akun berawalan salah satu prefix.
      */
-    private function getAccountBalanceAtDate(array $prefixes, Carbon $date): float
+    private function sumMovementByPrefixes(array $prefixes, Carbon $start, Carbon $end): float
     {
-        if (empty($prefixes)) {
-            return 0.0;
-        }
-
-        $query = \App\Models\JournalEntry::query()
+        $query = $this->journalQuery()
             ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
-            ->where(function (Builder $query) use ($prefixes) {
+            ->where(function (Builder $q) use ($prefixes) {
                 foreach ($prefixes as $prefix) {
-                    $query->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
+                    $q->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
                 }
             })
-            ->where('journal_entries.date', '<=', $date);
+            ->where(fn (Builder $q) => $q->whereNull('journal_entries.journal_type')->orWhere('journal_entries.journal_type', '!=', 'closing'))
+            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()]);
 
-        $this->applyTransactionFilters($query);
-
-        $debits = (float) $query->sum('journal_entries.debit');
-        $credits = (float) $query->sum('journal_entries.credit');
-
-        return $debits - $credits;
+        return (float) $query->selectRaw('COALESCE(SUM(journal_entries.debit), 0) - COALESCE(SUM(journal_entries.credit), 0) as net')->value('net');
     }
 
-    private function buildSection(CashFlowSection $section, Carbon $start, Carbon $end): array
+    private function journalQuery(): Builder
     {
-        $items = [];
-        $total = 0.0;
+        $query = JournalEntry::query();
 
-        foreach ($section->items as $item) {
-            $amount = $this->resolveAmount($item, $start, $end);
-            $metadata = $this->buildMetadata($item, $start, $end);
-
-            if ($item->include_assets) {
-                $assetAdjustment = $this->sumAssetsByPrefixes(
-                    $item->prefixes->where('is_asset', true)->pluck('prefix')->toArray(),
-                    $start,
-                    $end,
-                    $item->type
-                );
-
-                if ($assetAdjustment !== 0.0) {
-                    $amount += $assetAdjustment;
-                    $metadata['asset_adjustment'] = round($assetAdjustment, 2);
-                }
-            }
-
-            $amount = round($amount, 2);
-            $total += $amount;
-
-            $items[] = [
-                'key' => $item->key,
-                'label' => $item->label,
-                'amount' => $amount,
-                'metadata' => $metadata,
-            ];
+        if ($this->hasBranchFilter()) {
+            $query->whereIn('journal_entries.cabang_id', array_values(array_filter((array) $this->filters['branches'])));
         }
 
-        return [
-            'key' => $section->key,
-            'label' => $section->label,
-            'items' => $items,
-            'total' => round($total, 2),
-        ];
-    }
-
-    private function resolveAmount(CashFlowItem $item, Carbon $start, Carbon $end): float
-    {
-        return match ($item->resolver) {
-            'salesReceipts' => $this->sumSalesReceipts($start, $end),
-            'customerDeposits' => $this->sumCustomerDeposits($start, $end),
-            'supplierDeposits' => $this->sumSupplierDeposits($start, $end),
-            default => $this->sumCashBankByConfig($item, $start, $end),
-        };
-    }
-
-    private function sumCustomerDeposits(Carbon $start, Carbon $end): float
-    {
-        $prefixes = $this->getCashAccountPrefixes();
-        if (empty($prefixes)) {
-            return 0.0;
+        if (! empty($this->filters['project_id'])) {
+            $query->where('journal_entries.project_id', $this->filters['project_id']);
         }
 
-        $query = \App\Models\JournalEntry::query()
-            ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
-            ->join('deposits', function ($join) {
-                $join->on('deposits.id', '=', 'journal_entries.source_id')
-                    ->where('journal_entries.source_type', \App\Models\Deposit::class);
-            })
-            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
-            ->where('journal_entries.source_type', \App\Models\Deposit::class)
-            ->where('journal_entries.journal_type', 'deposit')
-            ->where('deposits.from_model_type', \App\Models\Customer::class)
-            ->where(function (Builder $query) use ($prefixes) {
-                $query->where(function (Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
-                    }
-                });
-            });
-
-        $debit = (float) $query->sum('journal_entries.debit');
-        $credit = (float) $query->sum('journal_entries.credit');
-
-        return $debit - $credit;
-    }
-
-    private function sumSupplierDeposits(Carbon $start, Carbon $end): float
-    {
-        $prefixes = $this->getCashAccountPrefixes();
-        if (empty($prefixes)) {
-            return 0.0;
-        }
-
-        $query = \App\Models\JournalEntry::query()
-            ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
-            ->join('deposits', function ($join) {
-                $join->on('deposits.id', '=', 'journal_entries.source_id')
-                    ->where('journal_entries.source_type', \App\Models\Deposit::class);
-            })
-            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
-            ->where('journal_entries.source_type', \App\Models\Deposit::class)
-            ->where('journal_entries.journal_type', 'deposit')
-            ->where('deposits.from_model_type', \App\Models\Supplier::class)
-            ->where(function (Builder $query) use ($prefixes) {
-                $query->where(function (Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
-                    }
-                });
-            });
-
-        $credit = (float) $query->sum('journal_entries.credit');
-        $debit = (float) $query->sum('journal_entries.debit');
-        $amount = $credit - $debit;
-
-        return -abs($amount);
-    }
-
-    private function sumSalesReceipts(Carbon $start, Carbon $end): float
-    {
-        $receipts = CustomerReceiptItem::query()
-            ->where(function (Builder $query) use ($start, $end) {
-                $query->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
-                    ->orWhere(function (Builder $nested) use ($start, $end) {
-                        $nested->whereNull('payment_date')
-                            ->whereHas('customerReceipt', function (Builder $receiptQuery) use ($start, $end) {
-                                $receiptQuery->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()]);
-                            });
-                    });
-            })
-            ->whereHas('customerReceipt', function (Builder $query) {
-                $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer'])
-                    ->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
-            })
-            ->sum('amount');
-
-        return (float) $receipts;
-    }
-
-    private function sumCashBankByConfig(CashFlowItem $item, Carbon $start, Carbon $end): float
-    {
-        $prefixes = $item->prefixes->where('is_asset', false)->pluck('prefix')->toArray();
-        if (empty($prefixes)) {
-            return 0.0;
-        }
-
-        $cashBankAmount = match ($item->type) {
-            'inflow' => $this->sumCashBankByPrefixes($prefixes, $start, $end, self::CASH_IN_TYPES),
-            'outflow' => -1 * $this->sumCashBankByPrefixes($prefixes, $start, $end, self::CASH_OUT_TYPES),
-            'net' => $this->sumCashBankByPrefixes($prefixes, $start, $end, self::CASH_IN_TYPES)
-                - $this->sumCashBankByPrefixes($prefixes, $start, $end, self::CASH_OUT_TYPES),
-            default => 0.0,
-        };
-
-        // Also include journal entries from transfers for cash flow
-        $journalAmount = $this->sumJournalByPrefixes($prefixes, $start, $end, $item->type);
-
-        return $cashBankAmount + $journalAmount;
-    }
-
-    private function sumCashBankByPrefixes(array $prefixes, Carbon $start, Carbon $end, array $types): float
-    {
-        if (empty($prefixes)) {
-            return 0.0;
-        }
-
-        $query = CashBankTransaction::query()
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-            ->whereIn('type', $types)
-            ->whereHas('offsetCoa', function (Builder $query) use ($prefixes) {
-                $query->where(function (Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('code', 'like', $prefix . '%');
-                    }
-                });
-            });
-
-        $sum = $this->applyTransactionFilters($query)->sum('amount');
-
-        return (float) $sum;
-    }
-
-    private function sumAssetsByPrefixes(array $prefixes, Carbon $start, Carbon $end, string $type): float
-    {
-        if (empty($prefixes)) {
-            return 0.0;
-        }
-
-        $sum = Asset::query()
-            ->whereBetween('purchase_date', [$start->toDateString(), $end->toDateString()])
-            ->whereHas('assetCoa', function (Builder $query) use ($prefixes) {
-                $query->where(function (Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('code', 'like', $prefix . '%');
-                    }
-                });
-            })
-            ->sum('purchase_cost');
-
-        $sum = (float) $sum;
-
-        return match ($type) {
-            'inflow' => $sum,
-            'net' => -1 * $sum,
-            default => -1 * $sum,
-        };
-    }
-
-    private function buildMetadata(CashFlowItem $item, Carbon $start, Carbon $end): array
-    {
-        $sources = $item->sources
-            ->sortBy('sort_order')
-            ->pluck('label')
-            ->values()
-            ->toArray();
-
-        $metadata = [
-            'sources' => $sources,
-            'period' => [
-                'start' => $start->toDateString(),
-                'end' => $end->toDateString(),
-            ],
-        ];
-
-        $operationalPrefixes = $item->prefixes->where('is_asset', false)->pluck('prefix')->toArray();
-        if (!empty($operationalPrefixes)) {
-            $metadata['breakdown'] = [
-                'inflow' => $this->getCashBankBreakdown($operationalPrefixes, $start, $end, self::CASH_IN_TYPES),
-                'outflow' => $this->getCashBankBreakdown($operationalPrefixes, $start, $end, self::CASH_OUT_TYPES),
-            ];
-        }
-
-        if ($item->resolver === 'salesReceipts') {
-            $metadata['detail'] = $this->getSalesReceiptBreakdown($start, $end);
-        }
-
-        return $metadata;
-    }
-
-    private function getCashBankBreakdown(array $prefixes, Carbon $start, Carbon $end, array $types): array
-    {
-        if (empty($prefixes)) {
-            return [];
-        }
-
-        $records = $this->applyTransactionFilters(
-            CashBankTransaction::query()
-                ->with('offsetCoa')
-                ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
-                ->whereIn('type', $types)
-                ->whereHas('offsetCoa', function (Builder $query) use ($prefixes) {
-                    $query->where(function (Builder $inner) use ($prefixes) {
-                        foreach ($prefixes as $prefix) {
-                            $inner->orWhere('code', 'like', $prefix . '%');
-                        }
-                    });
-                })
-                ->selectRaw('offset_coa_id, SUM(amount) as total')
-                ->groupBy('offset_coa_id')
-        )->get();
-
-        return $records->map(function (CashBankTransaction $transaction) {
-            $coa = $transaction->offsetCoa;
-
-            return [
-                'coa_code' => $coa?->code,
-                'coa_name' => $coa?->name,
-                'amount' => round((float) $transaction->total, 2),
-            ];
-        })->values()->toArray();
-    }
-
-    private function getSalesReceiptBreakdown(Carbon $start, Carbon $end): array
-    {
-        return CustomerReceiptItem::query()
-            ->with(['customerReceipt.customer'])
-            ->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()])
-            ->whereHas('customerReceipt', function (Builder $query) {
-                $query->whereIn('payment_method', ['Cash', 'Bank', 'Bank Transfer'])
-                    ->whereIn(DB::raw('LOWER(status)'), ['paid', 'partial']);
-            })
-            ->selectRaw('customer_receipt_id, SUM(amount) as total')
-            ->groupBy('customer_receipt_id')
-            ->get()
-            ->map(function (CustomerReceiptItem $item) {
-                $receipt = $item->customerReceipt;
-
-                return [
-                    'receipt_number' => $receipt?->receipt_number,
-                    'customer_name' => $receipt?->customer?->name,
-                    'amount' => round((float) $item->total, 2),
-                ];
-            })
-            ->values()
-            ->toArray();
-    }
-
-    private function applyTransactionFilters(Builder $query): Builder
-    {
-        if (!empty($this->filters['division_id'])) {
-            $query->where('division_id', $this->filters['division_id']);
-        }
-
-        if (!empty($this->filters['project_id'])) {
-            $query->where('project_id', $this->filters['project_id']);
-        }
-
-        if (!empty($this->filters['branches'])) {
-            $query->whereIn('cabang_id', (array) $this->filters['branches']);
-        }
-
-        if (!empty($this->filters['cash_accounts'])) {
-            $query->whereIn('cash_bank_account_id', (array) $this->filters['cash_accounts']);
+        if (! empty($this->filters['division_id'])) {
+            $query->where('journal_entries.department_id', $this->filters['division_id']);
         }
 
         return $query;
     }
 
-    private function getOpeningBalance(Carbon $start): float
+    private function hasBranchFilter(): bool
     {
-        $cashBalance = $this->getCashBankOpeningBalance($start);
-            $prefixedBalance = 0;
-            // opening_balance column may not exist in older schemas; guard with schema check
-            if (\Illuminate\Support\Facades\Schema::hasColumn('report_cash_flow_cash_accounts', 'opening_balance')) {
-                $prefixedBalance = CashFlowCashAccount::query()
-                    ->when($this->filters['cash_accounts'] ?? null, function ($query, $ids) {
-                        $query->whereIn('id', (array) $ids);
-                    })
-                    ->sum('opening_balance');
-            }
-
-        return round($cashBalance + (float) $prefixedBalance, 2);
+        return ! empty(array_filter((array) ($this->filters['branches'] ?? [])));
     }
 
-    private function getCashBankOpeningBalance(Carbon $start): float
+    /**
+     * ID COA kas & setara kas.
+     */
+    private function cashCoaIds(): array
     {
-        $prefixes = $this->getCashAccountPrefixes();
-        if (empty($prefixes)) {
-            return 0.0;
+        if ($this->cashCoaIds !== null) {
+            return $this->cashCoaIds;
         }
 
-        $baseQuery = CashBankTransaction::query()
-            ->where('date', '<', $start->toDateString())
-            ->when(!empty($this->filters['cash_accounts']), function (Builder $query) {
-                $query->whereIn('cash_bank_account_id', (array) $this->filters['cash_accounts']);
+        $prefixes = $this->getCashAccountPrefixes();
+        $restrictToConfigured = ! empty($this->filters['cash_accounts']);
+
+        if (empty($prefixes) && ! $restrictToConfigured) {
+            $prefixes = ChartOfAccount::hasCashBankFlags() ? [] : [ChartOfAccount::CASH_PREFIX, ChartOfAccount::BANK_PREFIX];
+        }
+
+        if (empty($prefixes) && $restrictToConfigured) {
+            return $this->cashCoaIds = [];
+        }
+
+        $useFlags = ! $restrictToConfigured && ChartOfAccount::hasCashBankFlags();
+
+        return $this->cashCoaIds = ChartOfAccount::withTrashed()
+            ->where(function (Builder $q) use ($prefixes, $useFlags) {
+                foreach ($prefixes as $prefix) {
+                    $q->orWhere('code', 'like', $prefix . '%');
+                }
+                if ($useFlags) {
+                    $q->orWhere('is_cash_bank', true);
+                }
             })
-            ->where(function (Builder $query) use ($prefixes) {
-                $query
-                    ->whereHas('accountCoa', function (Builder $accountQuery) use ($prefixes) {
-                        $this->applyCodePrefixConstraint($accountQuery, $prefixes);
-                    })
-                    ->orWhereHas('offsetCoa', function (Builder $offsetQuery) use ($prefixes) {
-                        $this->applyCodePrefixConstraint($offsetQuery, $prefixes);
-                    });
-            })
-            ->where(function (Builder $query) use ($prefixes) {
-                $query
-                    ->whereDoesntHave('accountCoa', function (Builder $accountQuery) use ($prefixes) {
-                        $this->applyCodePrefixConstraint($accountQuery, $prefixes);
-                    })
-                    ->orWhereDoesntHave('offsetCoa', function (Builder $offsetQuery) use ($prefixes) {
-                        $this->applyCodePrefixConstraint($offsetQuery, $prefixes);
-                    });
-            });
-
-        $inflow = (clone $baseQuery)->whereIn('type', self::CASH_IN_TYPES)->sum('amount');
-        $outflow = (clone $baseQuery)->whereIn('type', self::CASH_OUT_TYPES)->sum('amount');
-
-        $cashBankBalance = (float) $inflow - (float) $outflow;
-
-        // Also include journal entries from transfers for opening balance
-        $journalQuery = \App\Models\JournalEntry::query()
-            ->where('date', '<', $start->toDateString())
-            ->where('source_type', \App\Models\CashBankTransfer::class)
-            ->where('journal_type', 'transfer')
-            ->whereHas('coa', function (\Illuminate\Database\Eloquent\Builder $query) use ($prefixes) {
-                $query->where(function (\Illuminate\Database\Eloquent\Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('code', 'like', $prefix . '%');
-                    }
-                });
-            });
-
-        $journalDebit = (clone $journalQuery)->sum('debit');
-        $journalCredit = (clone $journalQuery)->sum('credit');
-        $journalBalance = $journalDebit - $journalCredit;
-
-        return $cashBankBalance + $journalBalance;
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function getConfiguredAccountPrefixes(string $configKey, array $fallbacks = []): array
@@ -655,30 +621,13 @@ class CashFlowReportService
         $prefixes = [];
 
         foreach ($codes as $code) {
-            $prefixes = array_merge($prefixes, $this->expandCodeVariants((string) $code));
+            $prefixes[] = (string) $code;
+            if (str_contains((string) $code, '.')) {
+                $prefixes[] = strstr((string) $code, '.', true);
+            }
         }
 
         return array_values(array_unique(array_filter($prefixes)));
-    }
-
-    private function expandCodeVariants(string $code): array
-    {
-        $variants = [$code];
-
-        if (str_contains($code, '.')) {
-            $variants[] = strstr($code, '.', true);
-        }
-
-        return $variants;
-    }
-
-    private function applyCodePrefixConstraint(Builder $query, array $prefixes): void
-    {
-        $query->where(function (Builder $inner) use ($prefixes) {
-            foreach ($prefixes as $prefix) {
-                $inner->orWhere('code', 'like', $prefix . '%');
-            }
-        });
     }
 
     private function getCashAccountPrefixes(): array
@@ -687,87 +636,14 @@ class CashFlowReportService
             return $this->cashAccountPrefixes;
         }
 
-            $prefixes = CashFlowCashAccount::query()
-                ->when($this->filters['cash_accounts'] ?? null, function ($query, $ids) {
-                    $query->whereIn('id', (array) $ids);
-                })
-                ->pluck('prefix')
+        return $this->cashAccountPrefixes = CashFlowCashAccount::query()
+            ->when($this->filters['cash_accounts'] ?? null, function ($query, $ids) {
+                $query->whereIn('id', (array) $ids);
+            })
+            ->pluck('prefix')
             ->filter()
             ->unique()
             ->values()
             ->toArray();
-
-        $this->cashAccountPrefixes = $prefixes;
-
-        return $prefixes;
-    }
-
-    private function sumJournalByPrefixes(array $prefixes, Carbon $start, Carbon $end, string $type): float
-    {
-        if (empty($prefixes)) {
-            return 0.0;
-        }
-
-        $entries = \App\Models\JournalEntry::query()
-            ->join('chart_of_accounts', 'journal_entries.coa_id', '=', 'chart_of_accounts.id')
-            ->whereBetween('journal_entries.date', [$start->toDateString(), $end->toDateString()])
-            ->where(function (\Illuminate\Database\Eloquent\Builder $query) {
-                $query->where(function (\Illuminate\Database\Eloquent\Builder $entryQuery) {
-                    $entryQuery->where('journal_entries.source_type', \App\Models\CashBankTransfer::class)
-                        ->where('journal_entries.journal_type', 'transfer');
-                })->orWhere(function (\Illuminate\Database\Eloquent\Builder $entryQuery) {
-                    $entryQuery->where('journal_entries.source_type', \App\Models\VendorPayment::class)
-                        ->where('journal_entries.journal_type', 'payment');
-                });
-            })
-            ->where(function (\Illuminate\Database\Eloquent\Builder $query) use ($prefixes) {
-                $query->where(function (\Illuminate\Database\Eloquent\Builder $inner) use ($prefixes) {
-                    foreach ($prefixes as $prefix) {
-                        $inner->orWhere('chart_of_accounts.code', 'like', $prefix . '%');
-                    }
-                });
-            })
-            ->get([
-                'journal_entries.debit',
-                'journal_entries.credit',
-                'journal_entries.source_type',
-                'journal_entries.journal_type',
-                'chart_of_accounts.type as coa_type',
-            ]);
-
-        $inflow = 0.0;
-        $outflow = 0.0;
-        $net = 0.0;
-
-        foreach ($entries as $entry) {
-            $debit = (float) $entry->debit;
-            $credit = (float) $entry->credit;
-            $accountType = strtolower((string) $entry->coa_type);
-
-            if ($accountType === 'revenue') {
-                $amount = $credit - $debit;
-            } elseif ($accountType === 'liability' && $entry->source_type === \App\Models\VendorPayment::class && $entry->journal_type === 'payment') {
-                // Vendor payment entries debit AP; for cash flow this is an outflow.
-                $amount = $credit - $debit;
-            } else {
-                $amount = $debit - $credit;
-            }
-
-            $net += $amount;
-
-            if ($amount > 0) {
-                $inflow += $amount;
-            } elseif ($amount < 0) {
-                $outflow += $amount;
-            }
-        }
-
-        return match ($type) {
-            'inflow' => $inflow,
-            'outflow' => $outflow,
-            'net' => $net,
-            default => 0.0,
-        };
     }
 }
-
