@@ -359,6 +359,39 @@ class JournalController extends Controller
             'entries.*.coa_id.required' => 'Akun COA pada setiap baris jurnal wajib dipilih.',
         ]);
 
+        // Validasi per baris: satu baris hanya boleh berisi Debit ATAU Kredit (bukan keduanya).
+        $postedLines = 0;
+        $debitLines = 0;
+        $creditLines = 0;
+        foreach ($validated['entries'] as $index => $line) {
+            $debit = (float) ($line['debit'] ?? 0);
+            $credit = (float) ($line['credit'] ?? 0);
+            if ($debit > 0 && $credit > 0) {
+                return back()->withInput()->with('error', 'Baris jurnal ke-' . ($index + 1) . ' berisi Debit dan Kredit sekaligus. Satu baris hanya boleh diisi salah satu sisi; pecah menjadi dua baris terpisah.');
+            }
+            if ($debit > 0 || $credit > 0) {
+                $postedLines++;
+                $debitLines += $debit > 0 ? 1 : 0;
+                $creditLines += $credit > 0 ? 1 : 0;
+            }
+        }
+
+        if ($postedLines < 2 || $debitLines < 1 || $creditLines < 1) {
+            return back()->withInput()->with('error', 'Voucher jurnal minimal terdiri dari 2 baris bernilai: sedikitnya satu baris Debit dan satu baris Kredit. Lengkapi baris lawan sebelum menyimpan.');
+        }
+
+        // Akun nonaktif tidak boleh menerima jurnal: laporan (Neraca Saldo, Neraca, L/R) hanya memuat akun aktif.
+        $inactiveCoas = ChartOfAccount::query()
+            ->whereIn('id', collect($validated['entries'])->pluck('coa_id')->unique()->all())
+            ->where('is_active', false)
+            ->orderBy('code')
+            ->get(['code', 'name']);
+        if ($inactiveCoas->isNotEmpty()) {
+            return back()->withInput()->with('error', 'Akun berikut nonaktif sehingga tidak dapat dipakai pada jurnal: '
+                . $inactiveCoas->map(fn ($c) => "{$c->code} {$c->name}")->implode(', ')
+                . '. Pilih akun aktif lain atau aktifkan kembali akun tersebut di Master COA.');
+        }
+
         // Validasi Keseimbangan Double-Entry
         $totalDebit = 0.0;
         $totalCredit = 0.0;
@@ -505,6 +538,11 @@ class JournalController extends Controller
             return back()->with('error', "Voucher jurnal {$reference} tidak ditemukan.");
         }
 
+        $existingReversal = JournalEntry::where('reversal_of_transaction_id', $reference)->value('reference');
+        if ($existingReversal) {
+            return back()->with('error', "Voucher {$reference} sudah dibalik oleh jurnal {$existingReversal}. Satu voucher hanya boleh dibalik sekali; bila perlu koreksi lanjutan, buat jurnal penyesuaian baru.");
+        }
+
         try {
             $newReference = DB::transaction(function () use ($lines, $validated, $reference) {
                 $cabangId = $lines->first()->cabang_id ?? Auth::user()?->cabang_id;
@@ -512,6 +550,12 @@ class JournalController extends Controller
                 $date = $validated['reverse_date'];
 
                 AccountingPeriod::ensureDateIsOpen($date, $cabangId);
+
+                // Kunci baris voucher asal agar dua permintaan pembalik bersamaan tidak lolos keduanya.
+                JournalEntry::whereIn('id', $lines->pluck('id'))->lockForUpdate()->get();
+                if (JournalEntry::where('reversal_of_transaction_id', $reference)->exists()) {
+                    throw new \RuntimeException("Voucher {$reference} sudah dibalik oleh jurnal lain. Muat ulang halaman untuk melihat jurnal pembaliknya.");
+                }
 
                 $revRef = 'REV-' . $reference . '-' . now()->format('His');
 

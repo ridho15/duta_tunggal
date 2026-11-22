@@ -238,14 +238,18 @@ class BalanceSheetService
                 ->get()
                 ->keyBy('coa_id');
 
-        return $this->orderAccountsHierarchically($accounts->map(function ($account) use ($balanceMap, $type) {
+        // Saldo awal COA (opening_balance) tidak berdimensi cabang: disajikan di neraca konsolidasi dan
+        // hanya di cabang atribusi saldo awal, agar Σ neraca per cabang = neraca konsolidasi.
+        $includeOpening = static::includesOpeningBalance($cabangId);
+
+        return $this->orderAccountsHierarchically($accounts->map(function ($account) use ($balanceMap, $type, $includeOpening) {
             $row = $balanceMap->get($account->id);
             $totalDebit  = (float) ($row->total_debit  ?? 0);
             $totalCredit = (float) ($row->total_credit ?? 0);
 
             // Calculate balance based on account type (normal balance)
             // Include opening balance in the calculation
-            $openingBalance = (float) ($account->opening_balance ?? 0);
+            $openingBalance = $includeOpening ? (float) ($account->opening_balance ?? 0) : 0.0;
             $balance = match ($type) {
                 'Asset'            => $openingBalance + $totalDebit - $totalCredit,
                 'Contra Asset'     => $openingBalance - $totalDebit + $totalCredit,
@@ -266,6 +270,37 @@ class BalanceSheetService
 
             return $accountWithBalance;
         }));
+    }
+
+    /**
+     * Cabang penerima atribusi saldo awal COA (opening_balance tidak punya cabang).
+     * config('coa.opening_balance_cabang_id') bila diisi; default cabang pertama (id terkecil, kantor pusat).
+     */
+    public static function openingBalanceCabangId(): ?int
+    {
+        $configured = config('coa.opening_balance_cabang_id');
+        if (! empty($configured)) {
+            return (int) $configured;
+        }
+
+        $id = \App\Models\Cabang::withoutGlobalScopes()->whereNull('deleted_at')->orderBy('id')->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
+    /**
+     * Apakah laporan untuk cabang (atau daftar cabang) ini memuat saldo awal COA. Konsolidasi (tanpa filter) selalu.
+     */
+    public static function includesOpeningBalance(mixed $cabangIds): bool
+    {
+        $ids = array_values(array_filter(array_map('intval', (array) $cabangIds)));
+        if (empty($ids)) {
+            return true;
+        }
+
+        $attributed = static::openingBalanceCabangId();
+
+        return $attributed !== null && in_array($attributed, $ids, true);
     }
 
     protected function orderAccountsHierarchically(Collection $accounts): Collection
@@ -316,11 +351,19 @@ class BalanceSheetService
      */
     protected function inferCurrentClassification(ChartOfAccount $account, string $type): ?bool
     {
+        return static::inferIsCurrent((string) $account->code, $type);
+    }
+
+    /**
+     * Inferensi lancar/tidak lancar dari kode & tipe akun (dipakai juga oleh ChartOfAccountSeeder dan
+     * migrasi backfill chart_of_accounts.is_current). null = tidak dapat disimpulkan / bukan akun neraca A/L.
+     */
+    public static function inferIsCurrent(string $code, string $type): ?bool
+    {
         if (!in_array($type, ['Asset', 'Liability'], true)) {
             return null;
         }
 
-        $code = (string) $account->code;
         if ($code === '') {
             return null;
         }
@@ -343,13 +386,13 @@ class BalanceSheetService
         }
 
         foreach ($candidates[true] as $prefix) {
-            if ($this->codeMatchesPrefix($code, $prefix)) {
+            if (static::codeMatchesPrefix($code, $prefix)) {
                 return true;
             }
         }
 
         foreach ($candidates[false] as $prefix) {
-            if ($this->codeMatchesPrefix($code, $prefix)) {
+            if (static::codeMatchesPrefix($code, $prefix)) {
                 return false;
             }
         }
@@ -360,7 +403,7 @@ class BalanceSheetService
     /**
      * Normalise code comparison so both segmented (1-1xxx) and compact (1100) formats work.
      */
-    protected function codeMatchesPrefix(string $code, string $prefix): bool
+    protected static function codeMatchesPrefix(string $code, string $prefix): bool
     {
         $sanitisedCode = str_replace([' ', '_'], '', $code);
         $sanitisedPrefix = str_replace([' ', '_'], '', $prefix);

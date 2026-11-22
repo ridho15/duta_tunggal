@@ -155,9 +155,14 @@ class LedgerControlsAuditTest extends TestCase
         app(AccountingPeriodService::class)->closePeriod($period, $this->user->id, false);
 
         $this->delete(route('keuangan.cashbank.destroy', $trx));
-        $remaining = JournalEntry::where('source_type', CashBankTransaction::class)->where('source_id', $trx->id)->count();
-        fwrite(STDERR, "[AUDIT-6d] Jurnal kas keluar Sep (periode tertutup) tersisa setelah hapus transaksi: {$remaining} baris (seharusnya 2, tetap)\n");
+        // Ekspektasi diperbaiki: hapus = VOID. Jurnal pembalik ikut bersumber transaksi yang sama tetapi bertanggal
+        // periode terbuka, sehingga yang diuji adalah baris di periode tertutup (Sep) yang harus tetap 2 baris
+        // (sama seperti uji pembatalan transfer di bawah) dan saldo bersih kas transaksi = 0 setelah VOID.
+        $remaining = JournalEntry::where('source_type', CashBankTransaction::class)->where('source_id', $trx->id)->where('date', '<=', '2026-09-30')->count();
+        $net = (float) JournalEntry::where('source_type', CashBankTransaction::class)->where('source_id', $trx->id)->where('coa_id', $this->coa['kas']->id)->selectRaw('SUM(debit) - SUM(credit) as n')->value('n');
+        fwrite(STDERR, "[AUDIT-6d] Jurnal kas keluar Sep (periode tertutup) tersisa setelah hapus transaksi: {$remaining} baris (seharusnya 2, tetap); saldo bersih kas setelah VOID={$net}\n");
         $this->assertSame(2, $remaining, 'Hapus transaksi kas menghapus jurnal di periode tertutup (lolos kunci periode)');
+        $this->assertEqualsWithDelta(0, $net, 0.01, 'Hapus transaksi kas harus di-VOID dengan jurnal pembalik di periode terbuka');
     }
 
     public function test_cancelling_transfer_must_reverse_not_delete_and_respect_closed_period(): void

@@ -222,16 +222,17 @@ class FinancialReportPreviewControllerTest extends TestCase
             'is_active' => true,
         ]);
 
-        CashBankTransaction::create([
+        // Arus kas dibaca dari buku besar kas: transaksi dibukukan, akun kas di account_coa_id (sesuai form Kas & Bank).
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CF-PRE-OPEN',
             'date' => '2025-01-01',
             'type' => 'cash_in',
-            'account_coa_id' => $revenue->id,
-            'offset_coa_id' => $cash->id,
+            'account_coa_id' => $cash->id,
+            'offset_coa_id' => $revenue->id,
             'amount' => 200000,
             'description' => 'Opening cash preview',
             'cabang_id' => $branch->id,
-        ]);
+        ]));
 
         $expected = app(CashFlowReportService::class)->generate('2025-01-05', '2025-01-31', [
             'branches' => [$branch->id],

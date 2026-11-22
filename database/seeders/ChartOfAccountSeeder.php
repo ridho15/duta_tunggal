@@ -344,6 +344,7 @@ class ChartOfAccountSeeder extends Seeder
                     'type' => $type,
                     'parent_id' => $parentId,
                     'is_active' => true,
+                    'is_current' => $this->isCurrent($code, $type),
                 ]
             );
 
@@ -375,6 +376,20 @@ class ChartOfAccountSeeder extends Seeder
         }
 
         return null;
+    }
+
+    /**
+     * Klasifikasi lancar/tidak lancar untuk Neraca (PSAK 1). Akun persediaan HPP berformat "1-xxx"
+     * (bahan baku 1-1xx, barang dalam proses 1-2xx) adalah aset lancar; selebihnya mengikuti
+     * inferensi kode BalanceSheetService (11xx/21xx lancar, 12xx/22xx tidak lancar). Non A/L → null.
+     */
+    private function isCurrent(string $code, string $type): ?bool
+    {
+        if ($type === 'Asset' && str_starts_with($code, '1-')) {
+            return true;
+        }
+
+        return \App\Services\BalanceSheetService::inferIsCurrent($code, $type);
     }
 
     private function getAccountType($code)

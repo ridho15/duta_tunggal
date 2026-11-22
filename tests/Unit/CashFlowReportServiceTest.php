@@ -124,7 +124,8 @@ class CashFlowReportServiceTest extends TestCase
             'payment_date' => '2025-10-10',
         ]);
 
-        CashBankTransaction::create([
+        // Arus kas dibaca dari buku besar: transaksi kas/bank dibukukan seperti alur aplikasi.
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CB-001',
             'date' => '2025-10-12',
             'type' => 'cash_out',
@@ -134,9 +135,10 @@ class CashFlowReportServiceTest extends TestCase
             'counterparty' => 'Biaya Penjualan A',
             'description' => 'Pengeluaran cabang A',
             'cabang_id' => $branchA->id,
-        ]);
+        ]));
 
-        CashBankTransaction::create([
+        // Arus kas dibaca dari buku besar: transaksi kas/bank dibukukan seperti alur aplikasi.
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CB-002',
             'date' => '2025-10-12',
             'type' => 'cash_out',
@@ -146,7 +148,7 @@ class CashFlowReportServiceTest extends TestCase
             'counterparty' => 'Biaya Penjualan B',
             'description' => 'Pengeluaran cabang B',
             'cabang_id' => $branchB->id,
-        ]);
+        ]));
 
         $service = app(CashFlowReportService::class);
 

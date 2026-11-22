@@ -122,16 +122,16 @@ describe('Cash Flow Report Page Tests', function () {
     it('calculates opening balance correctly', function () {
         // Create opening balance transaction (before current period)
         // This represents cash inflow where offset account is cash/bank
-        CashBankTransaction::create([
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CBT-OPEN-001',
             'date' => now()->startOfMonth()->subDays(5),
             'type' => 'cash_in',
-            'account_coa_id' => $this->revenueAccount->id, // Revenue account
-            'offset_coa_id' => $this->cashAccount->id,     // Cash account (this should match cash prefixes)
+            'account_coa_id' => $this->cashAccount->id, // akun kas/bank (sesuai form Kas & Bank)
+            'offset_coa_id' => $this->revenueAccount->id,
             'amount' => 10000000,
             'description' => 'Opening balance',
             'cabang_id' => $this->cabang->id,
-        ]);
+        ]));
 
         $service = app(CashFlowReportService::class);
         $report = $service->generate(
@@ -145,40 +145,40 @@ describe('Cash Flow Report Page Tests', function () {
 
     it('calculates net change and closing balance correctly', function () {
         // Opening balance
-        CashBankTransaction::create([
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CBT-OPEN-002',
             'date' => now()->startOfMonth()->subDays(5),
             'type' => 'cash_in',
-            'account_coa_id' => $this->revenueAccount->id,
-            'offset_coa_id' => $this->cashAccount->id,
+            'account_coa_id' => $this->cashAccount->id, // akun kas/bank (sesuai form Kas & Bank)
+            'offset_coa_id' => $this->revenueAccount->id,
             'amount' => 10000000,
             'description' => 'Opening balance',
             'cabang_id' => $this->cabang->id,
-        ]);
+        ]));
 
         // Inflow during period
-        CashBankTransaction::create([
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CBT-IN-001',
             'date' => now()->subDays(3),
             'type' => 'cash_in',
-            'account_coa_id' => $this->revenueAccount->id,
-            'offset_coa_id' => $this->cashAccount->id,
+            'account_coa_id' => $this->cashAccount->id, // akun kas/bank (sesuai form Kas & Bank)
+            'offset_coa_id' => $this->revenueAccount->id,
             'amount' => 5000000,
             'description' => 'Cash inflow',
             'cabang_id' => $this->cabang->id,
-        ]);
+        ]));
 
         // Outflow during period
-        CashBankTransaction::create([
+        app(\App\Services\CashBankService::class)->postTransaction(CashBankTransaction::create([
             'number' => 'CBT-OUT-001',
             'date' => now()->subDays(1),
             'type' => 'cash_out',
-            'account_coa_id' => $this->expenseAccount->id,
-            'offset_coa_id' => $this->cashAccount->id,
+            'account_coa_id' => $this->cashAccount->id, // akun kas/bank (sesuai form Kas & Bank)
+            'offset_coa_id' => $this->expenseAccount->id,
             'amount' => 2000000,
             'description' => 'Cash outflow',
             'cabang_id' => $this->cabang->id,
-        ]);
+        ]));
 
         $service = app(CashFlowReportService::class);
         $report = $service->generate(
@@ -188,10 +188,9 @@ describe('Cash Flow Report Page Tests', function () {
         );
 
         expect($report['opening_balance'])->toBe(10000000.0);
-        // Net change will be 0 because we don't have CustomerReceiptItem data or matching prefixes
-        // The service calculates net change from configured sections/items, not directly from CashBankTransaction
-        expect($report['net_change'])->toBe(0.0);
-        expect($report['closing_balance'])->toBe(10000000.0); // opening + net change
+        // Arus kas kini direkonsiliasi ke buku besar kas: +5.000.000 − 2.000.000 (dulu 0 karena dibaca dari konfigurasi).
+        expect($report['net_change'])->toBe(3000000.0);
+        expect($report['closing_balance'])->toBe(13000000.0); // opening + net change
     });
 
     it('filters data by branch correctly', function () {
