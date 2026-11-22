@@ -318,7 +318,8 @@
                     $discountAmount = $bruto * ($discount / 100.0);
                     $afterDiscount = $bruto - $discountAmount;
 
-                    $taxResult = \App\Services\TaxService::compute($afterDiscount, $taxRate, $taxType);
+                    // Sama dengan total PO (hitungSubtotal → LineAmounts): tarif 12% atas DPP Nilai Lain 11/12 (PMK 131/2024)
+                    $taxResult = \App\Support\LineAmounts::calculate(1, $afterDiscount, 0, $taxRate, $taxType);
                     $itemDPP = $taxResult['dpp'];
                     $itemPPN = $taxResult['ppn'];
                     $itemTotal = $taxResult['total'];

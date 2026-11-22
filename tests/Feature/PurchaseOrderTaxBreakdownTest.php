@@ -29,7 +29,7 @@ class PurchaseOrderTaxBreakdownTest extends TestCase
             return ['dpp' => 0, 'ppn' => 0, 'total' => 0, 'empty' => true];
         }
 
-        $taxResult      = TaxService::compute($afterDisc, $taxRate, $tipePajak);
+        $taxResult      = TaxService::compute($afterDisc, \App\Support\LineAmounts::effectiveRate($taxRate), $tipePajak);  // tampilan PO = LineAmounts (12% × DPP Nilai Lain)
         $normalizedType = TaxService::normalizeType($tipePajak);
 
         return array_merge($taxResult, ['normalized_type' => $normalizedType, 'after_disc' => $afterDisc]);

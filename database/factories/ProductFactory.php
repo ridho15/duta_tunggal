@@ -30,7 +30,7 @@ class ProductFactory extends Factory
             'supplier_id' => Supplier::inRandomOrder()->first()->id ?? Supplier::factory()->create()->id,
             'product_category_id' => $category->id,
             'uom_id' => optional(UnitOfMeasure::inRandomOrder()->first())->id ?? UnitOfMeasure::factory()->create()->id,
-            'cost_price' => $this->faker->randomFloat(2, 5000, 100000),
+            'cost_price' => $this->faker->randomFloat(2, 1000, 9000), // di bawah sell_price minimum agar aturan harga-jual ≥ HPP tidak membuat test acak gagal
             'sell_price' => $this->faker->randomFloat(2, 10000, 200000),
             'biaya' => $this->faker->randomFloat(2, 1000, 5000),
             'harga_batas' => $this->faker->randomFloat(2, 0, 20),

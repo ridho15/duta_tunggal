@@ -845,6 +845,8 @@ test('UAT 21 Nov: alur HTTP lengkap retur penjualan memasukkan stok ke gudang tu
     test()->seed(\Database\Seeders\WarehouseSeeder::class);
     \App\Models\ChartOfAccount::firstOrCreate(['code' => '1101.01'], ['name' => 'Persediaan Barang', 'type' => 'asset', 'cabang_id' => $data['cabang']->id]);
     \App\Models\ChartOfAccount::firstOrCreate(['code' => '5100.10'], ['name' => 'HPP', 'type' => 'expense', 'cabang_id' => $data['cabang']->id]);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '4120.10'], ['name' => 'Retur Penjualan', 'type' => 'revenue', 'cabang_id' => $data['cabang']->id]);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '2160.04'], ['name' => 'Deposit Konsumen', 'type' => 'liability', 'cabang_id' => $data['cabang']->id]);
     $warehouse = Warehouse::withoutGlobalScopes()->first();
 
     $customerReturn = CustomerReturn::create([
