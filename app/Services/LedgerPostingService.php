@@ -316,8 +316,18 @@ class LedgerPostingService
             // Create journal entry for other fees if any
             if ($totalOtherFees > 0) {
                 $expenseCoa = $invoice->expense_coa_id ? ChartOfAccount::find($invoice->expense_coa_id) : ChartOfAccount::where('code', config('coa.general_expense'))->first();
+                if (! $expenseCoa) {
+                    // Jangan jatuh ke akun sembarang (dulu COA id 1): biaya lain-lain harus ke akun beban yang benar.
+                    // Baris yang sudah terbentuk dibatalkan agar tidak tersisa jurnal setengah jadi bila pemanggil tanpa transaksi.
+                    foreach ($entries as $createdEntry) {
+                        $createdEntry->forceDelete();
+                    }
+                    throw new \Exception('Akun beban untuk biaya lain-lain faktur ' . $invoice->invoice_number . ' tidak ditemukan (COA '
+                        . ($invoice->expense_coa_id ? '#' . $invoice->expense_coa_id : config('coa.general_expense', '6100'))
+                        . '). Solusi: buat/aktifkan akun tersebut di Chart of Accounts atau pilih akun beban pada faktur, lalu posting ulang.');
+                }
                 $entries[] = $this->createJournalEntry([
-                    'coa_id' => $expenseCoa ? $expenseCoa->id : 1, // fallback to first COA if not found
+                    'coa_id' => $expenseCoa->id,
                     'date' => $date,
                     'reference' => $invoice->invoice_number,
                     'description' => 'Biaya lainnya (termasuk dari purchase receipt) untuk ' . $invoice->invoice_number,

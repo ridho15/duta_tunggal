@@ -242,7 +242,16 @@ class LedgerControlsAuditTest extends TestCase
             'invoice_date' => '2026-11-03', 'subtotal' => 1000000, 'tax' => 0, 'ppn_rate' => 0, 'dpp' => 1000000,
             'other_fee' => [['name' => 'Ongkos kirim', 'amount' => 50000]], 'total' => 1050000, 'status' => 'unpaid', 'cabang_id' => $this->cabang->id,
         ]));
-        app(LedgerPostingService::class)->postInvoice($invoice->fresh());
+        // Perilaku benar: tolak posting dengan pesan sebab & solusi (tidak menebak akun), atau posting ke akun beban yang sah.
+        try {
+            app(LedgerPostingService::class)->postInvoice($invoice->fresh());
+        } catch (\Exception $e) {
+            fwrite(STDERR, '[AUDIT-1c] Posting ditolak: '.$e->getMessage()."\n");
+            $this->assertStringContainsString('Solusi', $e->getMessage());
+            $this->assertSame(0, JournalEntry::where('coa_id', 1)->where('source_type', Invoice::class)->where('source_id', $invoice->id)->count());
+
+            return;
+        }
 
         $feeLine = JournalEntry::where('source_type', Invoice::class)->where('source_id', $invoice->id)->where('debit', 50000)->first();
         $coa1 = ChartOfAccount::find(1);
