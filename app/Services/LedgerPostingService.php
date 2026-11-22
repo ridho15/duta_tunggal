@@ -512,8 +512,11 @@ class LedgerPostingService
     public function postVendorPayment(VendorPayment $payment): array
     {
         return DB::transaction(function () use ($payment) {
+            // Jurnal yang sudah dibalik (pembatalan/perubahan nominal) tidak dihitung sebagai "sudah terposting".
             $alreadyPosted = JournalEntry::where('source_type', VendorPayment::class)
                 ->where('source_id', $payment->id)
+                ->where('is_reversal', false)
+                ->whereNull('reversal_of_transaction_id')
                 ->lockForUpdate()
                 ->exists();
             if ($alreadyPosted) {

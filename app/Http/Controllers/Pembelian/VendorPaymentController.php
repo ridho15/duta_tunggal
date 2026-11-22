@@ -190,11 +190,14 @@ class VendorPaymentController extends Controller
             ->values();
 
         $data = $invoices->map(function (Invoice $inv) {
+            // Semua nominal dalam mata uang faktur (sama dengan alokasi yang divalidasi di store()).
             $total = (float) $inv->total;
-            $remaining = (float) ($inv->accountPayable?->remaining ?? $total);
-            $paid = (float) ($inv->accountPayable?->paid ?? 0);
+            $remaining = (float) ($inv->accountPayable?->remaining_original ?? $inv->accountPayable?->remaining ?? $total);
+            $paid = (float) ($inv->accountPayable?->paid_original ?? $inv->accountPayable?->paid ?? 0);
             $dueDate = $inv->due_date ? Carbon::parse($inv->due_date) : null;
             $isOverdue = $dueDate ? $dueDate->isPast() && $remaining > 0 : false;
+            $currencyCode = $inv->currency?->code ?? 'IDR';
+            $fmt = fn (float $v) => $currencyCode === 'IDR' ? MoneyHelper::rupiah($v) : $currencyCode . ' ' . number_format($v, 2, ',', '.');
 
             return [
                 'id' => $inv->id,
@@ -204,11 +207,11 @@ class VendorPaymentController extends Controller
                 'due_date' => $dueDate ? $dueDate->format('d/m/Y') : '-',
                 'is_overdue' => $isOverdue,
                 'total' => $total,
-                'total_formatted' => MoneyHelper::rupiah($total),
+                'total_formatted' => $fmt($total),
                 'paid' => $paid,
-                'paid_formatted' => MoneyHelper::rupiah($paid),
+                'paid_formatted' => $fmt($paid),
                 'remaining' => $remaining,
-                'remaining_formatted' => MoneyHelper::rupiah($remaining),
+                'remaining_formatted' => $fmt($remaining),
                 'currency_code' => $inv->currency?->code ?? 'IDR',
                 'exchange_rate' => (float) ($inv->exchange_rate ?: 1),
             ];
@@ -266,7 +269,8 @@ class VendorPaymentController extends Controller
                 foreach ($invoiceReceipts as $invId => $amount) {
                     $invoice = $invoices->get($invId);
                     $ap = $payables->get($invId);
-                    $remaining = (float) ($ap?->remaining ?? $invoice?->total ?? 0);
+                    // Alokasi dalam mata uang faktur (detail.amount = nominal asli; amount_idr = × kurs faktur).
+                    $remaining = (float) ($ap?->remaining_original ?? $ap?->remaining ?? $invoice?->total ?? 0);
                     $invNum = $invoice?->invoice_number ?? "#{$invId}";
 
                     if ($remaining <= 0.01) {
@@ -278,11 +282,12 @@ class VendorPaymentController extends Controller
                     }
                 }
 
-                $totalOutstanding = collect($invoiceReceipts)->sum(function ($amt, $invId) use ($payables, $invoices) {
+                // sum() hanya meneruskan nilai (bukan key) ke callback → iterasi berdasarkan key invoice.
+                $totalOutstanding = collect(array_keys($invoiceReceipts))->sum(function ($invId) use ($payables, $invoices) {
                     $ap = $payables->get($invId);
                     $invoice = $invoices->get($invId);
 
-                    return (float) ($ap?->remaining ?? $invoice?->total ?? 0);
+                    return (float) ($ap?->remaining_original ?? $ap?->remaining ?? $invoice?->total ?? 0);
                 });
 
                 $isDraft = ($action === 'save_draft');
@@ -436,7 +441,7 @@ class VendorPaymentController extends Controller
                 }
 
                 $invoices = Invoice::with('accountPayable')->whereIn('id', $selectedInvoices)->get();
-                $totalOutstanding = $invoices->sum(fn ($inv) => (float) ($inv->accountPayable?->remaining ?? $inv->total));
+                $totalOutstanding = $invoices->sum(fn ($inv) => (float) ($inv->accountPayable?->remaining_original ?? $inv->accountPayable?->remaining ?? $inv->total));
 
                 $isDraft = ($action === 'save_draft');
                 $status = $isDraft
@@ -549,7 +554,7 @@ class VendorPaymentController extends Controller
 
                 $invoiceIds = $details->pluck('invoice_id')->toArray();
                 $invoices = Invoice::with('accountPayable')->whereIn('id', $invoiceIds)->get();
-                $totalOutstanding = $invoices->sum(fn ($inv) => (float) ($inv->accountPayable?->remaining ?? $inv->total));
+                $totalOutstanding = $invoices->sum(fn ($inv) => (float) ($inv->accountPayable?->remaining_original ?? $inv->accountPayable?->remaining ?? $inv->total));
 
                 $newStatus = ($payment->total_payment >= ($totalOutstanding - 1.00))
                     ? VendorPayment::STATUS_PAID
@@ -594,8 +599,8 @@ class VendorPaymentController extends Controller
                 // 1. Reversalkan efek Account Payable dan status Invoice
                 $observer->reverseAccountPayableAndInvoiceStatus($payment);
 
-                // 2. Reversalkan Jurnal Akuntansi Buku Besar (GL)
-                $payment->journalEntries()->delete();
+                // 2. Jurnal pembalik bertanggal pembatalan (jejak audit tetap utuh; ditolak bila periode sudah ditutup)
+                $observer->reverseJournalEntries($payment, now());
 
                 // 3. Update status pembayaran menjadi Cancelled
                 $payment->status = VendorPayment::STATUS_CANCELLED;

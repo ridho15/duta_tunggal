@@ -37,7 +37,7 @@ class VendorPaymentObserver
     public function updated(VendorPayment $payment)
     {
         // Handle amount changes - reverse old journals and post new ones
-        if ($payment->wasChanged('total_payment') && $payment->journalEntries()->exists()) {
+        if ($payment->wasChanged('total_payment') && $this->hasActiveJournal($payment)) {
             $this->reverseJournalEntries($payment);
             // Re-post with new amount if payment is still active
             if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
@@ -61,7 +61,7 @@ class VendorPaymentObserver
         
         // Post journal for both partial and full payments (only if no journals exist)
         if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
-            if (!$payment->journalEntries()->exists()) {
+            if (!$this->hasActiveJournal($payment)) {
                 $this->ledger->postVendorPayment($payment);
             }
         }
@@ -87,7 +87,7 @@ class VendorPaymentObserver
         // Post journal for both partial and full payments
         if (in_array(strtolower($payment->status ?? ''), ['partial', 'paid'])) {
             // Avoid double posting journals: only post if none exist yet
-            if (!$payment->journalEntries()->exists()) {
+            if (!$this->hasActiveJournal($payment)) {
                 try {
                     $this->ledger->postVendorPayment($payment);
                 } catch (Throwable $exception) {
@@ -122,6 +122,12 @@ class VendorPaymentObserver
 
         // Soft delete related vendor payment details
         $payment->vendorPaymentDetail()->delete();
+    }
+
+    /** Jurnal pembayaran yang masih berlaku (belum dibalik). */
+    protected function hasActiveJournal(VendorPayment $payment): bool
+    {
+        return $payment->journalEntries()->where('is_reversal', false)->whereNull('reversal_of_transaction_id')->exists();
     }
 
     public function updateAccountPayableAndInvoiceStatus(VendorPayment $payment)
@@ -165,22 +171,19 @@ class VendorPaymentObserver
             $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($accountPayable->invoice);
             $totalReturnOriginal = round($totalReturnGrossIdr / $exchangeRate, 2);
 
-            $totalPaidOrCreditedOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
-            $newPaidOriginal = min($totalPaidOrCreditedOriginal, $totalOriginal);
-            $newRemainingOriginal = max(0, $totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice);
+            // Tanpa min()/max(0): kelebihan retur atas hutang lunas tetap tercatat sebagai saldo debit (nota debit supplier),
+            // sama dengan saldo GL Hutang Dagang.
+            $newPaidOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
+            $newRemainingOriginal = round($totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice, 4);
 
             $accountPayable->paid_original = $newPaidOriginal;
             $accountPayable->remaining_original = $newRemainingOriginal;
             $accountPayable->paid = round($newPaidOriginal * $exchangeRate, 2);
             $accountPayable->remaining = round($newRemainingOriginal * $exchangeRate, 2);
+            // Sisa ≤ Rp1 dianggap lunas untuk STATUS, tetapi nominalnya TIDAK dihapus: tanpa jurnal penghapusan, menghapusnya
+            // membuat subledger ≠ GL. Sisa sen dapat dilunasi atau disesuaikan (adjustment_amount) lewat pembayaran berikutnya.
             $isPaid = $newRemainingOriginal <= 1.00 || (float) $accountPayable->remaining <= 1.00;
-            if ($isPaid) {
-                $accountPayable->remaining = 0;
-                $accountPayable->remaining_original = 0;
-                $accountPayable->status = PaymentStatus::PAID->value;
-            } else {
-                $accountPayable->status = PaymentStatus::UNPAID->value;
-            }
+            $accountPayable->status = $isPaid ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
             $accountPayable->save();
 
             // Sync invoice status with AP
@@ -237,9 +240,10 @@ class VendorPaymentObserver
             $totalReturnGrossIdr = app(\App\Services\PurchaseReturnService::class)->calculateApprovedReturnsTotalForInvoice($accountPayable->invoice);
             $totalReturnOriginal = round($totalReturnGrossIdr / $exchangeRate, 2);
 
-            $totalPaidOrCreditedOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
-            $newPaidOriginal = min($totalPaidOrCreditedOriginal, $totalOriginal);
-            $newRemainingOriginal = max(0, $totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice);
+            // Tanpa min()/max(0): kelebihan retur atas hutang lunas tetap tercatat sebagai saldo debit (nota debit supplier),
+            // sama dengan saldo GL Hutang Dagang.
+            $newPaidOriginal = (float) $totalPaidOriginalForInvoice + $totalReturnOriginal;
+            $newRemainingOriginal = round($totalOriginal - $newPaidOriginal - (float) $totalAdjustmentOriginalForInvoice, 4);
 
             $accountPayable->paid_original = $newPaidOriginal;
             $accountPayable->remaining_original = $newRemainingOriginal;
@@ -293,10 +297,59 @@ class VendorPaymentObserver
         }
     }
 
-    protected function reverseJournalEntries(VendorPayment $payment)
+    /**
+     * Jurnal yang sudah terposting tidak dihapus: dibuat JURNAL PEMBALIK (debit ↔ kredit) bertanggal pembatalan, jurnal asli
+     * ditandai sudah dibalik. Ditolak bila tanggal pembatalan jatuh di periode akuntansi yang sudah ditutup.
+     */
+    public function reverseJournalEntries(VendorPayment $payment, $reversalDate = null)
     {
-        // Delete existing journal entries to prepare for re-posting
-        $payment->journalEntries()->delete();
+        $date = \Carbon\Carbon::parse($reversalDate ?? now())->toDateString();
+        $originals = \App\Models\JournalEntry::withoutGlobalScopes()->whereNull('deleted_at')
+            ->where('source_type', VendorPayment::class)
+            ->where('source_id', $payment->id)
+            ->where('is_reversal', false)
+            ->whereNull('reversal_of_transaction_id')
+            ->get();
+
+        if ($originals->isEmpty()) {
+            return;
+        }
+
+        foreach ($originals->pluck('cabang_id')->unique() as $cabangId) {
+            try {
+                \App\Models\AccountingPeriod::ensureDateIsOpen($date, $cabangId);
+            } catch (\App\Exceptions\ClosedPeriodException $e) {
+                throw new \App\Exceptions\ClosedPeriodException("Pembayaran {$payment->payment_number} tidak dapat dibatalkan: periode akuntansi tanggal {$date} sudah ditutup. Solusi: buka kembali periode tersebut (Keuangan → Periode Akuntansi) atau minta Manager Keuangan memproses pembatalan di periode terbuka.");
+            }
+        }
+
+        $reversalBatch = 'REV-VP-' . $payment->id . '-' . now()->format('YmdHisv');
+        foreach ($originals as $entry) {
+            \App\Models\JournalEntry::create([
+                'coa_id' => $entry->coa_id,
+                'date' => $date,
+                'reference' => 'REVERSAL: ' . ($entry->reference ?? $payment->payment_number),
+                'description' => 'Pembalikan Jurnal (batal pembayaran): ' . ($entry->description ?? ''),
+                'debit' => $entry->credit,
+                'credit' => $entry->debit,
+                'journal_type' => $entry->journal_type,
+                'cabang_id' => $entry->cabang_id,
+                'department_id' => $entry->department_id,
+                'project_id' => $entry->project_id,
+                'currency_id' => $entry->currency_id,
+                'exchange_rate' => $entry->exchange_rate,
+                'amount_original_currency' => $entry->amount_original_currency,
+                'source_type' => VendorPayment::class,
+                'source_id' => $payment->id,
+                'transaction_id' => $reversalBatch,
+                'is_reversal' => true,
+                'reversal_of_transaction_id' => $entry->transaction_id ?: ('VP-' . $payment->id),
+            ]);
+        }
+
+        // Tandai jurnal asli sudah dibalik (update massal tanpa event: jurnal asli boleh berada di periode tertutup).
+        \App\Models\JournalEntry::withoutGlobalScopes()->whereIn('id', $originals->pluck('id'))
+            ->update(['reversal_of_transaction_id' => $reversalBatch]);
     }
 
     /**
