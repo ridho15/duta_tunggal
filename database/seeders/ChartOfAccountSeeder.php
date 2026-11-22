@@ -87,6 +87,7 @@ class ChartOfAccountSeeder extends Seeder
             '1170.06' => 'PPN MASUKAN',
             '1180' => 'AKTIVA LANCAR LAINNYA',
             '1180.01' => 'BARANG DALAM PERJALANAN',
+            '1180.02' => 'REKENING ANTAR CABANG',
             '1180.10' => 'BARANG TERKIRIM - DEFAULT PRODUK',
             '1200' => 'AKTIVA TETAP',
             '1210' => 'HARGA PEROLEHAN ASET TETAP',

@@ -20,6 +20,7 @@ return [
     'ppn_masukan'            => '1170.06', // PPN Masukan
     'pph22'                  => '1170.02', // PPh Pasal 22
     'fixed_asset'            => '1500',    // Harga Perolehan Aset Tetap
+    'inter_branch'           => '1180.02',  // Rekening Antar Cabang (perantara mutasi stok antar cabang)
 
     // --- Liabilities ---
     'accounts_payable'       => '2110',     // Hutang Dagang

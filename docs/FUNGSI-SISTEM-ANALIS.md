@@ -247,6 +247,12 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 | Retur penjualan tidak tampil di kartu barang | **Diperbaiki.** Gerakan stok retur kini bertanggal hari *Selesaikan* (sebelumnya tanggal retur dibuat sehingga tergeser ke periode lalu). Jurnal retur memakai COA HPP/persediaan produk sebagai cadangan agar *Selesaikan* tidak gagal karena setting COA. Catatan: stok baru masuk saat tombol **Selesaikan** (setelah Disetujui). |
 | Retur by DO: DO pengganti salah | **Diperbaiki.** DO pengganti (…C) = sisa barang bagus seluruh DO asal (DO 8 retur 2 → 6; dulu 2). DO asal ditutup. Kartu barang: keluar 2 & masuk 2 (retur) + keluar 6 saat SJ pengganti = total keluar 8, masuk 2. |
 
+**Keputusan 22 Nov 2026 — Mutasi stok antar cabang**
+
+| Item | Penyelesaian |
+|---|---|
+| Jurnal mutasi antar cabang | **Sudah.** Laporan per cabang dipakai; mutasi dinilai **HPP** (tanpa margin), dijurnal **saat disetujui** lewat akun perantara **1180.02 Rekening Antar Cabang** (dibuat otomatis oleh migrasi). Cabang asal: Dr Rek. Antar Cabang / Cr Persediaan; cabang tujuan: Dr Persediaan / Cr Rek. Antar Cabang — saling meniadakan di laporan gabungan. Mutasi satu cabang tidak dijurnal. Ubah qty mutasi yang sudah disetujui → jurnal dibalik & diposting ulang; Void → jurnal pembalik. Mutasi antar cabang yang disetujui **sebelum** deploy tidak dijurnal ulang otomatis. |
+
 ## 9. Cara Menguji
 
 **Aturan praktis**
