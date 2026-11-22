@@ -268,6 +268,16 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
             'quantity' => 2,
         ]);
 
+        // DO sudah berangkat & dijurnal (Dr Barang Terkirim / Cr Persediaan @ HPP 50.000 × 2). Hanya DO yang sudah dijurnal
+        // yang dibalik; retur by DO sebelum SJ tidak menjurnal apa pun (lihat test berikutnya).
+        foreach ([[$this->goodsDeliveryCoa, 100000, 0], [$this->inventoryCoa, 0, 100000]] as [$coa, $debit, $credit]) {
+            JournalEntry::create([
+                'coa_id' => $coa->id, 'date' => now()->toDateString(), 'reference' => $do->do_number, 'description' => 'Goods Delivery '.$do->do_number,
+                'debit' => $debit, 'credit' => $credit, 'journal_type' => 'sales', 'source_type' => DeliveryOrder::class, 'source_id' => $do->id,
+                'cabang_id' => $this->cabang->id,
+            ]);
+        }
+
         // Uninvoiced DO: No invoice created!
         $returnProduct = ReturnProduct::create([
             'return_number' => 'RET-UNINV-' . strtoupper(substr(uniqid(), -4)),
@@ -305,6 +315,37 @@ class CustomerReturnAndReturnProductFinancialTest extends TestCase
         $this->assertEquals(50000.0, (float) $debitInventory->debit);
         $this->assertNotNull($creditDelivery, 'Akun Barang Terkirim harus dikredit untuk DO yang belum di-invoice.');
         $this->assertEquals(50000.0, (float) $creditDelivery->credit);
+    }
+
+    public function test_return_product_for_do_before_surat_jalan_posts_no_journal(): void
+    {
+        $so = SaleOrder::create([
+            'so_number' => 'SO-DO-PRE-' . uniqid(), 'customer_id' => $this->customer->id, 'cabang_id' => $this->cabang->id,
+            'order_date' => now(), 'status' => 'approved', 'total_amount' => 100000,
+        ]);
+        InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'rak_id' => null],
+            ['qty_available' => 50, 'qty_reserved' => 0]
+        );
+        $do = DeliveryOrder::create([
+            'do_number' => 'DO-PRE-' . uniqid(), 'sale_order_id' => $so->id, 'customer_id' => $this->customer->id,
+            'warehouse_id' => $this->warehouse->id, 'cabang_id' => $this->cabang->id, 'status' => 'confirmed', 'delivery_date' => now(),
+        ]);
+        $doItem = DeliveryOrderItem::create(['delivery_order_id' => $do->id, 'product_id' => $this->product->id, 'quantity' => 2]);
+        $returnProduct = ReturnProduct::create([
+            'return_number' => 'RET-PRE-' . strtoupper(substr(uniqid(), -4)), 'from_model_type' => DeliveryOrder::class, 'from_model_id' => $do->id,
+            'warehouse_id' => $this->warehouse->id, 'status' => 'draft', 'reason' => 'Retur sebelum Surat Jalan',
+        ]);
+        ReturnProductItem::create([
+            'return_product_id' => $returnProduct->id, 'from_item_model_type' => DeliveryOrderItem::class, 'from_item_model_id' => $doItem->id,
+            'product_id' => $this->product->id, 'quantity' => 1, 'condition' => 'good',
+        ]);
+
+        app(ReturnProductService::class)->updateQuantityFromModel($returnProduct);
+
+        $this->assertEquals('approved', $returnProduct->fresh()->status);
+        $this->assertSame(0, JournalEntry::where('source_type', ReturnProduct::class)->where('source_id', $returnProduct->id)->count(),
+            'DO belum pernah dijurnal: retur tidak boleh memposting jurnal pembalik.');
     }
 
     public function test_return_product_for_invoiced_do_credits_cogs_account_and_updates_sales_invoice(): void

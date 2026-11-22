@@ -23,10 +23,11 @@ use Illuminate\Validation\ValidationException;
  *  - B15: stok yang kembali tercatat sebagai Stock Adjustment (approved) bernomor sama dengan retur (DO…R);
  *  - B16: barang kondisi damage/repair (reject) masuk ke gudang KARANTINA cabang (bukan stok jual), kondisi good kembali ke gudang sumber;
  *  - B17: gerakan stoknya berjenis sendiri `do_return` ("Retur DO"), bukan `customer_return`;
- *  - B14: DO asal ditandai "sudah diretur" dan dibuat DO pengganti (DO…C) untuk kuantitas yang diretur.
+ *  - B14: DO asal ditandai "sudah diretur" dan dibuat DO pengganti (DO…C): sebelum SJ berisi sisa barang bagus dan DO asal ditutup;
+ *    DO yang sudah berangkat: pengganti untuk kuantitas yang diretur.
  *
- * Jurnal akuntansi retur tetap dari ReturnProductService::createReversingJournalEntries; Stock Adjustment di sini hanya mencatat stok
- * (tanpa jurnal sendiri) agar tidak terjadi pembukuan ganda.
+ * Jurnal akuntansi retur tetap dari ReturnProductService::createReversingJournalEntries (hanya bila DO sudah dijurnal/diinvoice);
+ * Stock Adjustment di sini hanya mencatat stok (tanpa jurnal sendiri) agar tidak terjadi pembukuan ganda.
  */
 class DeliveryOrderReturnProcessor
 {
@@ -317,13 +318,29 @@ class DeliveryOrderReturnProcessor
             return $existing;
         }
 
+        // Retur sebelum Surat Jalan: DO pengganti berisi SISA barang bagus (kuantitas DO asal setelah dikurangi retur) dan DO asal
+        // ditutup agar kuncinya lepas — hanya DO…C yang boleh jadi SJ. DO yang sudah berangkat tetap: pengganti = barang yang diretur.
+        if (! \App\Observers\DeliveryOrderObserver::isDispatched($deliveryOrder)
+            && ! in_array($deliveryOrder->status, ['closed', 'reject'], true)) {
+            $lines = $deliveryOrder->deliveryOrderItem()->get()
+                ->filter(fn (DeliveryOrderItem $i) => (float) $i->quantity > 0.00001)
+                ->map(fn (DeliveryOrderItem $i) => ['do_item' => $i, 'quantity' => (float) $i->quantity]);
+
+            $deliveryOrder->forceFill([
+                'status' => 'closed',
+                'notes' => trim(($deliveryOrder->notes ? $deliveryOrder->notes.' | ' : '').'Ditutup karena retur '.$returnProduct->return_number.'; sisa barang dikirim lewat DO pengganti.'),
+            ])->save();
+
+            return $this->createReplacement($deliveryOrder, $returnProduct, $lines);
+        }
+
         return $this->createReplacement($deliveryOrder, $returnProduct);
     }
 
-    private function createReplacement(DeliveryOrder $original, ReturnProduct $returnProduct): ?DeliveryOrder
+    private function createReplacement(DeliveryOrder $original, ReturnProduct $returnProduct, $lines = null): ?DeliveryOrder
     {
         $returnProduct->loadMissing('returnProductItem');
-        $lines = $returnProduct->returnProductItem
+        $lines ??= $returnProduct->returnProductItem
             ->filter(fn (ReturnProductItem $i) => $i->from_item_model_type === DeliveryOrderItem::class && (float) $i->quantity > 0)
             ->groupBy('from_item_model_id')
             ->map(fn ($group, $itemId) => ['do_item' => DeliveryOrderItem::withoutGlobalScopes()->find($itemId), 'quantity' => (float) $group->sum('quantity')])

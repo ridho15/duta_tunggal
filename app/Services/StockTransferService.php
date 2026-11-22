@@ -281,6 +281,8 @@ class StockTransferService
             'warehouse_id' => $warehouseId,
             'rak_id' => $rakId,
             'quantity' => $stockTransferItem->quantity,
+            // Nilai kartu stok mutasi = qty × HPP rata-rata produk (keluar & masuk bernilai sama, tanpa dampak GL)
+            'value' => round((float) $stockTransferItem->quantity * (float) ($stockTransferItem->product?->cost_price ?? 0), 2),
             'type' => $type,
             'reference_id' => $stockTransfer->transfer_number,
             'date' => $stockTransfer->transfer_date,

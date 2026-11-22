@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Gudang;
 
-use App\Helpers\MoneyHelper;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryStock;
 use App\Models\Product;
@@ -196,13 +195,6 @@ class StockAdjustmentController extends Controller
 
     private function validated(Request $request): array
     {
-        $items = collect($request->input('items', []))->map(function ($item) {
-            $item['unit_cost'] = filled($item['unit_cost'] ?? null) ? MoneyHelper::safeParse($item['unit_cost']) : 0;
-
-            return $item;
-        })->all();
-        $request->merge(['items' => $items]);
-
         $data = $request->validate([
             'adjustment_date' => ['required', 'date'],
             'warehouse_id' => ['required', 'integer', 'in:'.$this->warehouses()->pluck('id')->implode(',')],
@@ -213,7 +205,6 @@ class StockAdjustmentController extends Controller
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.rak_id' => ['nullable', 'integer'],
             'items.*.adjusted_qty' => ['required', 'numeric', 'min:0'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string'],
         ], ['items.required' => 'Tambahkan minimal satu item.', 'warehouse_id.in' => 'Gudang tidak tersedia untuk akun Anda.']);
 
@@ -226,7 +217,7 @@ class StockAdjustmentController extends Controller
         return $data;
     }
 
-    /** Simpan header + item; qty saat ini, selisih, dan nilai dihitung ulang di server. */
+    /** Simpan header + item; qty saat ini, selisih, dan nilai (selisih x HPP rata-rata produk, #4B) dihitung ulang di server. */
     private function persist(StockAdjustment $adjustment, array $data): StockAdjustment
     {
         $adjustment->fill(collect($data)->only(['adjustment_date', 'warehouse_id', 'adjustment_type', 'reason', 'notes'])->all())->save();
@@ -244,10 +235,11 @@ class StockAdjustmentController extends Controller
 
                 continue;
             }
+            $hpp = (float) (Product::query()->whereKey($item['product_id'])->value('cost_price') ?? 0);
             $adjustment->items()->create([
                 'product_id' => $item['product_id'], 'rak_id' => $item['rak_id'] ?? null, 'current_qty' => $current,
-                'adjusted_qty' => $item['adjusted_qty'], 'difference_qty' => $diff, 'unit_cost' => $item['unit_cost'],
-                'difference_value' => round($diff * (float) $item['unit_cost'], 2), 'notes' => $item['notes'] ?? null,
+                'adjusted_qty' => $item['adjusted_qty'], 'difference_qty' => $diff, 'unit_cost' => $hpp,
+                'difference_value' => round($diff * $hpp, 2), 'notes' => $item['notes'] ?? null,
             ]);
         }
         if ($errors) {

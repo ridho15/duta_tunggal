@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\InventoryStock;
 use App\Models\Product;
-use App\Models\PurchaseReceiptItem;
 use App\Models\Rak;
 use App\Models\StockMovement;
 use App\Models\StockOpname;
@@ -105,6 +104,21 @@ class StockOpnameService
                     continue;
                 }
 
+                // Nilai selisih dihitung ulang dengan HPP rata-rata saat disetujui (#4B) agar kartu stok = jurnal = GL persediaan.
+                $hpp = $this->calculateProductCost((int) $item->product_id);
+                if ($hpp <= 0) {
+                    throw ValidationException::withMessages([
+                        'items' => sprintf(
+                            'HPP produk %s masih 0, sehingga selisih opname (%s) tidak dapat dinilai dan dijurnal. Isi HPP (cost_price) produk di Master Produk, lalu setujui stock opname lagi.',
+                            $item->product?->name ?? $item->product_id,
+                            rtrim(rtrim(number_format($diffQty, 2, ',', '.'), '0'), ',')
+                        ),
+                    ]);
+                }
+                if (abs((float) $item->unit_cost - $hpp) > 0.00001) {
+                    $item->update(['unit_cost' => $hpp, 'average_cost' => $hpp]);
+                }
+
                 $type = $diffQty > 0 ? 'adjustment_in' : 'adjustment_out';
                 $existingMovement = StockMovement::query()
                     ->where('from_model_type', StockOpname::class)
@@ -183,7 +197,6 @@ class StockOpnameService
             }
 
             $count = 0;
-            $opnameDate = $lockedOpname->opname_date ?? now();
 
             if ($stocks->isNotEmpty()) {
                 foreach ($stocks as $stock) {
@@ -197,7 +210,7 @@ class StockOpnameService
                     }
 
                     $systemQty = (float) $stock->qty_available;
-                    $avgCost = $this->calculateProductCost($stock->product_id, $opnameDate);
+                    $avgCost = $this->calculateProductCost((int) $stock->product_id);
 
                     $existingItem = StockOpnameItem::query()
                         ->where('stock_opname_id', $lockedOpname->id)
@@ -248,7 +261,7 @@ class StockOpnameService
                 // If warehouse has no inventory stock rows yet, load active products
                 $products = Product::where('status', 1)->get();
                 foreach ($products as $product) {
-                    $avgCost = (float) ($product->cost_price ?? $product->price_buy ?? 0);
+                    $avgCost = (float) ($product->cost_price ?? 0);
                     StockOpnameItem::firstOrCreate([
                         'stock_opname_id' => $lockedOpname->id,
                         'product_id' => $product->id,
@@ -307,30 +320,12 @@ class StockOpnameService
         });
     }
 
-    protected function calculateProductCost(int $productId, mixed $opnameDate): float
+    /**
+     * Keputusan #4B: nilai selisih opname = selisih qty x HPP rata-rata bergerak (products.cost_price), sama dengan nilai
+     * persediaan di GL. Harga penerimaan pembelian tidak dipakai (kolom harga tidak ada di purchase_receipt_items).
+     */
+    protected function calculateProductCost(int $productId): float
     {
-        $purchaseItems = PurchaseReceiptItem::where('product_id', $productId)
-            ->whereHas('purchaseReceipt', function ($query) use ($opnameDate) {
-                $query->where('receipt_date', '<=', $opnameDate);
-            })
-            ->orderBy('purchase_receipt_items.created_at', 'asc')
-            ->get();
-
-        if ($purchaseItems->isEmpty()) {
-            $product = Product::find($productId);
-
-            return (float) ($product ? ($product->cost_price ?? $product->price_buy ?? 0) : 0);
-        }
-
-        $totalQty = 0;
-        $totalVal = 0;
-        foreach ($purchaseItems as $item) {
-            $qty = (float) ($item->quantity_received ?? $item->qty_received ?? $item->quantity ?? 0);
-            $price = (float) ($item->unit_price ?? 0);
-            $totalQty += $qty;
-            $totalVal += ($qty * $price);
-        }
-
-        return $totalQty > 0 ? $totalVal / $totalQty : 0.0;
+        return (float) (Product::query()->whereKey($productId)->value('cost_price') ?? 0);
     }
 }

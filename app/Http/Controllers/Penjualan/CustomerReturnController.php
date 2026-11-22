@@ -616,7 +616,7 @@ class CustomerReturnController extends Controller
                 $parts[] = $fmt($summary['restored_qty']).' pcs masuk stok '.($summary['warehouse'] ?? 'gudang');
             }
             if ($summary['repair_qty'] > 0) {
-                $parts[] = $fmt($summary['repair_qty']).' pcs dicatat sebagai barang dalam perbaikan (belum masuk stok jual)';
+                $parts[] = $fmt($summary['repair_qty']).' pcs diterima untuk diperbaiki lalu dikembalikan ke customer (tidak masuk stok; penjualan, PPN, dan piutang tidak dibalik)';
             }
             if ($summary['rejected_qty'] > 0) {
                 $parts[] = $fmt($summary['rejected_qty']).' pcs klaim ditolak (tidak masuk stok)';

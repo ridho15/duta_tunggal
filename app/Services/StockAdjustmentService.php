@@ -93,6 +93,7 @@ class StockAdjustmentService
                     }
                 }
 
+                $this->priceAtAverageCost($item);
                 $this->upsertItemMovement($lockedAdjustment, $item);
             }
 
@@ -149,6 +150,28 @@ class StockAdjustmentService
             throw ValidationException::withMessages([
                 'items' => 'Stock adjustment tipe pengurangan hanya boleh berisi item dengan selisih qty negatif.',
             ]);
+        }
+    }
+
+    /**
+     * Keputusan #4B: nilai penyesuaian = selisih qty x HPP rata-rata bergerak (products.cost_price) saat disetujui, bukan harga isian
+     * user, agar kartu stok, jurnal, dan GL persediaan memakai nilai yang sama.
+     */
+    private function priceAtAverageCost(StockAdjustmentItem $item): void
+    {
+        $hpp = (float) ($item->product?->cost_price ?? 0);
+        if ($hpp <= 0) {
+            throw ValidationException::withMessages([
+                'accounting' => sprintf(
+                    "HPP produk '%s' masih 0, sehingga penyesuaian stok tidak dapat dinilai dan dijurnal. Isi HPP (cost_price) produk di Master Produk, lalu setujui lagi.",
+                    $item->product?->name ?? 'Produk ID '.$item->product_id
+                ),
+            ]);
+        }
+
+        $value = round((float) $item->difference_qty * $hpp, 2);
+        if (abs((float) $item->unit_cost - $hpp) > 0.00001 || abs((float) $item->difference_value - $value) > 0.004) {
+            $item->forceFill(['unit_cost' => $hpp, 'difference_value' => $value])->save();
         }
     }
 
@@ -225,14 +248,11 @@ class StockAdjustmentService
                 continue;
             }
 
+            // Nilai sudah ditetapkan = selisih qty x HPP saat disetujui (priceAtAverageCost); tanpa fallback harga jual.
             $itemVal = abs((float) $item->difference_value);
-            if ($itemVal <= 0) {
-                $unitCost = (float) ($item->unit_cost ?: ($item->product?->cost_price ?? $item->product?->sell_price ?? 0));
-                $itemVal = $qtyDiff * $unitCost;
-            }
 
             $inventoryCoa = $item->product?->resolveInventoryCoaOrDefault()
-                ?? ChartOfAccount::whereIn('code', ['1140.10', '1140.01', '1140', '1100'])->first();
+                ?? $this->findFirstExistingCoa(['1140.10', '1140.01']);
 
             if (! $inventoryCoa) {
                 $prodName = $item->product?->name ?? 'Produk ID ' . $item->product_id;
@@ -244,7 +264,7 @@ class StockAdjustmentService
             if ($itemVal <= 0) {
                 $prodName = $item->product?->name ?? 'Produk ID ' . $item->product_id;
                 throw ValidationException::withMessages([
-                    'accounting' => "Produk '{$prodName}' tidak memiliki harga pokok (cost_price) atau nilai penyesuaian yang valid untuk penjurnalan persediaan.",
+                    'accounting' => "Produk '{$prodName}' tidak memiliki nilai penyesuaian (selisih qty x HPP) yang valid untuk penjurnalan persediaan. Isi HPP (cost_price) produk di Master Produk, lalu setujui lagi.",
                 ]);
             }
 

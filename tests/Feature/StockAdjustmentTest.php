@@ -337,7 +337,7 @@ function adjJournal(StockAdjustment $adjustment): \Illuminate\Support\Collection
 
 test('#4B penyesuaian lebih: Persediaan didebit, HPP dikredit (bukan pendapatan lain-lain)', function () {
     $adjustment = StockAdjustment::factory()->draft()->increase()->create();
-    $product = Product::factory()->create(['cogs_coa_id' => null]);
+    $product = Product::factory()->create(['cogs_coa_id' => null, 'cost_price' => 1000]);   // nilai = selisih × HPP produk
     $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
     StockAdjustmentItem::create([
         'stock_adjustment_id' => $adjustment->id, 'product_id' => $product->id, 'rak_id' => $rak->id,
@@ -354,7 +354,7 @@ test('#4B penyesuaian lebih: Persediaan didebit, HPP dikredit (bukan pendapatan 
 
 test('#4B penyesuaian kurang: HPP didebit, Persediaan dikredit (bukan biaya lain-lain)', function () {
     $adjustment = StockAdjustment::factory()->draft()->create(['adjustment_type' => 'decrease']);
-    $product = Product::factory()->create(['cogs_coa_id' => null]);
+    $product = Product::factory()->create(['cogs_coa_id' => null, 'cost_price' => 2000]);   // nilai = selisih × HPP produk
     $rak = Rak::factory()->create(['warehouse_id' => $adjustment->warehouse_id]);
     \App\Models\InventoryStock::create(['product_id' => $product->id, 'warehouse_id' => $adjustment->warehouse_id, 'rak_id' => $rak->id, 'qty_available' => 10, 'qty_reserved' => 0, 'qty_min' => 0]);
     StockAdjustmentItem::create([
