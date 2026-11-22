@@ -17,7 +17,7 @@ return new class extends Migration
         $exists = Schema::hasColumn('invoices', 'dpp_nilai_lain');
         Schema::table('invoices', function (Blueprint $table) use ($exists) {
             $table->decimal('tax', 18, 2)->default(0)->change();
-            $column = $table->decimal('dpp_nilai_lain', 18, 2)->default(0);
+            $column = $table->decimal('dpp_nilai_lain', 18, 2)->nullable()->default(0);
             $exists ? $column->change() : $column->after('dpp');
         });
     }
