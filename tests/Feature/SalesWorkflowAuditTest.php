@@ -431,7 +431,7 @@ describe('PDF generators include required item columns and totals', function () 
             'No', 'Nama Barang', 'Qty', 'Harga Satuan', 'Disc (%)', 'Tax (%)', 'PPN', 'Subtotal'
         ]);
         expect($html)->toContain('GRAND TOTAL');
-        expect($html)->toContain('Rp 212.800');
+        expect($html)->toContain('Rp 210.900');   // 190.000 + 12% × (11/12 × 190.000) — PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
     });
 
     it('invoice PDF includes all columns', function () {
@@ -561,7 +561,7 @@ describe('Excel exports reflect correct columns and values', function () {
         // compute expected values
         $lineBase = 2 * 500000;
         $afterDiscount = $lineBase * 0.90;
-        $taxRes = \App\Services\TaxService::compute($afterDiscount, 12, 'Eksklusif');
+        $taxRes = \App\Support\LineAmounts::calculate(2, 500000, 10, 12, 'Eksklusif');   // PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
         $expectedTaxAmt = $taxRes['ppn'];
         $expectedSubtotal = $taxRes['total'];
 
@@ -717,7 +717,7 @@ describe('PPN Keluaran journal entry — correct monetary amount', function () {
             ->where('coa_id', $this->coas['ar']->id)
             ->first();
 
-        expect((float) $arEntry->debit)->toBe(2_240_000.0); // 2 * 1M * 1.12
+        expect((float) $arEntry->debit)->toBe(2_220_000.0); // 2 * 1M * 1.11 — PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
     });
 
     it('journal entries are balanced (total debit == total credit)', function () {
@@ -1205,7 +1205,7 @@ describe('Inclusive tax invoice workflow', function () {
     });
 
     it('inclusive tax: total stays at gross price, DPP extracted correctly', function () {
-        // 1,120,000 gross, 12% inclusive → DPP = 1,000,000, PPN = 120,000
+        // 1,120,000 gross, 12% inclusive atas DPP Nilai Lain (efektif 11%) → DPP = 1,120,000 × 100/111, PPN = sisanya
         $so = SaleOrder::factory()->create([
             'customer_id' => $this->customer->id,
             'cabang_id'   => $this->cabang->id,
@@ -1229,11 +1229,11 @@ describe('Inclusive tax invoice workflow', function () {
             ->first();
 
         // Invoice subtotal (DPP) should be 1,000,000
-        expect((float) $invoice->subtotal)->toBe(1_000_000.0);
+        expect((float) $invoice->subtotal)->toBe(1_009_009.01);
 
         // Invoice items should have correct tax_amount
         $item = InvoiceItem::where('invoice_id', $invoice->id)->first();
-        expect((float) $item->tax_amount)->toBe(120_000.0);
+        expect((float) $item->tax_amount)->toBe(110_990.99);
 
         // total = DPP + PPN = 1,120,000
         expect((float) $invoice->total)->toBe(1_120_000.0);
@@ -1446,7 +1446,7 @@ describe('SalesOrderService::updateTotalAmount — null tipe_pajak defaults to E
         $soIncl->refresh();
 
         // Exclusive total > Inclusive total for same unit_price
-        expect((float) $soExcl->total_amount)->toBe(1_120_000.0);   // 1,000,000 + 120,000 PPN
+        expect((float) $soExcl->total_amount)->toBe(1_110_000.0);   // 1,000,000 + 110,000 PPN (PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif)
         expect((float) $soIncl->total_amount)->toBe(1_000_000.0);   // stays at gross
         expect($soExcl->total_amount)->toBeGreaterThan($soIncl->total_amount);
     });

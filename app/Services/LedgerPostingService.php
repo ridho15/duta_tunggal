@@ -399,7 +399,7 @@ class LedgerPostingService
      * @param  int|null  $cabangId  cabang jurnal; bila null, ditentukan JournalBranchResolver (mis. dari pembuat).
      *                              Deposit dari kelebihan penerimaan wajib memakai cabang invoice/penerimaan.
      */
-    public function postDeposit(\App\Models\Deposit $deposit, ?int $cabangId = null): array
+    public function postDeposit(\App\Models\Deposit $deposit, ?int $cabangId = null, ?string $date = null): array
     {
         // Atomic duplicate-posting guard.
         $alreadyPosted = DB::transaction(function () use ($deposit) {
@@ -421,7 +421,8 @@ class LedgerPostingService
         $exchangeRate = $currencyContext['exchange_rate'];
 
         $entries = [];
-        $date = now()->toDateString();
+        // Tanggal jurnal = tanggal uang diterima/dibayar (payment_date) bila diberikan pemanggil, bukan tanggal input.
+        $date = $date ? Carbon::parse($date)->toDateString() : now()->toDateString();
 
         // Supplier deposit (uang muka pembelian)
         if ($deposit->from_model_type === 'App\\Models\\Supplier') {
@@ -462,11 +463,21 @@ class LedgerPostingService
                 ], $currencyId, $exchangeRate);
             }
         } elseif ($deposit->from_model_type === 'App\\Models\\Customer') {
-            // Customer deposit (receipt from customer)
-            // Debit: Kas/Bank (coa_id in deposit)
-            if ($deposit->coa_id) {
+            // Customer deposit: Dr Kas/Bank penerima (payment_coa_id) / Cr Deposit Pelanggan (coa_id = akun liabilitas).
+            // Data lama menyimpan akun kas di coa_id; bila coa_id bukan liabilitas dan payment_coa_id kosong, coa_id dipakai sebagai kas.
+            $liabilityCoa = \App\Models\Deposit::customerDepositAccount();
+            if (! $liabilityCoa) {
+                throw new \RuntimeException('Akun Deposit Pelanggan (' . config('coa.customer_deposit') . ') tidak ditemukan; jurnal titip dana tidak dapat dibuat. Tambahkan akun tersebut di Chart of Account / Pengaturan Akuntansi.');
+            }
+            $cashCoaId = $deposit->payment_coa_id
+                ?: ((int) $deposit->coa_id !== (int) $liabilityCoa->id && strcasecmp((string) $deposit->coa?->type, 'Liability') !== 0 ? $deposit->coa_id : null);
+            if (! $cashCoaId) {
+                throw new \RuntimeException("Deposit {$deposit->deposit_number} tidak memiliki akun Kas/Bank penerima (payment_coa_id); jurnal titip dana tidak dapat dibuat.");
+            }
+
+            if ($cashCoaId) {
                 $entries[] = $this->createJournalEntry([
-                    'coa_id' => $deposit->coa_id,
+                    'coa_id' => $cashCoaId,
                     'date' => $date,
                     'reference' => 'DEP-' . $deposit->id,
                     'description' => 'Deposit from customer - ' . ($deposit->fromModel->name ?? ''),
@@ -482,7 +493,6 @@ class LedgerPostingService
             }
 
             // Credit: Customer deposit liability
-            $liabilityCoa = \App\Models\ChartOfAccount::where('code', config('coa.customer_deposit'))->first();
             if ($liabilityCoa) {
                 $entries[] = $this->createJournalEntry([
                     'coa_id' => $liabilityCoa->id,
@@ -1097,26 +1107,13 @@ class LedgerPostingService
         return $snapshots;
     }
 
+    /**
+     * Pemakaian deposit customer selalu mendebit akun liabilitas Deposit Pelanggan (2160.04) — akun yang sama yang dikredit saat
+     * titip dana/kelebihan bayar. Dulu memakai deposits.coa_id yang berisi akun KAS sehingga pemakaian deposit mendebit Kas.
+     */
     private function resolveDepositCoaForCustomer(\App\Models\CustomerReceipt $receipt): ?ChartOfAccount
     {
-        // Find deposit for this customer
-        $deposit = \App\Models\Deposit::where('from_model_type', \App\Models\Customer::class)
-            ->where('from_model_id', $receipt->customer_id)
-            ->first();
-
-        if ($deposit && $deposit->coa) {
-            return $deposit->coa;
-        }
-
-        $preferredCodes = ['1150.01', '1150.02', '1150'];
-        foreach ($preferredCodes as $code) {
-            $coa = ChartOfAccount::where('code', $code)->first();
-            if ($coa) {
-                return $coa;
-            }
-        }
-
-        return ChartOfAccount::where('name', 'LIKE', '%UANG MUKA%')->first();
+        return \App\Models\Deposit::customerDepositAccount();
     }
 
     /**

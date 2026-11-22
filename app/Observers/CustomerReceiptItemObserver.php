@@ -5,9 +5,8 @@ namespace App\Observers;
 use App\Models\AccountReceivable;
 use App\Models\CustomerReceiptItem;
 use App\Models\Deposit;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class CustomerReceiptItemObserver
 {
@@ -34,74 +33,66 @@ class CustomerReceiptItemObserver
         // Update customer receipt status based on all selected invoices
         $this->updateCustomerReceiptStatus($customerReceipt);
 
-        $deposit = Deposit::where('from_model_type', 'App\Models\Customer')
-            ->where('from_model_id', $customerReceipt->customer_id)->where('status', 'active')->first();
-        if ($deposit) {
-            $deposit->remaining_amount = $deposit->remaining_amount - $customerReceiptItem->amount;
-            $deposit->used_amount = $deposit->used_amount + $customerReceiptItem->amount;
-            $deposit->save();
-
-            $customerReceiptItem->depositLog()->create([
-                'deposit_id' => $deposit->id,
-                'amount' => $customerReceiptItem->amount,
-                'type' => 'use',
-                'created_by' => Auth::user() ? Auth::user()->id : 1 // Fallback to user ID 1 if no auth context
-            ]);
-        }
-
-        // Handle deposit usage for customer receipts (similar to vendor payments)
-        if ($customerReceipt->payment_method === 'Deposit' || $customerReceiptItem->method === 'Deposit') {
-            // Get all active deposits for this customer with remaining balance, ordered by creation date (FIFO)
-            $availableDeposits = Deposit::where('from_model_type', 'App\Models\Customer')
-                ->where('from_model_id', $customerReceipt->customer_id)
-                ->where('status', 'active')
-                ->where('remaining_amount', '>', 0)
-                ->orderBy('created_at', 'asc') // FIFO - oldest deposits first
-                ->get();
-
-            if ($availableDeposits->isNotEmpty()) {
-                $remainingPaymentAmount = $customerReceiptItem->amount;
-
-                foreach ($availableDeposits as $deposit) {
-                    if ($remainingPaymentAmount <= 0) {
-                        break; // Payment fully covered
-                    }
-
-                    $amountToUse = min($remainingPaymentAmount, $deposit->remaining_amount);
-
-                    // Update deposit balances
-                    $deposit->remaining_amount -= $amountToUse;
-                    $deposit->used_amount += $amountToUse;
-
-                    if ($deposit->remaining_amount <= 0) {
-                        $deposit->status = 'closed';
-                    }
-                    $deposit->save();
-
-                    // Create deposit log for this usage
-                    $customerReceiptItem->depositLog()->create([
-                        'deposit_id' => $deposit->id,
-                        'amount' => $amountToUse,
-                        'type' => 'use',
-                        'created_by' => Auth::user() ? Auth::user()->id : 1
-                    ]);
-
-                    $remainingPaymentAmount -= $amountToUse;
-                }
-
-                // If payment couldn't be fully covered by available deposits
-                if ($remainingPaymentAmount > 0) {
-                    Log::warning("Insufficient deposit balance for customer receipt item ID {$customerReceiptItem->id}. Remaining amount: {$remainingPaymentAmount}");
-                }
-            } else {
-                Log::warning("No available deposits found for customer ID {$customerReceipt->customer_id} in customer receipt item ID {$customerReceiptItem->id}");
-            }
+        // Saldo deposit dipotong HANYA untuk rincian bermetode Deposit — satu kali, FIFO lintas baris deposit aktif.
+        // Rincian Tunai/Transfer/Giro/Cek/Pembulatan tidak menyentuh saldo titip customer.
+        $method = strtolower((string) ($customerReceiptItem->method ?: $customerReceipt->payment_method));
+        if ($method === 'deposit') {
+            $this->consumeDeposits($customerReceiptItem, (int) $customerReceipt->customer_id);
         }
 
         // Journal posting is handled at the CustomerReceipt level via LedgerPostingService.
         // Item observer only keeps deposits and AR status in sync.
     }
     
+    /**
+     * @throws ValidationException saldo deposit customer tidak cukup (jurnal Dr Deposit Pelanggan tidak boleh melebihi subledger)
+     */
+    private function consumeDeposits(CustomerReceiptItem $item, int $customerId): void
+    {
+        $need = round((float) $item->amount, 2);
+        $deposits = Deposit::where('from_model_type', \App\Models\Customer::class)
+            ->where('from_model_id', $customerId)
+            ->where('status', 'active')
+            ->where('remaining_amount', '>', 0)
+            ->orderBy('created_at')->orderBy('id')   // FIFO — setoran terlama dipakai lebih dulu
+            ->lockForUpdate()
+            ->get();
+
+        $available = round((float) $deposits->sum('remaining_amount'), 2);
+        if ($available + 0.005 < $need) {
+            throw ValidationException::withMessages([
+                'payment_method' => sprintf(
+                    'Saldo Deposit Pelanggan tidak mencukupi: dibutuhkan Rp %s, saldo Rp %s. Kurangi nominal atau pilih metode Tunai/Transfer untuk sisanya.',
+                    number_format($need, 2, ',', '.'),
+                    number_format($available, 2, ',', '.')
+                ),
+            ]);
+        }
+
+        foreach ($deposits as $deposit) {
+            if ($need <= 0.005) {
+                break;
+            }
+
+            $take = round(min($need, (float) $deposit->remaining_amount), 2);
+            $deposit->remaining_amount = round((float) $deposit->remaining_amount - $take, 2);
+            $deposit->used_amount = round((float) $deposit->used_amount + $take, 2);
+            if ($deposit->remaining_amount <= 0.005) {
+                $deposit->status = 'closed';
+            }
+            $deposit->save();
+
+            $item->depositLog()->create([
+                'deposit_id' => $deposit->id,
+                'amount' => $take,
+                'type' => 'use',
+                'created_by' => Auth::id() ?? $deposit->created_by,
+            ]);
+
+            $need = round($need - $take, 2);
+        }
+    }
+
     private function updateCustomerReceiptStatus($customerReceipt)
     {
         // Check status of all invoices in selected_invoices

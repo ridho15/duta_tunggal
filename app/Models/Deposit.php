@@ -61,6 +61,41 @@ class Deposit extends Model
         return $this->morphMany(JournalEntry::class, 'source');
     }
 
+    /**
+     * Akun liabilitas Deposit Pelanggan (Pengaturan Akuntansi → config coa.customer_deposit, bawaan 2160.04).
+     * Semua titip dana / kelebihan bayar customer dikredit ke akun ini dan pemakaiannya didebit dari akun ini.
+     */
+    public static function customerDepositAccount(): ?ChartOfAccount
+    {
+        return app(\App\Services\AccountingSettings::class)->first('customer_deposit');
+    }
+
+    /**
+     * Saldo titip yang sedang DICADANGKAN (verifikasi kasir COD, belum menjadi penerimaan) = Σ reserve − Σ release.
+     * Tanpa $saleOrderId: seluruh SO customer.
+     */
+    public static function reservedForCustomer(int $customerId, ?int $saleOrderId = null): float
+    {
+        $sum = fn (string $type) => (float) DepositLog::query()
+            ->join('deposits', 'deposits.id', '=', 'deposit_logs.deposit_id')
+            ->whereNull('deposits.deleted_at')
+            ->where('deposits.from_model_type', Customer::class)->where('deposits.from_model_id', $customerId)
+            ->where('deposit_logs.type', $type)->where('deposit_logs.reference_type', SaleOrder::class)
+            ->when($saleOrderId, fn ($q) => $q->where('deposit_logs.reference_id', $saleOrderId))
+            ->sum('deposit_logs.amount');
+
+        return max(0.0, round($sum('reserve') - $sum('release'), 2));
+    }
+
+    /** Saldo titip customer yang bebas dipakai = Σ sisa deposit aktif − cadangan COD yang belum direalisasi. */
+    public static function availableForCustomer(int $customerId): float
+    {
+        $remaining = (float) self::query()->where('from_model_type', Customer::class)->where('from_model_id', $customerId)
+            ->where('status', 'active')->sum('remaining_amount');
+
+        return max(0.0, round($remaining - self::reservedForCustomer($customerId), 2));
+    }
+
     protected static function booted()
     {
         static::deleting(function ($deposit) {

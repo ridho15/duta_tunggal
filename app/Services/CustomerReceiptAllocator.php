@@ -30,11 +30,14 @@ class CustomerReceiptAllocator
 {
     private const TOLERANCE = 1.00;
 
+    /** Metode rincian penerimaan untuk selisih kecil yang dihapuskan ke akun Pembulatan (bukan uang yang diterima). */
+    public const WRITE_OFF_METHOD = 'Pembulatan';
+
     /**
      * @param  array<int|string, mixed>  $invoiceReceipts  invoice_id => nominal yang diterima
      * @param  bool  $allowDepositOverpayment  true = kelebihan dicatat sebagai Deposit Customer
      * @param  CustomerReceipt|null  $existing  penerimaan yang sedang diubah (nominalnya sendiri tidak dihitung sebagai "sudah dibayar")
-     * @return array{applied: array<int, float>, overpayment: float, excess: array<int, float>, cabang_id: int|null, invoices: Collection, invoice_numbers: array<int, string>}
+     * @return array{applied: array<int, float>, write_off: array<int, float>, write_off_coa_id: int|null, overpayment: float, excess: array<int, float>, cabang_id: int|null, invoices: Collection, invoice_numbers: array<int, string>}
      *
      * @throws ValidationException
      */
@@ -67,8 +70,12 @@ class CustomerReceiptAllocator
 
         $errors = [];
         $applied = [];
+        $writeOff = [];
         $excess = [];
         $numbers = [];
+        // Selisih kurang bayar <= toleransi dihapuskan ke akun Pembulatan agar kas = uang yang benar-benar diterima.
+        // Tanpa akun Pembulatan di COA: tidak ada penghapusan; piutang dilunasi sebesar uang yang diterima saja.
+        $roundingCoa = \App\Models\ChartOfAccount::where('code', config('coa.rounding', '9000.02'))->where('is_active', true)->first();
 
         foreach ($amounts as $invoiceId => $amount) {
             /** @var Invoice|null $invoice */
@@ -100,10 +107,10 @@ class CustomerReceiptAllocator
                 $excess[$invoiceId] = $over;
                 $applied[$invoiceId] = round($remaining, 2);
             } else {
-                if ($remaining - $amount <= self::TOLERANCE) {
-                    $applied[$invoiceId] = round($remaining, 2);
-                } else {
-                    $applied[$invoiceId] = min($amount, round($remaining, 2));
+                $applied[$invoiceId] = min($amount, round($remaining, 2));
+                $shortfall = round($remaining - $amount, 2);
+                if ($shortfall > 0 && $shortfall <= self::TOLERANCE && $roundingCoa && strtolower((string) $paymentMethod) !== 'deposit') {
+                    $writeOff[$invoiceId] = $shortfall;
                 }
             }
         }
@@ -151,6 +158,8 @@ class CustomerReceiptAllocator
 
         return [
             'applied' => $applied,
+            'write_off' => $writeOff,
+            'write_off_coa_id' => $writeOff !== [] ? (int) $roundingCoa->id : null,
             'overpayment' => $overpayment,
             'excess' => $excess,
             'cabang_id' => $cabangId,

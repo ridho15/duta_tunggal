@@ -111,7 +111,9 @@ it('B4: titip dana tanpa invoice tercatat sebagai deposit aktif dan jurnalnya se
     ])->assertSessionHasErrors('selected_invoices');
 });
 
-it('B4: verifikasi kasir memakai beberapa baris deposit aktif (FIFO) dan refund mengembalikannya', function () {
+// Audit penjualan #3: verifikasi kasir kini MENCADANGKAN saldo (tanpa memotong remaining_amount / tanpa jurnal); saldo bebas
+// (availableForCustomer) turun, liabilitas deposit tetap sampai invoice SO terbit dan melunasi piutang.
+it('B4: verifikasi kasir mencadangkan saldo dari beberapa baris deposit aktif dan refund melepasnya', function () {
     $ctx = stkContext();
     Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
     $ctx['user']->assignRole('Super Admin');
@@ -128,12 +130,14 @@ it('B4: verifikasi kasir memakai beberapa baris deposit aktif (FIFO) dan refund 
     $service = app(SaleOrderCashierVerification::class);
     $service->verify($so->fresh(), null, null, $ctx['user']);
 
-    expect((float) $d1->fresh()->remaining_amount)->toBe(0.0)
-        ->and((float) $d2->fresh()->remaining_amount)->toBe(50000.0)
-        ->and($ctx['customer']->fresh()->depositBalance())->toBe(50000.0);
+    expect((float) $d1->fresh()->remaining_amount)->toBe(150000.0)
+        ->and((float) $d2->fresh()->remaining_amount)->toBe(100000.0)
+        ->and(Deposit::reservedForCustomer($ctx['customer']->id, $so->id))->toBe(200000.0)
+        ->and(Deposit::availableForCustomer($ctx['customer']->id))->toBe(50000.0);
 
     expect($service->refund($so->fresh(), $ctx['user']))->toBe(200000.0);
-    expect((float) $d1->fresh()->remaining_amount)->toBe(150000.0)
+    expect(Deposit::availableForCustomer($ctx['customer']->id))->toBe(250000.0)
+        ->and((float) $d1->fresh()->remaining_amount)->toBe(150000.0)
         ->and((float) $d2->fresh()->remaining_amount)->toBe(100000.0);
 });
 

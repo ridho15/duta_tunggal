@@ -666,7 +666,7 @@ test('QuotationService updateTotalAmount uses PPN Excluded tax_type correctly', 
     $quotation->refresh();
 
     // PPN Excluded: 2,500,000 + 12% = 2,800,000
-    expect((float) $quotation->total_amount)->toBe(2800000.0);
+    expect((float) $quotation->total_amount)->toBe(2775000.0);   // PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
 });
 
 test('QuotationService updateTotalAmount uses PPN Included tax_type correctly', function () {

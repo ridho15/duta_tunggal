@@ -71,8 +71,9 @@ class CustomerReceiptJournalTest extends TestCase
             'is_active' => true,
         ]);
 
+        // Audit penjualan #1: pemakaian deposit customer mendebit akun Deposit Pelanggan resmi (config coa.customer_deposit), bukan 1150.01
         $this->depositCoa = ChartOfAccount::firstOrCreate([
-            'code' => '1150.01',
+            'code' => config('coa.customer_deposit'),
         ], [
             'name' => 'Hutang Titipan Konsumen',
             'type' => 'liability',
@@ -480,6 +481,11 @@ class CustomerReceiptJournalTest extends TestCase
     #[Test]
     public function it_throws_when_deposit_receipt_has_no_deposit_coa_and_rolls_back_entries()
     {
+        // Saldo deposit ada (rincian Deposit kini ditolak bila saldo kurang); yang diuji: akun Deposit Pelanggan hilang saat posting
+        Deposit::factory()->create([
+            'from_model_type' => Customer::class, 'from_model_id' => $this->customer->id, 'coa_id' => $this->depositCoa->id,
+            'amount' => 500000.00, 'remaining_amount' => 500000.00,
+        ]);
         $this->depositCoa->delete();
 
         $invoice = Invoice::factory()->create([

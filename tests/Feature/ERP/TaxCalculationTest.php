@@ -125,10 +125,10 @@ class TaxCalculationTest extends TestCase
     {
         // qty=2, price=500,000, discount=0%, tax=12%, type=Eksklusif
         // base = 2 * 500,000 = 1,000,000
-        // ppn  = 1,000,000 * 12% = 120,000
-        // total= 1,120,000
+        // ppn  = 12% × DPP Nilai Lain (11/12 × 1,000,000) = 110,000 (PPN 12% atas DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif)
+        // total= 1,110,000
         $result = HelperController::hitungSubtotal(2, 500_000, 0, 12, 'Eksklusif');
-        $this->assertEquals(1_120_000, $result);
+        $this->assertEquals(1_110_000, $result);
     }
 
     #[Test]
@@ -144,9 +144,9 @@ class TaxCalculationTest extends TestCase
     public function hitung_subtotal_with_discount_reduces_base_before_tax(): void
     {
         // qty=1, price=1,000,000, discount=10% => after_discount=900,000
-        // tax=12% Eksklusif => total = 900,000 + 108,000 = 1,008,000
+        // tax=12% Eksklusif atas DPP Nilai Lain => total = 900,000 + 99,000 = 999,000
         $result = HelperController::hitungSubtotal(1, 1_000_000, 10, 12, 'Eksklusif');
-        $this->assertEquals(1_008_000, $result);
+        $this->assertEquals(999_000, $result);
     }
 
     #[Test]
