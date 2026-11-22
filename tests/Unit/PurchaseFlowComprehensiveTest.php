@@ -53,6 +53,9 @@ beforeEach(function () {
     $this->purchaseReturnCoa = ChartOfAccount::factory()->create(['code' => '5120.10', 'type' => 'Expense']);
     $this->expenseCoa = ChartOfAccount::factory()->create(['code' => '6000.01', 'type' => 'Expense']);
     $this->accountsPayableCoa = ChartOfAccount::factory()->create(['code' => '2101.01', 'type' => 'Liability']);
+    // Akun PPN Masukan & Beban Umum: tanpa keduanya PPN/biaya lain faktur dulu diposting ke COA id 1; kini ditolak.
+    ChartOfAccount::factory()->create(['code' => config('coa.ppn_masukan', '1170.06'), 'type' => 'Asset']);
+    ChartOfAccount::factory()->create(['code' => config('coa.general_expense', '6100'), 'type' => 'Expense']);
 
     // Create product with COA
     $this->product = Product::factory()->create([
@@ -631,6 +634,12 @@ describe('Purchase Return Creation', function () {
             'unit_price' => 15000,
             'reason' => 'Defective goods',
         ]);
+
+        // Barang diterima ada di gudang (retur kini ditolak bila stok tidak cukup — tidak boleh minus).
+        \App\Models\InventoryStock::updateOrCreate(
+            ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id],
+            ['qty_available' => 8, 'qty_reserved' => 0]
+        );
 
         // Submit for approval
         $service = app(PurchaseReturnService::class);
