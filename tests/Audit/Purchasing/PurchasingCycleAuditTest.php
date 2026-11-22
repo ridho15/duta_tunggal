@@ -237,11 +237,15 @@ it('A2. PPN 11% efektif wajib disajikan sebagai DPP Nilai Lain 11/12 dengan tari
     [$receipt] = audReceive($ctx, $po, 10);
     $invoice = audInvoice($this, $ctx, $receipt);
     $ppn = (float) $invoice->invoiceItem()->sum('tax_amount');
-    audLog('A2 DPP', ['dpp' => (float) $invoice->dpp, 'ppn_rate' => (float) $invoice->ppn_rate, 'ppn_amount' => $ppn, 'expected_dpp_nilai_lain' => round(500000 * 11 / 12, 2), 'expected_rate' => 12]);
+    audLog('A2 DPP', ['dpp' => (float) $invoice->dpp, 'dpp_nilai_lain' => (float) $invoice->dpp_nilai_lain, 'ppn_rate' => (float) $invoice->ppn_rate, 'ppn_amount' => $ppn, 'expected_dpp_nilai_lain' => round(500000 * 11 / 12, 2), 'expected_rate' => 12]);
 
+    // DPP Nilai Lain disimpan di kolom tersendiri: `dpp` (DPP harga) & `ppn_rate` (tarif efektif 11%) adalah dasar jurnal PPN,
+    // retur (pembalikan PPN) dan cetakan faktur (yang menghitung 11/12 × dpp) — menimpanya dengan 458.333/12% akan
+    // membuat retur membalik PPN 12% dan cetakan menghitung 11/12 dua kali.
     expect($ppn)->toBe(55000.0); // nilai uang 11%
-    expect(round((float) $invoice->dpp, 2))->toBe(458333.33)
-        ->and((float) $invoice->ppn_rate)->toBe(12.0);
+    expect(round((float) $invoice->dpp_nilai_lain, 2))->toBe(458333.33)
+        ->and(round((float) $invoice->dpp_nilai_lain * 0.12, 2))->toBe(55000.0)
+        ->and((float) $invoice->dpp)->toBe(500000.0);
 });
 
 it('B. selisih harga faktur vs PO masuk 5160, 2100.10 tetap bersih', function () {

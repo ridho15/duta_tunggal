@@ -95,8 +95,9 @@ it('PR-1 retur gudang, hutang belum lunas: jurnal seimbang, PPN masukan dibalik,
         ->and($j['1170.06']['credit'])->toBe(11000.0)
         ->and($qty)->toBe(18.0)
         ->and((float) $ap->remaining)->toBe(444000.0)
-        // Rata-rata bergerak: setelah barang @50.000 keluar, nilai buku stok (qty × cost_price) harus = saldo GL persediaan
-        ->and($qty * (float) $ctx['product']->fresh()->cost_price)->toBe((float) (20 * 45000 - $j['1140.10']['credit']));
+        // Rata-rata bergerak: setelah barang @50.000 keluar, nilai buku stok (qty × cost_price) harus = saldo GL persediaan.
+        // HPP 800.000/18 = 44.444,44… tidak bisa disimpan eksak (kolom 4 desimal) → dibandingkan pada presisi rupiah-sen.
+        ->and(round($qty * (float) $ctx['product']->fresh()->cost_price, 2))->toBe((float) (20 * 45000 - $j['1140.10']['credit']));
 });
 
 it('PR-2 hutang sudah lunas: nota debit/piutang supplier harus tercatat di subledger (GL = subledger)', function () {
