@@ -157,6 +157,17 @@ class ChartOfAccountController extends Controller
         $validated['is_cash_bank'] = $request->boolean('is_cash_bank');
         $validated['is_active'] = $request->boolean('is_active', true);
 
+        // Akun bersaldo tidak boleh dinonaktifkan: saldonya akan hilang dari laporan & tidak bisa dijurnal balik.
+        if ($coa->is_active && ! $validated['is_active']) {
+            $balance = round((float) $coa->calculateEndingBalance(), 2);
+            if (abs($balance) >= 0.01) {
+                return back()->withInput()->with('error', sprintf(
+                    "Akun '%s' (%s) tidak bisa dinonaktifkan karena masih bersaldo Rp %s. Solusi: pindahkan saldonya ke akun lain lewat Jurnal Umum sampai saldo 0, lalu nonaktifkan.",
+                    $coa->name, $coa->code, number_format($balance, 2, ',', '.')
+                ));
+            }
+        }
+
         try {
             $coa->update($validated);
 

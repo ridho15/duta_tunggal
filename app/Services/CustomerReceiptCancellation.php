@@ -151,10 +151,8 @@ class CustomerReceiptCancellation
         }
 
         if ($deposit) {
-            JournalEntry::withoutGlobalScopes()
-                ->where('source_type', \App\Models\Deposit::class)
-                ->where('source_id', $deposit->id)
-                ->delete();
+            // Jurnal deposit tidak dihapus (jejak audit & kunci periode): dibalik dengan entri cermin, lalu deposit diarsipkan.
+            app(\App\Services\JournalReversalService::class)->reverseSource($deposit, "Pembatalan penerimaan pelanggan #{$receipt->id}");
             $deposit->delete();
         }
 
@@ -164,8 +162,10 @@ class CustomerReceiptCancellation
 
         if ($hasDepositMethod) {
             $itemIds = $receipt->customerReceiptItem()->pluck('id');
+            // Log pemakaian ditulis CustomerReceiptItemObserver lewat $item->depositLog() (morph reference_type/reference_id)
             $logs = \App\Models\DepositLog::where('type', 'use')
-                ->whereIn('deposit_loggable_id', $itemIds)
+                ->where('reference_type', (new \App\Models\CustomerReceiptItem)->getMorphClass())
+                ->whereIn('reference_id', $itemIds)
                 ->get();
 
             if ($logs->isNotEmpty()) {

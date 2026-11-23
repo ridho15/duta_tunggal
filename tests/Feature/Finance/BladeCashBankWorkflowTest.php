@@ -441,7 +441,12 @@ class BladeCashBankWorkflowTest extends TestCase
 
         $response->assertRedirect(route('keuangan.cashbank.index'));
         $this->assertNull(CashBankTransaction::find($transaction->id));
-        $this->assertFalse(JournalEntry::where('source_type', CashBankTransaction::class)->where('source_id', $transaction->id)->exists());
+        // Hapus = VOID: jurnal asal tetap (jejak audit & kunci periode) + jurnal pembalik, saldo bersih tiap akun = 0.
+        $lines = JournalEntry::where('source_type', CashBankTransaction::class)->where('source_id', $transaction->id)->get();
+        $this->assertTrue($lines->where('is_reversal', true)->isNotEmpty());
+        foreach ($lines->groupBy('coa_id') as $coaLines) {
+            $this->assertEqualsWithDelta(0, (float) $coaLines->sum('debit') - (float) $coaLines->sum('credit'), 0.01);
+        }
     }
 
     /**
@@ -468,6 +473,11 @@ class BladeCashBankWorkflowTest extends TestCase
 
         $response->assertRedirect(route('keuangan.cashbank.index', ['tab' => 'transfer']));
         $this->assertNull(CashBankTransfer::find($transfer->id));
-        $this->assertFalse(JournalEntry::where('source_type', CashBankTransfer::class)->where('source_id', $transfer->id)->exists());
+        // Hapus = VOID: jurnal asal tetap (jejak audit & kunci periode) + jurnal pembalik, saldo bersih tiap akun = 0.
+        $lines = JournalEntry::where('source_type', CashBankTransfer::class)->where('source_id', $transfer->id)->get();
+        $this->assertTrue($lines->where('is_reversal', true)->isNotEmpty());
+        foreach ($lines->groupBy('coa_id') as $coaLines) {
+            $this->assertEqualsWithDelta(0, (float) $coaLines->sum('debit') - (float) $coaLines->sum('credit'), 0.01);
+        }
     }
 }

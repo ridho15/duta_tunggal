@@ -103,6 +103,23 @@ class BladeCoaTest extends TestCase
         ]);
     }
 
+    public function test_coa_with_balance_cannot_be_deactivated(): void
+    {
+        $code = '5100.' . rand(100, 999);
+        $account = ChartOfAccount::create(['code' => $code, 'name' => 'Beban Bersaldo', 'type' => 'Expense', 'is_active' => true]);
+        \App\Models\JournalEntry::create([
+            'coa_id' => $account->id, 'date' => now()->toDateString(), 'reference' => 'UJI-SALDO', 'description' => 'Uji saldo',
+            'debit' => 125000, 'credit' => 0, 'journal_type' => 'manual',
+        ]);
+
+        $response = $this->actingAs($this->user)->put(route('master.coa.update', $account), [
+            'code' => $code, 'name' => 'Beban Bersaldo', 'type' => 'Expense', 'is_active' => 0,
+        ]);
+
+        $response->assertSessionHas('error', fn (string $msg) => str_contains($msg, 'masih bersaldo') && str_contains($msg, 'Solusi'));
+        $this->assertTrue((bool) $account->fresh()->is_active);
+    }
+
     public function test_user_can_delete_unused_coa(): void
     {
         $code = '9998.' . rand(100, 999);

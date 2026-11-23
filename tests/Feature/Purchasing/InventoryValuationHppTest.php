@@ -48,6 +48,8 @@ function hppReceive(float $hpp, float $poPrice, bool $withVarianceCoa = true): a
     ]);
     $poItem = PurchaseOrderItem::factory()->create([
         'purchase_order_id' => $po->id, 'product_id' => $product->id, 'quantity' => 10, 'unit_price' => $poPrice, 'currency_id' => $currency->id,
+        // Tanpa diskon & PPN (factory mengacak keduanya): biaya perolehan GRN kini = harga neto diskon tanpa PPN.
+        'discount' => 0, 'tax' => 0, 'tipe_pajak' => 'Non Pajak',
     ]);
     $receipt = PurchaseReceipt::factory()->create([
         'purchase_order_id' => $po->id, 'receipt_number' => 'RN-HPP-'.uniqid(), 'receipt_date' => now(),

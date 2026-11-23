@@ -21,6 +21,11 @@ class StockMovementObserver
             \App\Support\InventoryValuation::applyPurchaseToAverage($stockMovement);
         }
 
+        // Retur pembelian membalik rata-rata bergerak pada nilai retur (DPP faktur/GRN), bukan pada HPP.
+        if (in_array($stockMovement->type, ['purchase_return', 'purchase_return_out'], true)) {
+            \App\Support\InventoryValuation::applyPurchaseReturnToAverage($stockMovement);
+        }
+
         if ($this->shouldSkipStockUpdate($stockMovement->meta)) {
             return;
         }

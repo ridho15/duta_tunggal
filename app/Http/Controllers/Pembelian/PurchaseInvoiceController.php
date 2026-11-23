@@ -330,7 +330,12 @@ class PurchaseInvoiceController extends Controller
                     'price_variance_amount' => $priceVariance,
                     'total' => $totalAmount,
                     'status' => $status,
+                    // Konteks mata uang PO: nominal faktur dalam mata uang PO, GL & subledger hutang dikonversi ke IDR
+                    // dengan kurs PO yang sama (AccountPayable.total = total × kurs = kredit 2110).
+                    'currency_id' => $merged['currency_id'] ?? null,
+                    'exchange_rate' => (float) ($merged['exchange_rate'] ?? 1) > 0 ? (float) $merged['exchange_rate'] : 1.0,
                 ]);
+                $invoice->forceFill(['dpp_nilai_lain' => $this->dppNilaiLain($subtotal, $taxTotal)])->saveQuietly();
 
                 // 4. Simpan baris item
                 foreach ($items as $itemData) {
@@ -468,6 +473,7 @@ class PurchaseInvoiceController extends Controller
                         'total' => $total,
                         'price_variance_amount' => round($totalVariance, 2),
                     ]);
+                    $invoice->forceFill(['dpp_nilai_lain' => $this->dppNilaiLain($subtotal, $taxTotal)])->saveQuietly();
                 }
 
                 // Jika aksi adalah update & post, posting ke GL & AP
@@ -485,6 +491,19 @@ class PurchaseInvoiceController extends Controller
             Log::error('PurchaseInvoiceController@update failed: ' . $e->getMessage());
             return back()->withInput()->with('error', 'Gagal memperbarui Faktur Pembelian: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * DPP Nilai Lain Faktur Pajak (PMK 131/2024): PPN efektif 11% disajikan sebagai 12% × (11/12 × DPP). Nilai PPN rupiah
+     * tidak berubah; null bila faktur tanpa PPN atau tarifnya bukan 11% efektif (mis. barang mewah 12% penuh).
+     */
+    private function dppNilaiLain(float $dpp, float $ppnAmount): ?float
+    {
+        if ($dpp <= 0 || $ppnAmount <= 0 || abs(($ppnAmount / $dpp) * 100 - 11) > 0.01) {
+            return null;
+        }
+
+        return round($dpp * 11 / 12, 2);
     }
 
     /**

@@ -34,6 +34,30 @@ function createCashFlowReceiptItem(array $attributes): CustomerReceiptItem
     return CustomerReceiptItem::withoutEvents(fn () => CustomerReceiptItem::create($attributes));
 }
 
+/**
+ * Arus kas kini direkonsiliasi ke buku besar (journal_entries kas/bank), bukan dibaca dari subledger.
+ * Data uji dibukukan seperti alur aplikasi: transaksi kas/bank lewat CashBankService, penerimaan
+ * pelanggan sebagai Dr Kas / Cr Piutang Dagang.
+ */
+function postCashFlowTrx(CashBankTransaction $trx): CashBankTransaction
+{
+    app(\App\Services\CashBankService::class)->postTransaction($trx->fresh());
+
+    return $trx;
+}
+
+function postCashFlowReceiptJournal(CustomerReceipt $receipt, int $cashCoaId, float $amount, string $date, ?int $cabangId = null): void
+{
+    $arCoaId = ChartOfAccount::where('code', '1120')->value('id');
+    foreach ([[$cashCoaId, $amount, 0], [$arCoaId, 0, $amount]] as [$coaId, $debit, $credit]) {
+        JournalEntry::create([
+            'coa_id' => $coaId, 'date' => $date, 'reference' => 'RC-' . $receipt->id, 'description' => 'Penerimaan pelanggan',
+            'debit' => $debit, 'credit' => $credit, 'journal_type' => 'receipt', 'cabang_id' => $cabangId,
+            'source_type' => CustomerReceipt::class, 'source_id' => $receipt->id,
+        ]);
+    }
+}
+
 beforeEach(function () {
     Carbon::setTestNow('2026-03-15 00:00:00');
 
@@ -143,6 +167,7 @@ test('service can generate direct method cash flow report', function () {
         'amount' => 1000000,
         'payment_date' => now()->subDays(5)->toDateString(),
     ]);
+    postCashFlowReceiptJournal($receipt, $cashCoa->id, 1000000, now()->subDays(5)->toDateString(), null);
 
     // Create cash outflow to expense account
     $expenseCoa = ChartOfAccount::factory()->create([
@@ -163,6 +188,7 @@ test('service can generate direct method cash flow report', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction3->save();
+    postCashFlowTrx($transaction3);
 
     $report = $service->generate(null, null, ['method' => 'direct']);
 
@@ -231,10 +257,11 @@ test('service includes vendor payment journals in direct cash flow', function ()
     ]);
 
     expect($report['net_change'])->toBe(-100000.0);
+    // PSAK 2: pelunasan hutang dagang adalah arus kas OPERASI (bukan pendanaan).
+    $operatingSection = collect($report['sections'])->firstWhere('key', 'operating');
+    expect(collect($operatingSection['items'])->firstWhere('key', 'supplier_payments')['amount'])->toBe(-100000.0);
     $financingSection = collect($report['sections'])->firstWhere('key', 'financing');
-    expect($financingSection)->not->toBeNull();
-    $liabilityItem = collect($financingSection['items'])->firstWhere('key', 'liability_operations');
-    expect($liabilityItem['amount'])->toBe(-100000.0);
+    expect($financingSection['total'])->toBe(0.0);
 });
 
 test('service counts customer deposits once and excludes deposit-funded receipts from sales receipts', function () {
@@ -473,7 +500,7 @@ test('service validates net change calculation', function () {
         'is_active' => true,
     ]);
     $bankCoa = ChartOfAccount::factory()->create([
-        'code' => '1121',
+        'code' => '1112',
         'name' => 'Bank',
         'type' => 'Asset',
         'is_active' => true,
@@ -528,6 +555,7 @@ test('service validates net change calculation', function () {
         'amount' => 2000000,
         'payment_date' => now()->subDays(5)->toDateString(),
     ]);
+    postCashFlowReceiptJournal($receipt, $cashCoa->id, 2000000, now()->subDays(5)->toDateString(), null);
 
     // Create cash outflow
     $transaction2 = new CashBankTransaction([
@@ -541,6 +569,7 @@ test('service validates net change calculation', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction2->save();
+    postCashFlowTrx($transaction2);
 
     // Create bank inflow
     $transaction3 = new CashBankTransaction([
@@ -554,6 +583,7 @@ test('service validates net change calculation', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction3->save();
+    postCashFlowTrx($transaction3);
 
     $report = $service->generate(null, null, ['method' => 'direct']);
 
@@ -627,6 +657,7 @@ test('service filters by date range correctly', function () {
         'amount' => 1000000,
         'payment_date' => now()->subDays(7)->toDateString(),
     ]);
+    postCashFlowReceiptJournal($receipt, $cashCoa->id, 1000000, now()->subDays(7)->toDateString(), null);
 
     // Create transaction outside the date range
     $transaction2 = new CashBankTransaction([
@@ -640,6 +671,7 @@ test('service filters by date range correctly', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction2->save();
+    postCashFlowTrx($transaction2);
 
     // Create transaction outside the date range
     $transaction3 = new CashBankTransaction([
@@ -653,6 +685,7 @@ test('service filters by date range correctly', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction3->save();
+    postCashFlowTrx($transaction3);
 
     $report = $service->generate($startDate, $endDate, ['method' => 'direct']);
 
@@ -692,6 +725,7 @@ test('service filters by branch correctly', function () {
         'cabang_id' => $branchB->id,
     ]);
     $transaction2->save();
+    postCashFlowTrx($transaction2);
 
     // Filter by branch A only (should have no transactions)
     $report = $service->generate(null, null, [
@@ -764,6 +798,7 @@ test('service calculates opening balance correctly', function () {
         'cabang_id' => $branch->id,
     ]);
     $openingTransaction->save();
+    postCashFlowTrx($openingTransaction);
 
     // Create customer receipt within the report period
     $customer = \App\Models\Customer::factory()->create();
@@ -807,6 +842,7 @@ test('service calculates opening balance correctly', function () {
         'amount' => 1000000,
         'payment_date' => now()->subDays(5)->toDateString(),
     ]);
+    postCashFlowReceiptJournal($receipt, $cashCoa->id, 1000000, now()->subDays(5)->toDateString(), null);
 
     $report = $service->generate(null, null, ['method' => 'direct']);
 
@@ -829,7 +865,7 @@ test('service handles multiple cash accounts correctly', function () {
         'is_active' => true,
     ]);
     $bankCoa = ChartOfAccount::factory()->create([
-        'code' => '1121',
+        'code' => '1112',
         'name' => 'Bank',
         'type' => 'Asset',
         'is_active' => true,
@@ -884,6 +920,7 @@ test('service handles multiple cash accounts correctly', function () {
         'amount' => 1000000,
         'payment_date' => now()->subDays(5)->toDateString(),
     ]);
+    postCashFlowReceiptJournal($receipt, $cashCoa->id, 1000000, now()->subDays(5)->toDateString(), null);
 
     // Create bank inflow (transfer from cash to bank)
     $transaction2 = new CashBankTransaction([
@@ -897,6 +934,7 @@ test('service handles multiple cash accounts correctly', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction2->save();
+    postCashFlowTrx($transaction2);
 
     // Create bank outflow
     $transaction3 = new CashBankTransaction([
@@ -910,6 +948,7 @@ test('service handles multiple cash accounts correctly', function () {
         'cabang_id' => $branch->id,
     ]);
     $transaction3->save();
+    postCashFlowTrx($transaction3);
 
     $report = $service->generate(null, null, ['method' => 'direct']);
 
@@ -1076,8 +1115,9 @@ test('branch filter limits cash bank outflows', function () {
         'amount' => 1000,
         'payment_date' => '2025-10-10',
     ]);
+    postCashFlowReceiptJournal($receipt, $cashCoa->id, 1000, '2025-10-10', $branchA->id);
 
-    CashBankTransaction::create([
+    postCashFlowTrx(CashBankTransaction::create([
         'number' => 'CB-016-' . now()->format('YmdHis'),
         'date' => '2025-10-12',
         'type' => 'cash_out',
@@ -1087,9 +1127,9 @@ test('branch filter limits cash bank outflows', function () {
         'counterparty' => 'Biaya Penjualan A',
         'description' => 'Pengeluaran cabang A',
         'cabang_id' => $branchA->id,
-    ]);
+    ]));
 
-    CashBankTransaction::create([
+    postCashFlowTrx(CashBankTransaction::create([
         'number' => 'CB-017-' . now()->format('YmdHis'),
         'date' => '2025-10-12',
         'type' => 'cash_out',
@@ -1099,7 +1139,7 @@ test('branch filter limits cash bank outflows', function () {
         'counterparty' => 'Biaya Penjualan B',
         'description' => 'Pengeluaran cabang B',
         'cabang_id' => $branchB->id,
-    ]);
+    ]));
 
     $service = app(CashFlowReportService::class);
 

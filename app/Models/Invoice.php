@@ -54,6 +54,7 @@ class Invoice extends Model
         'ppn_rate',
         'tipe_pajak',
         'dpp', //Dasar penggunaan pajak,
+        'dpp_nilai_lain', // 11/12 × DPP untuk Faktur Pajak (PMK 131/2024)
         'customer_name',
         'customer_phone',
         'supplier_id',

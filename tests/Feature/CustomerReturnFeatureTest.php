@@ -602,6 +602,9 @@ function buildApprovedReturn(array $data, string $decision = CustomerReturnItem:
         ['code' => '5100.10'],
         ['name' => 'COGS Reversal', 'type' => 'expense', 'cabang_id' => $data['cabang']->id]
     );
+    // Sisi keuangan retur (invoice lunas → Deposit Konsumen): tanpa akun ini retur kini ditolak, bukan dilewati diam-diam.
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '4120.10'], ['name' => 'Retur Penjualan', 'type' => 'revenue', 'cabang_id' => $data['cabang']->id]);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '2160.04'], ['name' => 'Deposit Konsumen', 'type' => 'liability', 'cabang_id' => $data['cabang']->id]);
 
     // Bypass CabangScope so the seeded warehouse is always found in tests
     $warehouse = Warehouse::withoutGlobalScopes()->first();
@@ -669,7 +672,8 @@ test('processCompletion restores inventory stock for replace decision', function
 
 test('processCompletion creates a stock_movement of type customer_return', function () {
     $data   = setupCustomerReturnPrerequisites();
-    $result = buildApprovedReturn($data, CustomerReturnItem::DECISION_REPAIR);
+    // Penggantian: barang kembali ke stok → tercatat di kartu barang. (Perbaikan sengaja tidak dicatat: barang milik customer.)
+    $result = buildApprovedReturn($data, CustomerReturnItem::DECISION_REPLACE);
 
     $customerReturn = $result['customerReturn'];
 
@@ -841,6 +845,8 @@ test('UAT 21 Nov: alur HTTP lengkap retur penjualan memasukkan stok ke gudang tu
     test()->seed(\Database\Seeders\WarehouseSeeder::class);
     \App\Models\ChartOfAccount::firstOrCreate(['code' => '1101.01'], ['name' => 'Persediaan Barang', 'type' => 'asset', 'cabang_id' => $data['cabang']->id]);
     \App\Models\ChartOfAccount::firstOrCreate(['code' => '5100.10'], ['name' => 'HPP', 'type' => 'expense', 'cabang_id' => $data['cabang']->id]);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '4120.10'], ['name' => 'Retur Penjualan', 'type' => 'revenue', 'cabang_id' => $data['cabang']->id]);
+    \App\Models\ChartOfAccount::firstOrCreate(['code' => '2160.04'], ['name' => 'Deposit Konsumen', 'type' => 'liability', 'cabang_id' => $data['cabang']->id]);
     $warehouse = Warehouse::withoutGlobalScopes()->first();
 
     $customerReturn = CustomerReturn::create([

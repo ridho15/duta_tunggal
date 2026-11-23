@@ -400,6 +400,9 @@ class InvoiceObserver
 
         DB::transaction(function () use ($invoice) {
             $this->executeSalesInvoicePosting($invoice);
+
+            // SO COD terverifikasi kasir: cadangan saldo titip melunasi piutang invoice ini (Dr Deposit Pelanggan / Cr Piutang)
+            app(\App\Services\SaleOrderCashierVerification::class)->settleInvoice($invoice->fresh());
         });
 
         Log::info('postSalesInvoice: ledger posting completed', [
@@ -707,10 +710,12 @@ class InvoiceObserver
         $debitTotals = [];
         $creditTotals = [];
         $snapshots = [];   // baris invoice + angka HPP yang SAMA dengan yang dijurnal (Fase 6: satu perhitungan → dua keluaran)
+        // HPP = nilai Barang Terkirim yang dijurnal saat DO berangkat (delivery_order_items.unit_cost), bukan HPP rata-rata saat invoice
+        $deliveredCosts = $this->deliveredUnitCosts($invoice);
 
         foreach ($invoiceItems as $item) {
             $quantity = max(0, (float) ($item->quantity ?? 0));
-            $costPrice = (float) ($item->product?->cost_price ?? 0);
+            $costPrice = (float) ($deliveredCosts[(int) $item->product_id] ?? $item->product?->cost_price ?? 0);
 
             if ($quantity <= 0 || $costPrice <= 0) {
                 if ($item instanceof \App\Models\InvoiceItem) {
@@ -819,7 +824,7 @@ class InvoiceObserver
         foreach ($deliveryOrders as $deliveryOrder) {
             foreach ($deliveryOrder->deliveryOrderItem as $item) {
                 $quantity = max(0, (float) ($item->quantity ?? 0));
-                $costPrice = (float) ($item->product?->cost_price ?? 0);
+                $costPrice = (float) ($item->unit_cost ?? $item->product?->cost_price ?? 0);
 
                 if ($quantity <= 0 || $costPrice <= 0) {
                     continue;
@@ -832,6 +837,28 @@ class InvoiceObserver
                 $this->pushCostTotals($debitTotals, $creditTotals, $amount, $cogsCoa, $goodsDeliveryCoa);
             }
         }
+    }
+
+    /**
+     * Biaya per unit Barang Terkirim per produk dari DO invoice ini (rata-rata tertimbang bila satu produk ada di beberapa baris DO).
+     * Hanya baris DO yang sudah menyimpan unit_cost; DO lama tanpa unit_cost jatuh ke cost_price produk.
+     *
+     * @return array<int, float> product_id => biaya per unit
+     */
+    protected function deliveredUnitCosts(Invoice $invoice): array
+    {
+        $deliveryOrderIds = array_filter((array) $invoice->delivery_orders);
+        if (empty($deliveryOrderIds)) {
+            return [];
+        }
+
+        return \App\Models\DeliveryOrderItem::query()
+            ->whereIn('delivery_order_id', $deliveryOrderIds)
+            ->whereNotNull('unit_cost')->where('quantity', '>', 0)
+            ->get(['product_id', 'quantity', 'unit_cost'])
+            ->groupBy('product_id')
+            ->map(fn ($rows) => (float) $rows->sum(fn ($row) => (float) $row->quantity * (float) $row->unit_cost) / max(0.0001, (float) $rows->sum('quantity')))
+            ->all();
     }
 
     protected function pushCostTotals(array &$debitTotals, array &$creditTotals, float $amount, $cogsCoa, $goodsDeliveryCoa): void

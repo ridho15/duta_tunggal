@@ -93,79 +93,40 @@ class AccountingPeriodService
         $transactionId = 'CLOSE-' . $period->id;
         $createdCount = 0;
 
-        $revenueAccounts = ChartOfAccount::query()->where('type', 'Revenue')->get();
-        $expenseAccounts = ChartOfAccount::query()->where('type', 'Expense')->get();
+        // Tutup SEMUA saldo akun nominal (pendapatan, beban, termasuk akun kontra seperti retur/potongan
+        // penjualan bertipe Revenue bersaldo debit) apa pun tandanya, sehingga saldo nominal = 0 setelah closing.
+        $nominalAccounts = ChartOfAccount::query()->whereIn('type', ['Revenue', 'Expense'])->orderBy('code')->get();
 
-        foreach ($revenueAccounts as $account) {
-            $balance = $this->getAccountBalanceForPeriod($account->id, $period, 'Revenue');
-            if (abs($balance) < 0.005) {
+        foreach ($nominalAccounts as $account) {
+            // Saldo bertanda dalam sisi debit: positif = saldo debit, negatif = saldo kredit.
+            $balance = $this->getAccountBalanceForPeriod($account->id, $period, $account->type);
+            $debitBalance = $account->type === 'Revenue' ? -$balance : $balance;
+            if (abs($debitBalance) < 0.005) {
                 continue;
             }
 
-            JournalEntry::create([
-                'coa_id' => $account->id,
-                'date' => $journalDate,
-                'reference' => $reference,
-                'description' => 'Closing Entry - Tutup akun pendapatan',
-                'debit' => $balance,
-                'credit' => 0,
-                'journal_type' => 'closing',
-                'cabang_id' => $period->cabang_id,
-                'source_type' => AccountingPeriod::class,
-                'source_id' => $period->id,
-                'transaction_id' => $transactionId,
-            ]);
+            $amount = round(abs($debitBalance), 2);
+            $closeAccountSide = $debitBalance > 0 ? 'credit' : 'debit';
+            $label = $account->type === 'Revenue' ? 'pendapatan' : 'beban';
 
-            JournalEntry::create([
-                'coa_id' => $retainedEarningsAccount->id,
-                'date' => $journalDate,
-                'reference' => $reference,
-                'description' => 'Closing Entry - Saldo laba ditahan dari pendapatan',
-                'debit' => 0,
-                'credit' => $balance,
-                'journal_type' => 'closing',
-                'cabang_id' => $period->cabang_id,
-                'source_type' => AccountingPeriod::class,
-                'source_id' => $period->id,
-                'transaction_id' => $transactionId,
-            ]);
-
-            $createdCount += 2;
-        }
-
-        foreach ($expenseAccounts as $account) {
-            $balance = $this->getAccountBalanceForPeriod($account->id, $period, 'Expense');
-            if (abs($balance) < 0.005) {
-                continue;
+            foreach ([
+                [$account->id, 'Closing Entry - Tutup akun ' . $label, $closeAccountSide],
+                [$retainedEarningsAccount->id, 'Closing Entry - Saldo laba ditahan dari ' . $label, $closeAccountSide === 'credit' ? 'debit' : 'credit'],
+            ] as [$coaId, $description, $side]) {
+                JournalEntry::create([
+                    'coa_id' => $coaId,
+                    'date' => $journalDate,
+                    'reference' => $reference,
+                    'description' => $description,
+                    'debit' => $side === 'debit' ? $amount : 0,
+                    'credit' => $side === 'credit' ? $amount : 0,
+                    'journal_type' => 'closing',
+                    'cabang_id' => $period->cabang_id,
+                    'source_type' => AccountingPeriod::class,
+                    'source_id' => $period->id,
+                    'transaction_id' => $transactionId,
+                ]);
             }
-
-            JournalEntry::create([
-                'coa_id' => $account->id,
-                'date' => $journalDate,
-                'reference' => $reference,
-                'description' => 'Closing Entry - Tutup akun beban',
-                'debit' => 0,
-                'credit' => $balance,
-                'journal_type' => 'closing',
-                'cabang_id' => $period->cabang_id,
-                'source_type' => AccountingPeriod::class,
-                'source_id' => $period->id,
-                'transaction_id' => $transactionId,
-            ]);
-
-            JournalEntry::create([
-                'coa_id' => $retainedEarningsAccount->id,
-                'date' => $journalDate,
-                'reference' => $reference,
-                'description' => 'Closing Entry - Saldo laba ditahan dari beban',
-                'debit' => $balance,
-                'credit' => 0,
-                'journal_type' => 'closing',
-                'cabang_id' => $period->cabang_id,
-                'source_type' => AccountingPeriod::class,
-                'source_id' => $period->id,
-                'transaction_id' => $transactionId,
-            ]);
 
             $createdCount += 2;
         }
@@ -191,9 +152,10 @@ class AccountingPeriodService
         $totalDebit = (float) $query->sum('debit');
         $totalCredit = (float) $query->sum('credit');
 
+        // Saldo bertanda (tanpa pemotongan ke 0): Revenue → kredit − debit; selain itu → debit − kredit.
         return $accountType === 'Revenue'
-            ? max(0, $totalCredit - $totalDebit)
-            : max(0, $totalDebit - $totalCredit);
+            ? $totalCredit - $totalDebit
+            : $totalDebit - $totalCredit;
     }
 
     protected function resolveRetainedEarningsAccount(): ChartOfAccount

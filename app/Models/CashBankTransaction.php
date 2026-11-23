@@ -105,10 +105,24 @@ class CashBankTransaction extends Model
             }
         });
 
-        // Delete journal entries when transaction is deleted
-        static::deleting(function ($transaction) {
-            $transaction->journalEntries()->delete();
+        // Hapus transaksi = VOID: jurnal asal dipertahankan (jejak audit & kunci periode), lalu diposting
+        // jurnal pembalik bertanggal periode terbuka. Menghapus jurnal lewat query builder melewati event
+        // JournalEntry sehingga jurnal di periode tertutup ikut terhapus (temuan audit).
+        static::deleting(function (CashBankTransaction $transaction) {
+            app(\App\Services\JournalReversalService::class)->reverseSource(
+                $transaction,
+                'Transaksi kas/bank ' . $transaction->number . ' dibatalkan'
+            );
         });
+    }
+
+    /**
+     * Matikan kaskade hapus-jurnal massal dari CascadesJournalEntries: jurnal transaksi kas/bank
+     * di-VOID oleh hook deleting di atas, bukan dihapus.
+     */
+    protected function cascadedJournalEntryRelationNames(): array
+    {
+        return [];
     }
 
     public function journalEntries()

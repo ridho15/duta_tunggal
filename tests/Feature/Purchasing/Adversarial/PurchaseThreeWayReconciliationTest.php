@@ -111,7 +111,9 @@ it('PUR-RC-02: retur pembelian (Purchase Return) memotong stok fisik dan mengura
 
     $returnService = app(PurchaseReturnService::class);
 
-    // Eksekusi pemotongan stok fisik & penyesuaian hutang
+    // Eksekusi urutan approve(): jurnal retur (Dr Hutang) → stok → hutang. Pengurang subledger hutang diambil dari
+    // jurnal Dr Hutang retur ini agar subledger = GL, sehingga jurnal wajib dibuat lebih dulu.
+    expect($returnService->createJournalEntry($return))->toBeTrue();
     $returnService->adjustStock($return);
     $returnService->adjustAccountPayable($return);
 

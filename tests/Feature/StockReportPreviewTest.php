@@ -169,7 +169,8 @@ class StockReportPreviewTest extends TestCase
                 && (float) $totals['qty_on_hand'] === 13.0
                 && (float) $totals['qty_available'] === 16.0
                 && (float) $totals['qty_reserved'] === 3.0
-                && (float) $totals['total_value'] === 32500.0;
+                // Nilai = stok fisik (qty_available 16) × HPP 2.500; reservasi bukan pengurang nilai aset (= GL persediaan).
+                && (float) $totals['total_value'] === 40000.0;
         });
         $response->assertViewHas('rows', function ($rows) use ($warehouse, $rak) {
             if ($rows->count() !== 1) {
@@ -185,11 +186,11 @@ class StockReportPreviewTest extends TestCase
                 && (float) $row['qty_reserved'] === 3.0
                 && (float) $row['qty_on_hand'] === 13.0
                 && (float) $row['cost_price'] === 2500.0
-                && (float) $row['total_value'] === 32500.0
+                && (float) $row['total_value'] === 40000.0
                 && $row['status'] === 'Normal';
         });
         $response->assertSee('Produk Preview Snapshot');
-        $response->assertSee('32.500');
+        $response->assertSee('40.000');
     }
 
     #[Test]

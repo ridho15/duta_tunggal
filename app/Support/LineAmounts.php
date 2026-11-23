@@ -22,6 +22,9 @@ use App\Services\TaxService;
  *   discount_amount  = gross − dpp (Eksklusif/Non Pajak) atau gross − total (Inklusif), sehingga
  *                      Jumlah − Diskon = nilai sebelum PPN yang terlihat pada dokumen.
  *
+ * Tarif 12% (UU HPP, PMK 131/2024, barang non-mewah): PPN = 12% × DPP Nilai Lain (11/12 × DPP) = 11% efektif. Tarif 11%
+ * tidak berubah (11% × DPP = 12% × DPP Nilai Lain). `dpp_nilai_lain` = 11/12 × DPP untuk Faktur Pajak.
+ *
  * Contoh UAT: 20 × 8.687, diskon 5%, PPN 11% eksklusif
  *   gross 173.740 | diskon 8.687 | DPP 165.053 | PPN 18.155,83 | total 183.208,83
  */
@@ -48,9 +51,21 @@ final class LineAmounts
         return $symbol . ' ' . number_format((float) $amount, $decimals ?? self::decimals(), ',', '.');
     }
 
+    /** Tarif 12% dikenakan atas DPP Nilai Lain 11/12 (PMK 131/2024). */
+    public static function isNilaiLainRate(float $rate): bool
+    {
+        return abs($rate - 12.0) < 0.0001;
+    }
+
+    /** Tarif efektif terhadap DPP: 12% × 11/12 = 11%; tarif lain apa adanya. */
+    public static function effectiveRate(float $rate): float
+    {
+        return self::isNilaiLainRate($rate) ? 11.0 : $rate;
+    }
+
     /**
      * @param  string|null  $taxType  tipe pajak apa adanya; dinormalkan lewat TaxService::normalizeType()
-     * @return array{gross: float, discount_pct: float, discount_amount: float, dpp: float, tax_rate: float, ppn: float, total: float, tax_type: string}
+     * @return array{gross: float, discount_pct: float, discount_amount: float, dpp: float, dpp_nilai_lain: float, tax_rate: float, ppn: float, total: float, tax_type: string}
      */
     public static function calculate(
         float|int|string|null $quantity,
@@ -81,13 +96,16 @@ final class LineAmounts
             $total = $dpp;
             $rate = 0.0;
         } elseif ($type === 'Inklusif') {
+            $effective = self::effectiveRate($rate);
             $total = round($afterDiscountRaw, $decimals);
-            $dpp = round($total * (100.0 / (100.0 + $rate)), $decimals);
+            $dpp = round($total * (100.0 / (100.0 + $effective)), $decimals);
             $ppn = round($total - $dpp, $decimals);
         } else {
             // Eksklusif (juga default bagi tipe lain yang tidak dikenal)
             $dpp = round($afterDiscountRaw, $decimals);
-            $ppn = round($dpp * ($rate / 100.0), $decimals);
+            $ppn = self::isNilaiLainRate($rate)
+                ? round(round($dpp * 11 / 12, $decimals) * ($rate / 100.0), $decimals)
+                : round($dpp * ($rate / 100.0), $decimals);
             $total = round($dpp + $ppn, $decimals);
         }
 
@@ -100,6 +118,7 @@ final class LineAmounts
             'discount_pct' => $discount,
             'discount_amount' => max(0.0, $discountAmount),
             'dpp' => $dpp,
+            'dpp_nilai_lain' => $rate > 0.0 ? round($dpp * 11 / 12, $decimals) : 0.0,
             'tax_rate' => $rate,
             'ppn' => $ppn,
             'total' => $total,

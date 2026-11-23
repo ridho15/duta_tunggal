@@ -147,6 +147,7 @@ test('JRN-BV-04: System-generated journals cascade-deleted when source transacti
     // Hapus transaksi kas
     $trx->delete();
 
-    // Jurnal otomatis terhapus (cascading)
-    expect($journalQuery->count())->toBe(0);
+    // Jurnal otomatis di-VOID (jurnal pembalik), bukan dihapus massal: saldo bersih tiap akun = 0.
+    expect($journalQuery->count())->toBe(4);
+    $journalQuery->get()->groupBy('coa_id')->each(fn ($lines) => expect(round((float) $lines->sum('debit') - (float) $lines->sum('credit'), 2))->toBe(0.0));
 });

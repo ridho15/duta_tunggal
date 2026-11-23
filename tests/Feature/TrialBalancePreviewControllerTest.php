@@ -18,6 +18,8 @@ class TrialBalancePreviewControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $branch = Cabang::factory()->create(['nama' => 'Trial Balance Preview Branch']);
+        // Saldo awal COA tidak berdimensi cabang: hanya ikut di cabang atribusinya (bukan di setiap cabang).
+        config(['coa.opening_balance_cabang_id' => $branch->id]);
 
         $cash = ChartOfAccount::factory()->create([
             'code' => '1-0001',

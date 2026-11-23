@@ -57,13 +57,13 @@ test('calculates total amount correctly with items and biayas', function () {
     $livewire->data['total_amount'] = $total;
 
     // Expected calculation:
-    // Item 1: 10 * 100000 = 1,000,000; discount 5% = 50,000; after discount = 950,000; tax 12% = 114,000; total = 1,064,000
+    // Item 1: 10 * 100000 = 1,000,000; discount 5% = 50,000; after discount = 950,000; PPN 12% × DPP Nilai Lain (11/12) = 104,500; total = 1,054,500 (PMK 131/2024)
     // Item 2: 5 * 200000 = 1,000,000; inclusive tax 12% = total remains 1,000,000
     // Biaya 1: 50,000 * 1 = 50,000
     // Biaya 2: 100 * 15000 = 1,500,000
-    // Grand total: 1,064,000 + 1,000,000 + 50,000 + 1,500,000 = 3,614,000
+    // Grand total: 1,054,500 + 1,000,000 + 50,000 + 1,500,000 = 3,604,500
 
-    expect($livewire->data['total_amount'])->toBe(3614000.0);
+    expect($livewire->data['total_amount'])->toBe(3604500.0);
 });
 
 test('handles decimal values in biaya correctly', function () {

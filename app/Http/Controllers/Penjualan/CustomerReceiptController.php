@@ -7,7 +7,6 @@ use App\Helpers\MoneyHelper;
 use App\Http\Controllers\Controller;
 use App\Models\AccountReceivable;
 use App\Models\Cabang;
-use App\Models\ChartOfAccount;
 use App\Models\Customer;
 use App\Support\CustomerPicker;
 use App\Models\CustomerReceipt;
@@ -181,11 +180,7 @@ class CustomerReceiptController extends Controller
         $customerDepositBalance = 0;
         if ($preselectedCustomerId) {
             $initialInvoices = $this->getInvoicesForCustomer((int) $preselectedCustomerId);
-            $customerDepositBalance = (float) Deposit::where('from_model_type', Customer::class)
-                ->where('from_model_id', $preselectedCustomerId)
-                ->where('status', 'active')
-                ->where('remaining_amount', '>', 0)
-                ->sum('remaining_amount');
+            $customerDepositBalance = Deposit::availableForCustomer((int) $preselectedCustomerId);
         }
 
         return view('penjualan.receipts.create', compact(
@@ -206,11 +201,8 @@ class CustomerReceiptController extends Controller
     {
         $invoices = $this->getInvoicesForCustomer($customer->id);
 
-        $depositBalance = (float) Deposit::where('from_model_type', Customer::class)
-            ->where('from_model_id', $customer->id)
-            ->where('status', 'active')
-            ->where('remaining_amount', '>', 0)
-            ->sum('remaining_amount');
+        // Saldo yang bebas dipakai: dikurangi cadangan verifikasi kasir COD yang belum menjadi penerimaan
+        $depositBalance = Deposit::availableForCustomer($customer->id);
 
         return response()->json([
             'customer' => [
@@ -327,10 +319,23 @@ class CustomerReceiptController extends Controller
             Auth::user()
         );
 
-        if ($plan['overpayment'] > 0 && !ChartOfAccount::where('code', config('coa.customer_deposit'))->exists()) {
+        $depositAccount = Deposit::customerDepositAccount();
+        if ($plan['overpayment'] > 0 && ! $depositAccount) {
             throw ValidationException::withMessages([
                 'overpayment_as_deposit' => 'Akun Deposit Pelanggan (' . config('coa.customer_deposit') . ') belum ada di Chart of Account, sehingga kelebihan bayar belum dapat dicatat.',
             ]);
+        }
+
+        if (strtolower($paymentMethod) === 'deposit') {
+            $needed = round(array_sum($plan['applied']), 2);
+            $available = Deposit::availableForCustomer((int) $validated['customer_id']);
+            if ($needed > $available + 0.005) {
+                throw ValidationException::withMessages([
+                    'payment_method' => 'Saldo Deposit Pelanggan yang bebas dipakai hanya ' . MoneyHelper::rupiah($available)
+                        . ' (sudah dikurangi saldo yang dicadangkan verifikasi kasir COD), sedangkan pelunasan ' . MoneyHelper::rupiah($needed)
+                        . '. Kurangi nominal atau bayar sisanya dengan Tunai/Transfer.',
+                ]);
+            }
         }
 
         // Upload berkas bukti bila ada
@@ -340,7 +345,7 @@ class CustomerReceiptController extends Controller
         }
 
         try {
-            $receipt = DB::transaction(function () use ($validated, $plan, $proofPath, $paymentMethod, $allowDepositOverpayment) {
+            $receipt = DB::transaction(function () use ($validated, $plan, $proofPath, $paymentMethod, $allowDepositOverpayment, $depositAccount) {
             $totalApplied = round(array_sum($plan['applied']), 2);
             $overpayment = round((float) ($plan['overpayment'] ?? 0), 2);
             $firstInvoiceId = array_key_first($plan['applied']);
@@ -428,6 +433,24 @@ class CustomerReceiptController extends Controller
                     'selected_invoices' => [$invId],
                 ]);
 
+                // Selisih kecil (<= toleransi) yang dihapuskan: piutang lunas, kas tetap sebesar uang yang diterima (Dr Pembulatan)
+                $writeOff = round((float) ($plan['write_off'][$invId] ?? 0), 2);
+                if ($writeOff > 0) {
+                    CustomerReceiptItem::create([
+                        'customer_receipt_id' => $receipt->id,
+                        'invoice_id' => $invId,
+                        'currency_id' => $itemCurrencyId,
+                        'exchange_rate' => $itemExchangeRate,
+                        'method' => CustomerReceiptAllocator::WRITE_OFF_METHOD,
+                        'amount' => $writeOff,
+                        'amount_idr' => $writeOff,
+                        'coa_id' => $plan['write_off_coa_id'],
+                        'payment_date' => $receipt->payment_date,
+                        'selected_invoices' => [$invId],
+                    ]);
+                    $appliedAmount = round($appliedAmount + $writeOff, 2);
+                }
+
                 // Update saldo Piutang (AccountReceivable)
                 $ar = AccountReceivable::where('invoice_id', $invId)->first();
                 if ($ar) {
@@ -475,14 +498,14 @@ class CustomerReceiptController extends Controller
                     'amount' => $overpayment,
                     'used_amount' => 0,
                     'remaining_amount' => $overpayment,
-                    'coa_id' => $receipt->coa_id,
-                    'payment_coa_id' => $receipt->coa_id,
+                    'coa_id' => $depositAccount->id,          // akun liabilitas Deposit Pelanggan
+                    'payment_coa_id' => $receipt->coa_id,      // akun kas/bank penerima uang
                     'note' => 'Kelebihan bayar dari Penerimaan Customer #' . $receipt->id,
                     'status' => 'active',
                     'created_by' => Auth::id(),
                 ]);
 
-                $this->ledgerService->postDeposit($deposit, $receipt->cabang_id ? (int) $receipt->cabang_id : null);
+                $this->ledgerService->postDeposit($deposit, $receipt->cabang_id ? (int) $receipt->cabang_id : null, (string) $validated['payment_date']);
 
                 $receipt->update(['deposit_id' => $deposit->id]);
             }
@@ -516,7 +539,8 @@ class CustomerReceiptController extends Controller
             ]);
         }
 
-        if (! ChartOfAccount::where('code', config('coa.customer_deposit'))->exists()) {
+        $depositAccount = Deposit::customerDepositAccount();
+        if (! $depositAccount) {
             throw ValidationException::withMessages([
                 'deposit_amount' => 'Akun Deposit Pelanggan (' . config('coa.customer_deposit') . ') belum ada di Chart of Account, sehingga titip dana belum dapat dicatat.',
             ]);
@@ -528,7 +552,7 @@ class CustomerReceiptController extends Controller
         $note = 'Titip dana customer (' . $validated['payment_method'] . ($reference !== '' ? ' ' . $reference : '') . ')'
             . (! empty($validated['notes']) ? ' — ' . $validated['notes'] : '');
 
-        $deposit = DB::transaction(function () use ($validated, $amount, $customer, $note) {
+        $deposit = DB::transaction(function () use ($validated, $amount, $customer, $note, $depositAccount) {
             $deposit = Deposit::create([
                 'deposit_number' => app(DepositNumberGenerator::class)->generate(),
                 'from_model_type' => Customer::class,
@@ -536,20 +560,19 @@ class CustomerReceiptController extends Controller
                 'amount' => $amount,
                 'used_amount' => 0,
                 'remaining_amount' => $amount,
-                'coa_id' => (int) $validated['coa_id'],
-                'payment_coa_id' => (int) $validated['coa_id'],
+                'coa_id' => $depositAccount->id,               // akun liabilitas Deposit Pelanggan
+                'payment_coa_id' => (int) $validated['coa_id'], // akun kas/bank penerima uang
                 'note' => mb_substr($note, 0, 255),
                 'status' => 'active',
                 'created_by' => Auth::id(),
             ]);
 
-            $this->ledgerService->postDeposit($deposit, Auth::user()?->cabang_id ? (int) Auth::user()->cabang_id : null);
+            $this->ledgerService->postDeposit($deposit, Auth::user()?->cabang_id ? (int) Auth::user()->cabang_id : null, (string) $validated['payment_date']);
 
             return $deposit;
         });
 
-        $balance = (float) Deposit::where('from_model_type', Customer::class)->where('from_model_id', $customer->id)
-            ->where('status', 'active')->sum('remaining_amount');
+        $balance = Deposit::availableForCustomer($customer->id);
 
         return redirect()->route('penjualan.receipts.index')->with('success',
             "Titip dana {$customer->name} sebesar " . MoneyHelper::rupiah($amount) . " tercatat ({$deposit->deposit_number}). "

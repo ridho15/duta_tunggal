@@ -315,8 +315,11 @@ class PurchaseReturnService
                     return;
                 }
 
+                // Nilai retur = DPP per unit faktur (bila sudah ditagih) atau biaya perolehan GRN (neto diskon, tanpa PPN).
+                $accountPayable = $this->findRelatedAccountPayable($purchaseReturn);
+                $hasAp = $accountPayable !== null;
                 $resolvedLines = $purchaseReturn->purchaseReturnItem
-                    ->map(fn ($item) => $this->resolveReturnItemJournalAmount($item))
+                    ->map(fn ($item) => $this->resolveReturnItemJournalAmount($item, $accountPayable?->invoice))
                     ->filter(fn (array $line) => $line['amount_idr'] > 0)
                     ->values();
 
@@ -343,14 +346,8 @@ class PurchaseReturnService
                     '5120',
                 ]);
 
-                $accountPayable = $this->findRelatedAccountPayable($purchaseReturn);
-                $hasAp = $accountPayable !== null;
                 $liabilityCoa = $hasAp
-                    ? $this->findFirstExistingCoa([
-                        config('coa.accounts_payable'),
-                        '2110',
-                        '2101.01',
-                    ])
+                    ? $this->accountsPayableCoa()
                     : $this->findFirstExistingCoa([
                         config('coa.unbilled_purchase'),
                         '2100.10',
@@ -512,7 +509,7 @@ class PurchaseReturnService
      *
      * @return array{item: PurchaseReturnItem, amount_idr: float, raw_unit_price: float, unit_price_idr: float, currency_id: ?int, currency_code: ?string, exchange_rate: float, amount_original_currency: float}
      */
-    private function resolveReturnItemJournalAmount(PurchaseReturnItem $item): array
+    private function resolveReturnItemJournalAmount(PurchaseReturnItem $item, ?\App\Models\Invoice $invoice = null): array
     {
         $qty = max(0, (float) ($item->qty_returned ?? 0));
         $fallbackRawUnitPrice = (float) ($item->unit_price ?? 0);
@@ -521,6 +518,16 @@ class PurchaseReturnService
             $unitCost = JournalCurrencyAmountResolver::resolvePurchaseReceiptItemUnitCost($item->purchaseReceiptItem);
             $unitPriceIdr = (float) ($unitCost['unit_price_idr'] > 0 ? $unitCost['unit_price_idr'] : $fallbackRawUnitPrice);
             $rawUnitPrice = (float) ($unitCost['raw_unit_price'] > 0 ? $unitCost['raw_unit_price'] : $fallbackRawUnitPrice);
+
+            // Sudah ditagih: nilai retur mengikuti DPP per unit di faktur (harga yang benar-benar diakui sebagai hutang).
+            $invoiceItem = $invoice?->invoiceItem()->where('product_id', $item->product_id)->where('price', '>', 0)->first();
+            if ($invoiceItem) {
+                $rate = is_numeric($invoice->currency_id ?? null) && (float) $invoice->exchange_rate > 0
+                    ? (float) $invoice->exchange_rate
+                    : (float) $unitCost['exchange_rate'];
+                $rawUnitPrice = (float) $invoiceItem->price;
+                $unitPriceIdr = round($rawUnitPrice * ($rate > 0 ? $rate : 1.0), 6);
+            }
             $amountIdr = round($qty * $unitPriceIdr, 2);
 
             return [
@@ -562,6 +569,55 @@ class PurchaseReturnService
             ->sum(fn (PurchaseReturnItem $item) => $this->resolveReturnItemJournalAmount($item)['amount_idr']), 2);
     }
 
+    private function accountsPayableCoa(): ?ChartOfAccount
+    {
+        return $this->findFirstExistingCoa([config('coa.accounts_payable'), '2110', '2101.01']);
+    }
+
+    /**
+     * Pengurang hutang (DPP + PPN, IDR) yang BENAR-BENAR dijurnal ke akun Hutang Dagang oleh retur ini. Retur sebelum
+     * ditagih dijurnal ke 2100.10 sehingga nilainya 0 (qty-nya sudah dikeluarkan dari faktur), jadi subledger = GL.
+     */
+    public function accountsPayableDebitForReturn(PurchaseReturn $purchaseReturn): float
+    {
+        $apCoa = $this->accountsPayableCoa();
+        if (! $apCoa) {
+            return 0.0;
+        }
+
+        return round((float) JournalEntry::withoutGlobalScopes()->whereNull('deleted_at')
+            ->where('source_type', PurchaseReturn::class)
+            ->where('source_id', $purchaseReturn->id)
+            ->where('coa_id', $apCoa->id)
+            ->sum('debit'), 2);
+    }
+
+    /**
+     * Qty retur gudang yang disetujui SEBELUM GRN ditagih (jurnal ke 2100.10, bukan ke hutang) untuk satu baris GRN.
+     * Qty ini tidak boleh ikut difakturkan.
+     */
+    public function unbilledReturnedQuantityForReceiptItem(int $receiptItemId): float
+    {
+        $apCoa = $this->accountsPayableCoa();
+
+        return (float) PurchaseReturnItem::query()
+            ->where('purchase_receipt_item_id', $receiptItemId)
+            ->whereHas('purchaseReturn', function ($q) use ($apCoa) {
+                $q->withoutGlobalScopes()
+                    ->where('status', 'approved')
+                    ->whereNull('quality_control_id')
+                    ->whereNull('failed_qc_action')
+                    ->when($apCoa, fn ($q) => $q->whereNotExists(function ($sub) use ($apCoa) {
+                        $sub->selectRaw('1')->from('journal_entries')
+                            ->whereColumn('journal_entries.source_id', 'purchase_returns.id')
+                            ->where('journal_entries.source_type', PurchaseReturn::class)
+                            ->where('journal_entries.coa_id', $apCoa->id)
+                            ->whereNull('journal_entries.deleted_at');
+                    }));
+            })
+            ->sum('qty_returned');
+    }
+
     /**
      * Adjust stock for purchase return
      */
@@ -573,72 +629,87 @@ class PurchaseReturnService
             return true;
         }
 
-        try {
-            DB::transaction(function () use ($purchaseReturn) {
-                $purchaseReturn->loadMissing([
-                    'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
-                    'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
-                ]);
-
-                foreach ($purchaseReturn->purchaseReturnItem as $item) {
-                    $resolvedLine = $this->resolveReturnItemJournalAmount($item);
-
-                    $warehouseId = $item->purchaseReceiptItem?->warehouse_id
-                        ?? $purchaseReturn->purchaseReceipt?->warehouse_id
-                        ?? $purchaseReturn->qualityControl?->warehouse_id
-                        ?? 1;
-
-                    // Lock the inventory stock row to prevent concurrent returns
-                    // from both reading the same qty and each decrementing incorrectly.
-                    $inventoryStock = InventoryStock::firstOrCreate(
-                        ['product_id' => $item->product_id, 'warehouse_id' => $warehouseId],
-                        ['qty_available' => 0, 'qty_reserved' => 0]
-                    );
-
-                    $inventoryStock->decrement('qty_available', $item->qty_returned);
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('inventory_stocks', 'qty_on_hand')) {
-                        $inventoryStock->decrement('qty_on_hand', $item->qty_returned);
-                    }
-
-                    // Create reverse stock movement
-                    StockMovement::create([
-                        'product_id' => $item->product_id,
-                        'warehouse_id' => $warehouseId,
-                        'rak_id' => $item->rak_id,
-                        'quantity' => $item->qty_returned,
-                        'value' => $resolvedLine['amount_idr'],
-                        'type' => 'purchase_return',
-                        'date' => $purchaseReturn->return_date ?? now(),
-                        'notes' => 'Stock outbound from purchase return: ' . $purchaseReturn->nota_retur,
-                        'meta' => [
-                            'source' => 'purchase_return',
-                            'purchase_return_id' => $purchaseReturn->id,
-                            'nota_retur' => $purchaseReturn->nota_retur,
-                            'unit_price' => $item->unit_price,
-                            'raw_unit_price' => $resolvedLine['raw_unit_price'],
-                            'unit_price_idr' => $resolvedLine['unit_price_idr'],
-                            'currency_id' => $resolvedLine['currency_id'],
-                            'currency_code' => $resolvedLine['currency_code'],
-                            'exchange_rate' => $resolvedLine['exchange_rate'],
-                            'amount_original_currency' => $resolvedLine['amount_original_currency'],
-                            'reason' => $item->reason,
-                            // qty_available already decremented above — StockMovementObserver must not apply this again.
-                            'skip_stock_update' => true,
-                        ],
-                        'from_model_type' => PurchaseReturn::class,
-                        'from_model_id' => $purchaseReturn->id,
-                    ]);
-                }
-            });
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Failed to adjust stock for purchase return', [
-                'purchase_return_id' => $purchaseReturn->id,
-                'error' => $e->getMessage()
+        DB::transaction(function () use ($purchaseReturn) {
+            $purchaseReturn->loadMissing([
+                'purchaseReturnItem.product',
+                'purchaseReturnItem.purchaseReceiptItem.purchaseOrderItem.currency',
+                'purchaseReturnItem.purchaseReceiptItem.purchaseReceipt.purchaseOrder.purchaseOrderCurrency.currency',
             ]);
-            return false;
-        }
+            $invoice = $this->findRelatedAccountPayable($purchaseReturn)?->invoice;
+
+            foreach ($purchaseReturn->purchaseReturnItem as $item) {
+                // Nilai keluar = nilai retur yang sama dengan jurnal (DPP faktur/GRN) → HPP rata-rata dihitung ulang oleh
+                // StockMovementObserver (InventoryValuation::applyPurchaseReturnToAverage).
+                $resolvedLine = $this->resolveReturnItemJournalAmount($item, $invoice);
+                $qtyReturned = (float) $item->qty_returned;
+                $productName = $item->product?->name ?? "Produk #{$item->product_id}";
+
+                // Tanpa fallback gudang sembarang: stok harus dikurangi dari gudang penerimaan barang.
+                $warehouseId = $item->purchaseReceiptItem?->warehouse_id
+                    ?? $purchaseReturn->purchaseReceipt?->warehouse_id
+                    ?? $purchaseReturn->qualityControl?->warehouse_id;
+                if (! $warehouseId) {
+                    throw new \Exception("Gudang asal untuk {$productName} pada retur {$purchaseReturn->nota_retur} tidak diketahui (baris penerimaan tanpa gudang). Solusi: lengkapi gudang pada Penerimaan Barang terkait, lalu setujui ulang retur.");
+                }
+
+                // Kunci baris stok agar dua retur bersamaan tidak membaca qty yang sama.
+                $stocks = InventoryStock::where('product_id', $item->product_id)
+                    ->where('warehouse_id', $warehouseId)
+                    ->orderByDesc('qty_available')
+                    ->lockForUpdate()
+                    ->get();
+                $available = (float) $stocks->sum('qty_available');
+                if ($available + 0.0001 < $qtyReturned) {
+                    throw new \Exception("Stok {$productName} di gudang tidak mencukupi untuk retur {$purchaseReturn->nota_retur}: tersedia {$available}, diretur {$qtyReturned}. Solusi: periksa stok fisik / kartu stok (barang mungkin sudah terjual atau dipindah), sesuaikan qty retur, lalu setujui ulang.");
+                }
+
+                $toDeduct = $qtyReturned;
+                foreach ($stocks as $inventoryStock) {
+                    if ($toDeduct <= 0) {
+                        break;
+                    }
+                    $take = min($toDeduct, (float) $inventoryStock->qty_available);
+                    if ($take <= 0) {
+                        continue;
+                    }
+                    $inventoryStock->decrement('qty_available', $take);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('inventory_stocks', 'qty_on_hand')) {
+                        $inventoryStock->decrement('qty_on_hand', $take);
+                    }
+                    $toDeduct -= $take;
+                }
+
+                StockMovement::create([
+                    'product_id' => $item->product_id,
+                    'warehouse_id' => $warehouseId,
+                    'rak_id' => $item->rak_id,
+                    'quantity' => $qtyReturned,
+                    'value' => $resolvedLine['amount_idr'],
+                    'type' => 'purchase_return',
+                    'date' => $purchaseReturn->return_date ?? now(),
+                    'notes' => 'Stock outbound from purchase return: ' . $purchaseReturn->nota_retur,
+                    'meta' => [
+                        'source' => 'purchase_return',
+                        'purchase_return_id' => $purchaseReturn->id,
+                        'nota_retur' => $purchaseReturn->nota_retur,
+                        'unit_price' => $item->unit_price,
+                        'raw_unit_price' => $resolvedLine['raw_unit_price'],
+                        'unit_price_idr' => $resolvedLine['unit_price_idr'],
+                        'currency_id' => $resolvedLine['currency_id'],
+                        'currency_code' => $resolvedLine['currency_code'],
+                        'exchange_rate' => $resolvedLine['exchange_rate'],
+                        'amount_original_currency' => $resolvedLine['amount_original_currency'],
+                        'reason' => $item->reason,
+                        // qty_available already decremented above — StockMovementObserver must not apply this again.
+                        'skip_stock_update' => true,
+                    ],
+                    'from_model_type' => PurchaseReturn::class,
+                    'from_model_id' => $purchaseReturn->id,
+                ]);
+            }
+        });
+
+        return true;
     }
 
     /**
@@ -695,24 +766,12 @@ class PurchaseReturnService
                 return false;
             }
 
-            $returnAmountIdr = $this->calculateReturnTotalIdr($purchaseReturn);
-            if ($returnAmountIdr <= 0) {
+            // Pengurang hutang = nilai yang dijurnal Dr Hutang Dagang oleh retur ini (DPP faktur + PPN), sehingga subledger = GL.
+            $returnAmountGrossIdr = $this->accountsPayableDebitForReturn($purchaseReturn);
+            if ($returnAmountGrossIdr <= 0) {
                 return false;
             }
-
-            // Factor in VAT if invoice had PPN
-            $ppnReturnAmount = 0.0;
-            if ($accountPayable->invoice) {
-                $invoice = $accountPayable->invoice;
-                $ppnRate = (float) ($invoice->ppn_rate ?? 0);
-                if ($ppnRate <= 0 && (float) $invoice->subtotal > 0 && (float) $invoice->tax > 0) {
-                    $ppnRate = round(((float) $invoice->tax / (float) $invoice->subtotal) * 100, 2);
-                }
-                if ($ppnRate > 0) {
-                    $ppnReturnAmount = round($returnAmountIdr * ($ppnRate / 100), 2);
-                }
-            }
-            $returnAmountGrossIdr = round($returnAmountIdr + $ppnReturnAmount, 2);
+            $returnAmountIdr = $returnAmountGrossIdr;
 
             $exchangeRate = (float) ($accountPayable->exchange_rate ?? $accountPayable->invoice?->exchange_rate ?? 1);
             $exchangeRate = $exchangeRate > 0 ? $exchangeRate : 1.0;
@@ -721,11 +780,21 @@ class PurchaseReturnService
             $totalIdr = (float) $accountPayable->total;
             $totalOriginal = (float) ($accountPayable->total_original ?? ($totalIdr / $exchangeRate));
 
-            $newPaidIdr = min($totalIdr, (float) $accountPayable->paid + $returnAmountGrossIdr);
-            $newRemainingIdr = max(0.0, $totalIdr - $newPaidIdr);
+            // Tanpa pembatasan min(): bila hutang sudah lunas, kelebihan retur menjadi saldo DEBIT subledger (remaining
+            // negatif) = nota debit / piutang ke supplier, sama dengan saldo debit akun Hutang Dagang di GL.
+            $newPaidIdr = round((float) $accountPayable->paid + $returnAmountGrossIdr, 2);
+            $newRemainingIdr = round($totalIdr - $newPaidIdr, 2);
 
-            $newPaidOriginal = min($totalOriginal, (float) ($accountPayable->paid_original ?? 0) + $returnAmountOriginal);
-            $newRemainingOriginal = max(0.0, $totalOriginal - $newPaidOriginal);
+            $newPaidOriginal = round((float) ($accountPayable->paid_original ?? 0) + $returnAmountOriginal, 4);
+            $newRemainingOriginal = round($totalOriginal - $newPaidOriginal, 4);
+
+            if ($newRemainingIdr < -0.01) {
+                Log::info('Retur pembelian melebihi sisa hutang: kelebihan dicatat sebagai nota debit (saldo debit hutang supplier)', [
+                    'purchase_return_id' => $purchaseReturn->id,
+                    'account_payable_id' => $accountPayable->id,
+                    'debit_note_idr' => abs($newRemainingIdr),
+                ]);
+            }
 
             $newStatus = ($newRemainingIdr <= 0.01) ? PaymentStatus::PAID->value : PaymentStatus::UNPAID->value;
 
@@ -760,7 +829,10 @@ class PurchaseReturnService
                 'purchase_return_id' => $purchaseReturn->id,
                 'error' => $e->getMessage(),
             ]);
-            return false;
+
+            // Jurnal Dr Hutang sudah dibuat dalam transaksi yang sama: subledger wajib ikut, jadi gagalkan seluruh persetujuan.
+            throw new \Exception('Gagal memperbarui saldo hutang supplier untuk retur ' . $purchaseReturn->nota_retur . ': ' . $e->getMessage()
+                . '. Solusi: periksa data Hutang Dagang faktur terkait, lalu setujui ulang retur.', 0, $e);
         }
     }
 
@@ -920,16 +992,13 @@ class PurchaseReturnService
             return 0.0;
         }
 
-        $ppnRate = (float) ($invoice->ppn_rate ?? 0);
-        if ($ppnRate <= 0 && (float) $invoice->subtotal > 0 && (float) $invoice->tax > 0) {
-            $ppnRate = round(((float) $invoice->tax / (float) $invoice->subtotal) * 100, 2);
-        }
-
+        // Hanya retur yang dijurnal ke Hutang Dagang (sesudah ditagih); retur pra-faktur sudah dikeluarkan dari qty faktur.
         $totalReturnGrossIdr = 0.0;
         foreach ($approvedReturns as $pr) {
-            $retDppIdr = $this->calculateReturnTotalIdr($pr);
-            $ppnAmount = ($ppnRate > 0) ? round($retDppIdr * ($ppnRate / 100), 2) : 0.0;
-            $totalReturnGrossIdr += round($retDppIdr + $ppnAmount, 2);
+            if ($pr->isQcReturn()) {
+                continue;
+            }
+            $totalReturnGrossIdr += $this->accountsPayableDebitForReturn($pr);
         }
 
         return round($totalReturnGrossIdr, 2);

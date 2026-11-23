@@ -62,14 +62,14 @@ class PurchaseReturn extends Model
         ];
     }
 
-    /** Whether this return originated from a QC inspection or receiving reject (not a normal warehouse return) */
+    /**
+     * Retur asal QC / tolak saat penerimaan (barang tidak pernah masuk stok) vs retur gudang biasa. Klasifikasi HANYA dari
+     * data terstruktur (quality_control_id / failed_qc_action) — dulu ikut menebak dari teks catatan berisi "qc", sehingga
+     * retur gudang yang catatannya menyebut QC tidak dijurnal & stoknya tidak berkurang.
+     */
     public function isQcReturn(): bool
     {
-        return !is_null($this->quality_control_id)
-            || !is_null($this->failed_qc_action)
-            || str_contains(strtolower($this->notes ?? ''), 'rejected during receiving')
-            || str_contains(strtolower($this->notes ?? ''), 'quality control')
-            || str_contains(strtolower($this->notes ?? ''), 'qc');
+        return ! is_null($this->quality_control_id) || ! empty($this->failed_qc_action);
     }
 
     public function purchaseReceipt()

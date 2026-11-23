@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DeliveryOrder;
+use App\Models\JournalEntry;
 use App\Models\SuratJalan;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -238,7 +239,14 @@ class SuratJalanService
         DB::transaction(function () use ($suratJalan, $reason, $userId) {
             foreach ($suratJalan->deliveryOrder()->get() as $deliveryOrder) {
                 if (in_array($deliveryOrder->status, ['sent', 'received'], true)) {
+                    // Barang sudah berangkat: stok fisik dikembalikan, jurnal Barang Terkirim dibalik, lalu DO kembali Siap Kirim
+                    // (confirmed) dengan stok bebas dikunci ulang lewat reservasi DO, siap diterbitkan Surat Jalan baru.
+                    $note = "Surat Jalan {$suratJalan->sj_number} dibatalkan: {$reason}";
+                    app(DeliveryShipments::class)->reverse($deliveryOrder, $note);
+                    $this->reverseDeliveryJournals($deliveryOrder, $suratJalan, $note);
+                    $deliveryOrder->deliveryOrderItem()->update(['unit_cost' => null]);   // pengiriman ulang memakai HPP saat itu
                     $deliveryOrder->update(['status' => 'confirmed']);
+                    app(\App\Observers\DeliveryOrderObserver::class)->createStockMovementsForDeliveryOrder($deliveryOrder->refresh(), force: true);
                 }
             }
 
@@ -251,6 +259,39 @@ class SuratJalanService
         });
 
         return $suratJalan->refresh();
+    }
+
+    /** Jurnal pembalik (Dr Persediaan / Cr Barang Terkirim) atas jurnal pengiriman DO yang belum dibalik. */
+    private function reverseDeliveryJournals(DeliveryOrder $deliveryOrder, SuratJalan $suratJalan, string $note): void
+    {
+        $originals = JournalEntry::query()
+            ->where('source_type', DeliveryOrder::class)->where('source_id', $deliveryOrder->id)
+            ->where('is_reversal', false)->whereNull('reversal_of_transaction_id')
+            ->get();
+        if ($originals->isEmpty()) {
+            return;
+        }
+
+        $tag = "SJ-CANCEL-{$suratJalan->id}-DO-{$deliveryOrder->id}";
+        foreach ($originals as $entry) {
+            JournalEntry::create([
+                'coa_id' => $entry->coa_id,
+                'date' => now()->toDateString(),
+                'reference' => $deliveryOrder->do_number,
+                'description' => 'Pembalikan Barang Terkirim — '.$note,
+                'debit' => $entry->credit,
+                'credit' => $entry->debit,
+                'journal_type' => $entry->journal_type,
+                'cabang_id' => $entry->cabang_id,
+                'source_type' => DeliveryOrder::class,
+                'source_id' => $deliveryOrder->id,
+                'transaction_id' => $tag,
+                'is_reversal' => true,
+                'reversal_of_transaction_id' => $tag,
+            ]);
+        }
+
+        JournalEntry::query()->whereKey($originals->modelKeys())->update(['reversal_of_transaction_id' => $tag]);
     }
 
     /**

@@ -401,6 +401,39 @@ class BladeCustomerReceiptWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_cancel_deposit_paid_receipt_restores_deposit_balance_from_usage_log()
+    {
+        $invoice = $this->createInvoiceWithAR(400000);
+        $deposit = Deposit::create([
+            'deposit_number' => 'DEP-CXL-' . uniqid(), 'from_model_type' => \App\Models\Customer::class, 'from_model_id' => $this->customer->id,
+            'amount' => 1000000, 'used_amount' => 0, 'remaining_amount' => 1000000, 'coa_id' => $this->depositCoa->id,
+            'payment_coa_id' => $this->cashCoa->id, 'status' => 'active', 'created_by' => $this->user->id,
+        ]);
+
+        $this->actingAs($this->user)->post(route('penjualan.receipts.store'), [
+            'customer_id' => $this->customer->id,
+            'payment_date' => now()->toDateString(),
+            'payment_method' => 'Deposit',
+            'coa_id' => $this->depositCoa->id,
+            'selected_invoices' => [$invoice->id],
+            'invoice_receipts' => [$invoice->id => 400000],
+        ])->assertSessionHasNoErrors();
+
+        $receipt = CustomerReceipt::latest('id')->first();
+        $this->assertEquals(600000, (float) $deposit->fresh()->remaining_amount);
+        $this->assertSame(1, \App\Models\DepositLog::where('type', 'use')->where('deposit_id', $deposit->id)->count());
+
+        $this->actingAs($this->user)->post(route('penjualan.receipts.cancel', $receipt->id), [
+            'reason' => 'Pembayaran deposit salah invoice, dibatalkan resmi.',
+        ])->assertSessionHasNoErrors();
+
+        // Saldo kembali tepat sebesar log pemakaian (bukan tebakan), dan log pemakaian dilepas
+        $deposit->refresh();
+        $this->assertEquals(1000000, (float) $deposit->remaining_amount);
+        $this->assertEquals(0, (float) $deposit->used_amount);
+        $this->assertSame(0, \App\Models\DepositLog::where('type', 'use')->where('deposit_id', $deposit->id)->count());
+    }
+
     public function test_reject_customer_receipt_cancellation_with_short_reason()
     {
         $invoice = $this->createInvoiceWithAR(1000000);

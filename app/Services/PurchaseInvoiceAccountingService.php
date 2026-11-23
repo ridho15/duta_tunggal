@@ -420,7 +420,9 @@ class PurchaseInvoiceAccountingService
                     continue;
                 }
 
-                $quantity = (float) ($receiptItem->qty_accepted ?? 0);
+                // Qty yang sudah diretur (disetujui) sebelum ditagih tidak ikut difakturkan.
+                $quantity = (float) ($receiptItem->qty_accepted ?? 0)
+                    - app(\App\Services\PurchaseReturnService::class)->unbilledReturnedQuantityForReceiptItem((int) $receiptItem->id);
                 if ($quantity <= 0) {
                     continue;
                 }
@@ -977,17 +979,8 @@ class PurchaseInvoiceAccountingService
     protected function buildReceiptBackedInvoiceItem($receiptItem, \App\Models\PurchaseOrderItem $purchaseOrderItem, float $quantity): array
     {
         $unitPrice = (float) ($purchaseOrderItem->unit_price ?? 0);
-        $discountPct = (float) ($purchaseOrderItem->discount ?? 0);
-        $afterDiscount = $unitPrice * (1 - ($discountPct / 100));
-
         $taxRate = (float) ($purchaseOrderItem->tax ?? 0);
-        $taxType = strtolower(trim((string) ($purchaseOrderItem->tipe_pajak ?? 'eklusif')));
-        $isInclusive = in_array($taxType, ['inklusif', 'inclusive'], true);
-
-        $dppUnitPrice = $afterDiscount;
-        if ($isInclusive && $taxRate > 0) {
-            $dppUnitPrice = $afterDiscount / (1 + ($taxRate / 100));
-        }
+        $dppUnitPrice = \App\Support\JournalCurrencyAmountResolver::purchaseOrderItemDppUnitPrice($purchaseOrderItem);
 
         $lineTotal = round($dppUnitPrice * $quantity, 2);
         $lineTaxAmount = round($lineTotal * ($taxRate / 100), 2);

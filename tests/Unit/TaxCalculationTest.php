@@ -134,9 +134,9 @@ class TaxCalculationTest extends TestCase
     #[Test]
     public function hitung_subtotal_eksklusif_adds_tax(): void
     {
-        // qty=10, price=1000, discount=0, tax=12%, Eksklusif → 10000 + 1200 = 11200
+        // qty=10, price=1000, discount=0, tax=12%, Eksklusif → 10000 + 1100 = 11100 — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
         $result = HelperController::hitungSubtotal(10, 1000, 0, 12, 'Eksklusif');
-        $this->assertEqualsWithDelta(11200.0, $result, 0.01);
+        $this->assertEqualsWithDelta(11100.0, $result, 0.01);
     }
 
     #[Test]
@@ -151,9 +151,9 @@ class TaxCalculationTest extends TestCase
     public function hitung_subtotal_with_discount_eksklusif(): void
     {
         // qty=10, price=1000, discount=10%, tax=12%, Eksklusif
-        // base = 10000, after discount = 9000, after tax = 9000 * 1.12 = 10080
+        // base = 10000, after discount = 9000, after tax = 9000 * 1.11 = 9990 — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
         $result = HelperController::hitungSubtotal(10, 1000, 10, 12, 'Eksklusif');
-        $this->assertEqualsWithDelta(10080.0, $result, 0.01);
+        $this->assertEqualsWithDelta(9990.0, $result, 0.01);
     }
 
     #[Test]

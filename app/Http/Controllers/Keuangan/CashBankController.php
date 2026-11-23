@@ -11,6 +11,7 @@ use App\Models\CashBankTransfer;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
 use App\Services\CashBankService;
+use App\Services\JournalReversalService;
 use App\Support\MenuAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -370,15 +371,13 @@ class CashBankController extends Controller
                 // Hapus detail rincian transaksi
                 $transaction->transactionDetails()->delete();
 
-                // Hapus jurnal terkait (soft delete via trait / CascadesJournalEntries)
-                $transaction->journalEntries()->delete();
-
-                // Hapus transaksi (soft delete)
+                // Soft delete transaksi: hook deleting di model mem-VOID jurnalnya dengan jurnal pembalik
+                // bertanggal periode terbuka (jurnal asal di periode tertutup tetap utuh).
                 $transaction->delete();
             });
 
             return redirect()->route('keuangan.cashbank.index')
-                ->with('success', "Transaksi {$transaction->number} dan jurnal akuntansinya berhasil dibatalkan.");
+                ->with('success', "Transaksi {$transaction->number} berhasil dibatalkan (VOID) dan jurnal pembaliknya telah dibukukan.");
         } catch (Throwable $e) {
             return back()->with('error', 'Gagal membatalkan transaksi: '.$e->getMessage());
         }
@@ -558,8 +557,9 @@ class CashBankController extends Controller
 
         try {
             DB::transaction(function () use ($transfer, $validated) {
-                // 1. Hapus entri jurnal akuntansi transfer
-                $transfer->journalEntries()->delete();
+                // 1. VOID jurnal transfer dengan jurnal pembalik bertanggal periode terbuka
+                //    (jurnal asal tidak dihapus agar periode tertutup tetap utuh).
+                app(JournalReversalService::class)->reverseSource($transfer, 'Transfer dibatalkan: ' . $validated['cancel_reason']);
 
                 // 2. Tandai status transfer menjadi Cancelled
                 $transfer->forceFill([
@@ -571,7 +571,7 @@ class CashBankController extends Controller
             });
 
             return redirect()->route('keuangan.cashbank.transfer.show', $transfer)
-                ->with('success', "Transfer {$transfer->number} berhasil dibatalkan secara resmi dan jurnal akuntansinya telah ditarik.");
+                ->with('success', "Transfer {$transfer->number} berhasil dibatalkan secara resmi dan jurnal pembaliknya telah dibukukan.");
         } catch (Throwable $e) {
             return back()->with('error', 'Gagal membatalkan transfer: ' . $e->getMessage());
         }
@@ -586,13 +586,23 @@ class CashBankController extends Controller
 
         try {
             DB::transaction(function () use ($transfer) {
-                $transfer->journalEntries()->delete();
+                if (! $transfer->isCancelled()) {
+                    app(JournalReversalService::class)->reverseSource($transfer, 'Transfer ' . $transfer->number . ' dihapus');
+                    $transfer->forceFill([
+                        'status' => 'cancelled',
+                        'cancel_reason' => 'Dihapus',
+                        'cancelled_by' => Auth::id(),
+                        'cancelled_at' => now(),
+                    ])->save();
+                }
 
                 if ($transfer->attachment_path && Storage::disk('public')->exists($transfer->attachment_path)) {
                     Storage::disk('public')->delete($transfer->attachment_path);
                 }
 
-                $transfer->delete();
+                // Tanpa event: kaskade CascadesJournalEntries / observer akan menghapus massal jurnal asal + pembalik
+                // (melewati kunci periode). Jurnal tetap tersimpan sebagai jejak VOID bersaldo nol.
+                CashBankTransfer::withoutEvents(fn () => $transfer->delete());
             });
 
             return redirect()->route('keuangan.cashbank.index', ['tab' => 'transfer'])

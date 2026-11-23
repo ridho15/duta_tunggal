@@ -83,6 +83,10 @@ class QcBeforeReceiptTest extends TestCase
             'product_id' => $this->product->id,
             'quantity' => 5,
             'unit_price' => 10000,
+            // Factory mengacak diskon/PPN; nilai persediaan kini = harga neto diskon tanpa PPN, jadi dipatok nol.
+            'discount' => 0,
+            'tax' => 0,
+            'tipe_pajak' => 'Non Pajak',
         ]);
 
         $qcService = app(QualityControlService::class);

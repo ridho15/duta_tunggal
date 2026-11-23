@@ -72,7 +72,10 @@ test('INV-RC-02: integritas buku besar stock opname selalu memiliki total debit 
         'physical_qty' => 25.0,
         'unit_cost' => 50000.0, // Surplus +5 * 50,000 = +250,000
     ]);
+    // Satu produk hanya punya satu HPP rata-rata (#4B), jadi defisit @30.000 memakai produk kedua ber-HPP 30.000.
+    $productB = \App\Models\Product::factory()->create(['cost_price' => 30000.0, 'inventory_coa_id' => $ctx['inventoryCoa']->id]);
     opnItem($opname, $ctx, [
+        'product_id' => $productB->id,
         'system_qty' => 15.0,
         'physical_qty' => 10.0,
         'unit_cost' => 30000.0, // Defisit -5 * 30,000 = -150,000

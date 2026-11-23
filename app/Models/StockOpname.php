@@ -129,91 +129,53 @@ class StockOpname extends Model
      */
     public function createAdjustmentJournalEntries()
     {
-        $this->loadMissing('items', 'warehouse');
-
-        $totalAdjustmentValue = $this->items->sum('difference_value');
+        $this->loadMissing('items.product', 'warehouse');
 
         $this->journalEntries()->where('journal_type', 'stock_opname')->delete();
-
-        // If no adjustment needed, skip
-        if ($totalAdjustmentValue == 0) {
-            return;
-        }
 
         $reference = 'ADJ-' . $this->opname_number;
         $date = $this->opname_date;
         $description = 'Penyesuaian inventory hasil stock opname ' . $this->opname_number;
 
-        // Ko Handy 10 Nov 2026 (#4B): hasil stock opname berdampak ke COA Persediaan dan COA HPP.
+        // Ko Handy 10 Nov 2026 (#4B): hasil stock opname berdampak ke COA Persediaan dan COA HPP produk (seperti Penyesuaian Stok).
         //   Lebih : Dr Persediaan / Cr HPP   ·   Kurang : Dr HPP / Cr Persediaan
-        $inventoryAdjustmentCoa = $this->findFirstExistingCoa([
-            '5100.10',
-            '5100',
-            '5000',
-        ]);
+        // Saldo bersih per akun: tiap item menambah +nilai ke akun persediaannya dan -nilai ke akun HPP-nya, sehingga tetap seimbang.
+        $net = [];
+        foreach ($this->items as $item) {
+            $value = round((float) $item->difference_value, 2);
+            if ($value == 0.0) {
+                continue;
+            }
 
-        // Get inventory account
-        $inventoryCoa = $this->findFirstExistingCoa([
-            '1100',
-            config('coa.inventory', '1140.01'),
-            '1140.10',
-        ]);
+            $productName = $item->product?->name ?? ('Produk #' . $item->product_id);
+            $inventoryCoa = $item->product?->resolveInventoryCoaOrDefault();
+            $cogsCoa = $item->product?->resolveCogsCoaOrDefault();
+            // Akun harus ada DAN berjenis benar (Persediaan = Asset, HPP = Expense); akun yang berganti jenis tidak boleh dipakai diam-diam.
+            $inventoryOk = $inventoryCoa && strtolower((string) $inventoryCoa->type) === 'asset';
+            $cogsOk = $cogsCoa && strtolower((string) $cogsCoa->type) === 'expense';
+            if (! $inventoryOk || ! $cogsOk) {
+                throw ValidationException::withMessages([
+                    'accounting' => 'Akun ' . (! $inventoryOk ? 'Persediaan (jenis Asset)' : 'HPP (jenis Expense)') . " untuk produk '{$productName}' tidak ditemukan atau jenisnya tidak sesuai. Atur akun tersebut di Master Produk atau Pengaturan Akuntansi, lalu setujui stock opname lagi.",
+                ]);
+            }
 
-        if (! $inventoryAdjustmentCoa || ! $inventoryCoa) {
-            throw ValidationException::withMessages([
-                'accounting' => 'Konfigurasi akun Persediaan dan HPP untuk stock opname belum lengkap.',
-            ]);
+            $net[$inventoryCoa->id] = ($net[$inventoryCoa->id] ?? 0.0) + $value;
+            $net[$cogsCoa->id] = ($net[$cogsCoa->id] ?? 0.0) - $value;
         }
 
-        if ($totalAdjustmentValue > 0) {
-            // Inventory increase - Debit inventory, Credit adjustment
-            JournalEntry::create([
-                'coa_id' => $inventoryCoa->id,
-                'date' => $date,
-                'reference' => $reference,
-                'description' => $description,
-                'debit' => abs($totalAdjustmentValue),
-                'credit' => 0,
-                'journal_type' => 'stock_opname',
-                'cabang_id' => $this->warehouse->cabang_id ?? null,
-                'source_type' => self::class,
-                'source_id' => $this->id,
-            ]);
+        foreach ($net as $coaId => $amount) {
+            $amount = round($amount, 2);
+            if ($amount == 0.0) {
+                continue;
+            }
 
             JournalEntry::create([
-                'coa_id' => $inventoryAdjustmentCoa->id,
+                'coa_id' => $coaId,
                 'date' => $date,
                 'reference' => $reference,
                 'description' => $description,
-                'debit' => 0,
-                'credit' => abs($totalAdjustmentValue),
-                'journal_type' => 'stock_opname',
-                'cabang_id' => $this->warehouse->cabang_id ?? null,
-                'source_type' => self::class,
-                'source_id' => $this->id,
-            ]);
-        } else {
-            // Inventory decrease - Debit adjustment, Credit inventory
-            JournalEntry::create([
-                'coa_id' => $inventoryAdjustmentCoa->id,
-                'date' => $date,
-                'reference' => $reference,
-                'description' => $description,
-                'debit' => abs($totalAdjustmentValue),
-                'credit' => 0,
-                'journal_type' => 'stock_opname',
-                'cabang_id' => $this->warehouse->cabang_id ?? null,
-                'source_type' => self::class,
-                'source_id' => $this->id,
-            ]);
-
-            JournalEntry::create([
-                'coa_id' => $inventoryCoa->id,
-                'date' => $date,
-                'reference' => $reference,
-                'description' => $description,
-                'debit' => 0,
-                'credit' => abs($totalAdjustmentValue),
+                'debit' => $amount > 0 ? $amount : 0,
+                'credit' => $amount < 0 ? abs($amount) : 0,
                 'journal_type' => 'stock_opname',
                 'cabang_id' => $this->warehouse->cabang_id ?? null,
                 'source_type' => self::class,
@@ -243,21 +205,5 @@ class StockOpname extends Model
                 'date' => $this->opname_date,
             ]);
         }
-    }
-
-    protected function findFirstExistingCoa(array $codes): ?ChartOfAccount
-    {
-        foreach ($codes as $code) {
-            if (! $code) {
-                continue;
-            }
-
-            $coa = ChartOfAccount::where('code', $code)->first();
-            if ($coa?->id) {
-                return $coa;
-            }
-        }
-
-        return ChartOfAccount::whereIn('type', ['Asset', 'asset', 'Expense', 'expense'])->first();
     }
 }

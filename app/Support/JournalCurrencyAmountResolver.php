@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Helpers\MoneyHelper;
 use App\Models\Currency;
+use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseReceiptItem;
 
 class JournalCurrencyAmountResolver
@@ -49,7 +50,11 @@ class JournalCurrencyAmountResolver
 
         $poItem = $item->purchaseOrderItem
             ?? $item->purchaseReceipt?->purchaseOrder?->purchaseOrderItem?->firstWhere('product_id', $item->product_id);
-        $rawUnitPrice = (float) ($poItem?->unit_price ?? $item->product?->cost_price ?? $item->product?->purchase_price ?? 0);
+        // Biaya perolehan (PSAK 14) = harga PO setelah diskon, tanpa PPN (DPP) — sama dengan baris faktur
+        // (PurchaseInvoiceAccountingService::buildReceiptBackedInvoiceItem), sehingga 2100.10 bersih setelah faktur.
+        $rawUnitPrice = $poItem
+            ? self::purchaseOrderItemDppUnitPrice($poItem)
+            : (float) ($item->product?->cost_price ?? $item->product?->purchase_price ?? 0);
         $currencyId = is_numeric($poItem?->currency_id ?? null)
             ? (int) $poItem->currency_id
             : null;
@@ -73,7 +78,24 @@ class JournalCurrencyAmountResolver
             'currency_id' => $currencyId,
             'currency_code' => $resolved['currency_code'] ?? $poCurrency?->currency?->code ?? $item->purchaseReceipt?->currency?->code,
             'exchange_rate' => $resolved['exchange_rate'],
-            'unit_price_idr' => $resolved['amount_idr'],
+            // Presisi satuan dipertahankan (bukan 2 desimal) agar qty × harga = total baris faktur tanpa sisa sen di 2100.10.
+            'unit_price_idr' => round($rawUnitPrice * $resolved['exchange_rate'], 6),
         ];
+    }
+
+    /**
+     * Harga satuan DPP baris PO dalam mata uang PO: harga × (1 − diskon%), lalu dikeluarkan PPN-nya bila tipe pajak Inklusif.
+     */
+    public static function purchaseOrderItemDppUnitPrice(PurchaseOrderItem $poItem): float
+    {
+        $afterDiscount = (float) ($poItem->unit_price ?? 0) * (1 - ((float) ($poItem->discount ?? 0) / 100));
+        $taxRate = (float) ($poItem->tax ?? 0);
+        $taxType = strtolower(trim((string) ($poItem->tipe_pajak ?? 'eklusif')));
+
+        if ($taxRate > 0 && in_array($taxType, ['inklusif', 'inclusive'], true)) {
+            return $afterDiscount / (1 + ($taxRate / 100));
+        }
+
+        return $afterDiscount;
     }
 }

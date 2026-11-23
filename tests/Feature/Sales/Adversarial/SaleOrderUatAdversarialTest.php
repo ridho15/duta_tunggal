@@ -268,8 +268,10 @@ test('UAT-SO-01: Cashier approves COD Sales Order with 4-Layer Data Validation a
     expect($so->approve_by)->toBe($this->kasirUser->id);
     expect($so->cashier_approved_by)->toBe($this->kasirUser->id);
     expect($so->cashier_approved_at)->not->toBeNull();
-    expect((float) $deposit->used_amount)->toBe(200000.0);
-    expect((float) $deposit->remaining_amount)->toBe(300000.0);
+    // Audit penjualan #3: verifikasi kasir mencadangkan saldo (tanpa memotong deposit/jurnal) sampai invoice SO terbit
+    expect((float) $deposit->used_amount)->toBe(0.0);
+    expect((float) $deposit->remaining_amount)->toBe(500000.0);
+    expect(Deposit::availableForCustomer($codCustomer->id))->toBe(300000.0);
 
     // LAYER 2: Kartu Stok (Fisik belum berkurang, belum ada DO)
     expect($so->deliveryOrder()->count())->toBe(0);

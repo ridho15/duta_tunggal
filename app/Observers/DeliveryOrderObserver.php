@@ -745,9 +745,12 @@ class DeliveryOrderObserver
      */
     protected function createJournalEntriesForDelivery(DeliveryOrder $deliveryOrder): void
     {
-        // Cegah pembuatan jurnal duplikat jika sudah pernah dibuat (misal saat sent)
+        // Cegah pembuatan jurnal duplikat jika sudah pernah dibuat (misal saat sent). Jurnal yang sudah dibalik
+        // (Surat Jalan dibatalkan) tidak dihitung, sehingga pengiriman ulang menjurnal lagi.
         $hasJournals = \App\Models\JournalEntry::where('source_type', DeliveryOrder::class)
             ->where('source_id', $deliveryOrder->id)
+            ->where('is_reversal', false)
+            ->whereNull('reversal_of_transaction_id')
             ->exists();
         if ($hasJournals) {
             return;
@@ -772,9 +775,13 @@ class DeliveryOrderObserver
             }
 
             $product = $item->product;
-            $costPerUnit = $product?->cost_price ?? 0;
+            // Nilai biaya saat barang berangkat disimpan di baris DO; invoice melepas Barang Terkirim ke HPP dengan nilai yang sama.
+            $costPerUnit = (float) ($item->unit_cost ?? $product?->cost_price ?? 0);
             if ($costPerUnit <= 0) {
                 continue;
+            }
+            if ($item->unit_cost === null) {
+                $item->forceFill(['unit_cost' => $costPerUnit])->saveQuietly();
             }
 
             $lineAmount = round($qtyDelivered * $costPerUnit, 2);

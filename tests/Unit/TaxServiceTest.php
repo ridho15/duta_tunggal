@@ -102,9 +102,9 @@ test('hitungSubtotal non pajak: qty * price, no tax added', function () {
 });
 
 test('hitungSubtotal eksklusif: tax added on top', function () {
-    // 2 × 100,000 = 200,000 base; 12% tax = 24,000; total = 224,000
+    // 2 × 100,000 = 200,000 base; PPN 22,000; total = 222,000 — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
     $result = HelperController::hitungSubtotal(2, 100000, 0, 12, 'Eksklusif');
-    expect($result)->toBe(224000.0);
+    expect($result)->toBe(222000.0);
 });
 
 test('hitungSubtotal inklusif: total stays same, tax already inside', function () {
@@ -114,9 +114,9 @@ test('hitungSubtotal inklusif: total stays same, tax already inside', function (
 });
 
 test('hitungSubtotal eksklusif with discount applied before tax', function () {
-    // 10 × 100,000 = 1,000,000; 5% discount = 50,000; after = 950,000; 12% tax = 114,000; total = 1,064,000
+    // 10 × 100,000 = 1,000,000; 5% discount = 50,000; after = 950,000; PPN 104,500; total = 1,054,500 — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
     $result = HelperController::hitungSubtotal(10, 100000, 5, 12, 'Eksklusif');
-    expect($result)->toBe(1064000.0);
+    expect($result)->toBe(1054500.0);
 });
 
 test('hitungSubtotal inklusif with discount applied before tax extraction', function () {
@@ -136,13 +136,13 @@ test('hitungSubtotal legacy eklusif typo normalised to eksklusif', function () {
     // Old DB values with typo 'Eklusif' should behave the same as 'Eksklusif'
     $withTypo   = HelperController::hitungSubtotal(1, 100000, 0, 12, 'Eklusif');
     $withCorrect = HelperController::hitungSubtotal(1, 100000, 0, 12, 'Eksklusif');
-    expect($withTypo)->toBe($withCorrect)->toBe(112000.0);
+    expect($withTypo)->toBe($withCorrect)->toBe(111000.0); // — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
 });
 
 test('hitungSubtotal formatted indonesian money string is parsed correctly', function () {
     // Unit price given as formatted string "100.000" (Indonesian thousand separator)
     $result = HelperController::hitungSubtotal(2, '100.000', 0, 12, 'Eksklusif');
-    expect($result)->toBe(224000.0);
+    expect($result)->toBe(222000.0); // — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
 });
 
 // ─── New: Input Validation Guards ─────────────────────────────────────────────
@@ -238,9 +238,9 @@ test('compute Inclusive tax_type: amount=2500000 rate=12 gives dpp=2232143 ppn=2
 });
 
 test('hitungSubtotal with Exclusive tax_type adds tax on top', function () {
-    // 1 qty × 2,500,000, 0 discount, 12% Exclusive → total = 2,800,000
+    // 1 qty × 2,500,000, 0 discount, 12% Exclusive → total = 2,775,000 — PPN 12% × DPP Nilai Lain 11/12 (PMK 131/2024) = 11% efektif
     $result = HelperController::hitungSubtotal(1, 2500000, 0, 12, 'Exclusive');
-    expect($result)->toBe(2800000.0);
+    expect($result)->toBe(2775000.0);
 });
 
 test('hitungSubtotal with Inclusive tax_type total stays same', function () {

@@ -23,7 +23,14 @@ class FinanceReportConfigSeeder extends Seeder
         });
     }
 
-    private function seedCashFlow(): void
+    /**
+     * Konfigurasi Arus Kas (PSAK 2). Klasifikasi berdasarkan AKUN LAWAN jurnal kas:
+     *  - Operasi  : penjualan/piutang, uang muka, hutang dagang & pemasok, beban, pajak, biaya YMH dibayar;
+     *  - Investasi: aset tetap (12xx);
+     *  - Pendanaan: pinjaman bank/leasing/jangka panjang & ekuitas (3xxx).
+     * Publik agar dapat dipanggil migrasi pembaruan konfigurasi (2026_11_22_130002).
+     */
+    public function seedCashFlow(): void
     {
         $sections = [
             [
@@ -61,6 +68,50 @@ class FinanceReportConfigSeeder extends Seeder
                         'include_assets' => false,
                         'sort_order' => 3,
                         'prefixes' => ['7000'],
+                        'asset_prefixes' => [],
+                        'sources' => ['Buku Kas & Bank'],
+                    ],
+                    [
+                        'key' => 'supplier_payments',
+                        'label' => 'Pembayaran kepada Pemasok (Hutang Dagang & Pembelian)',
+                        'type' => 'outflow',
+                        'resolver' => null,
+                        'include_assets' => false,
+                        'sort_order' => 4,
+                        'prefixes' => ['2110', '2100.10', '2190', '1140', '1150.01', '1180.01', '1-1', '1-2', '5'],
+                        'asset_prefixes' => [],
+                        'sources' => ['Pembayaran Hutang', 'Buku Kas & Bank'],
+                    ],
+                    [
+                        'key' => 'employee_expenses',
+                        'label' => 'Pembayaran kepada Karyawan',
+                        'type' => 'outflow',
+                        'resolver' => null,
+                        'include_assets' => false,
+                        'sort_order' => 4,
+                        'prefixes' => ['6210', '6-2', '2170.07', '2170.08', '2170.09', '1130.01'],
+                        'asset_prefixes' => [],
+                        'sources' => ['Buku Kas & Bank'],
+                    ],
+                    [
+                        'key' => 'tax_payments',
+                        'label' => 'Pembayaran Pajak',
+                        'type' => 'net',
+                        'resolver' => null,
+                        'include_assets' => false,
+                        'sort_order' => 4,
+                        'prefixes' => ['2120', '1170', '9100'],
+                        'asset_prefixes' => [],
+                        'sources' => ['Buku Kas & Bank'],
+                    ],
+                    [
+                        'key' => 'accrued_and_other_operating',
+                        'label' => 'Biaya Yang Masih Harus Dibayar, Uang Muka & Hutang/Piutang Lain',
+                        'type' => 'net',
+                        'resolver' => null,
+                        'include_assets' => false,
+                        'sort_order' => 4,
+                        'prefixes' => ['2170', '2160', '2210', '1130', '1150', '1160'],
                         'asset_prefixes' => [],
                         'sources' => ['Buku Kas & Bank'],
                     ],
@@ -124,11 +175,11 @@ class FinanceReportConfigSeeder extends Seeder
                         'label' => 'Biaya Perlengkapan Kantor',
                         'type' => 'outflow',
                         'resolver' => null,
-                        'include_assets' => true,
+                        'include_assets' => false,
                         'sort_order' => 9,
                         'prefixes' => ['6250'],
-                        'asset_prefixes' => ['1210.01', '1210.02'],
-                        'sources' => ['Buku Kas & Bank', 'Aset'],
+                        'asset_prefixes' => [],
+                        'sources' => ['Buku Kas & Bank'],
                     ],
                     [
                         'key' => 'office_needs_expenses',
@@ -170,7 +221,7 @@ class FinanceReportConfigSeeder extends Seeder
                         'resolver' => null,
                         'include_assets' => false,
                         'sort_order' => 12,
-                        'prefixes' => ['8000'],
+                        'prefixes' => ['8000', '9000'],
                         'asset_prefixes' => [],
                         'sources' => ['Buku Kas & Bank'],
                     ],
@@ -183,13 +234,13 @@ class FinanceReportConfigSeeder extends Seeder
                 'items' => [
                     [
                         'key' => 'asset_operations',
-                        'label' => 'Operasi Aset',
+                        'label' => 'Perolehan / Pelepasan Aset Tetap',
                         'type' => 'net',
                         'resolver' => null,
-                        'include_assets' => true,
+                        'include_assets' => false,
                         'sort_order' => 1,
-                        'prefixes' => ['1210', '1220', '1230', '1240', '1250'],
-                        'asset_prefixes' => ['1210', '1220', '1230', '1240', '1250'],
+                        'prefixes' => ['1200', '1210', '1220', '1230', '1240', '1250'],
+                        'asset_prefixes' => [],
                         'sources' => ['Buku Kas & Bank', 'Aset'],
                     ],
                 ],
@@ -201,14 +252,26 @@ class FinanceReportConfigSeeder extends Seeder
                 'items' => [
                     [
                         'key' => 'liability_operations',
-                        'label' => 'Operasi Liabilitas',
+                        'label' => 'Penerimaan / Pembayaran Pinjaman',
                         'type' => 'net',
                         'resolver' => null,
                         'include_assets' => false,
                         'sort_order' => 1,
-                        'prefixes' => ['2100', '2110', '2120', '2130', '2140', '2150', '2160', '2170', '2200', '2210', '2220'],
+                        // Hanya pinjaman (bank, leasing, jangka panjang, pemegang saham). Hutang dagang & biaya akrual = operasi.
+                        'prefixes' => ['2140', '2150', '2160.03', '2200', '2220'],
                         'asset_prefixes' => [],
-                        'sources' => ['Buku Kas & Bank', 'Penjualan', 'Biaya Lain-lain Belum Terbayar'],
+                        'sources' => ['Buku Kas & Bank'],
+                    ],
+                    [
+                        'key' => 'equity_financing',
+                        'label' => 'Setoran Modal & Pembagian Dividen',
+                        'type' => 'net',
+                        'resolver' => null,
+                        'include_assets' => false,
+                        'sort_order' => 2,
+                        'prefixes' => ['3'],
+                        'asset_prefixes' => [],
+                        'sources' => ['Buku Kas & Bank'],
                     ],
                 ],
             ],

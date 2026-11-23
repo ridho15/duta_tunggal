@@ -518,8 +518,14 @@ class BladeVendorPaymentWorkflowTest extends TestCase
         $this->assertEquals(500000, (float)$ap->remaining);
         $this->assertEquals(0, (float)$ap->paid);
 
-        // Jurnal GL harus bersih
-        $this->assertFalse($payment->journalEntries()->exists());
+        // Jurnal GL tidak dihapus (jejak audit), melainkan dibalik: saldo bersih nol & tidak ada baris terhapus.
+        $lines = $payment->journalEntries()->get();
+        $this->assertTrue($lines->where('is_reversal', true)->isNotEmpty());
+        $this->assertEquals(0.0, round((float) $lines->sum('debit') - (float) $lines->sum('credit'), 2));
+        foreach ($lines->groupBy('coa_id') as $coaLines) {
+            $this->assertEquals(0.0, round((float) $coaLines->sum('debit') - (float) $coaLines->sum('credit'), 2));
+        }
+        $this->assertSame(0, \App\Models\JournalEntry::onlyTrashed()->where('source_type', VendorPayment::class)->where('source_id', $payment->id)->count());
     }
 
     public function test_stream_vendor_payment_pdf(): void

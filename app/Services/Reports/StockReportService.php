@@ -14,7 +14,7 @@ class StockReportService
 {
     private const IN_TYPES = ['purchase_in', 'manufacture_in', 'transfer_in', 'adjustment_in', 'opname_in', 'beginning', 'return_in', 'do_return'];
 
-    private const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'opname_out', 'return_out'];
+    private const OUT_TYPES = ['sales', 'transfer_out', 'manufacture_out', 'adjustment_out', 'opname_out', 'return_out', 'purchase_return', 'purchase_return_out'];
 
     public function generate(array $filters = []): array
     {
@@ -117,7 +117,10 @@ class StockReportService
             $warehouse = $stock?->warehouse ?? $warehouseMap->get($warehouseId);
             $rak = $stock?->rak ?? ($rakId ? $rakMap->get($rakId) : null);
             $costPrice = (float) ($product?->cost_price ?? 0);
-            $totalValue = $qtyOnHand * $costPrice;
+            // Nilai persediaan = stok FISIK (qty_available) × HPP. Reservasi SO tidak mengurangi nilai aset (barang masih
+            // milik perusahaan sampai dikirim), sehingga Σ nilai laporan = saldo GL persediaan.
+            $physicalQty = $stock ? $qtyAvailable : (float) ($closing['net_qty'] ?? 0);
+            $totalValue = $physicalQty * $costPrice;
             $qtyMin = (float) ($stock?->qty_min ?? 0);
 
             if ($qtyOnHand <= 0) {

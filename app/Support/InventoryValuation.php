@@ -85,10 +85,49 @@ class InventoryValuation
             : $unitPrice;
 
         $product->forceFill([
-            'cost_price' => round($newCost, 2),
+            'cost_price' => round($newCost, 4), // 4 desimal (decimal(18,4)): pembulatan 2 desimal menyisakan saldo GL saat stok habis
             'last_purchase_price' => round($unitPrice, 2),
             'last_purchase_at' => self::dateString($movement->date),
         ])->saveQuietly();
+    }
+
+    /**
+     * Retur pembelian = kebalikan pembelian pada rata-rata bergerak: barang keluar pada nilai retur (DPP faktur/GRN), bukan
+     * pada HPP, sehingga HPP baru = (qty × HPP − nilai retur) ÷ (qty − qty retur). Dengan begitu Σ qty × HPP tetap = saldo
+     * GL persediaan (yang dikredit sebesar nilai retur). Qty dibaca SEBELUM retur: bila stok gudang sudah dikurangi lebih
+     * dulu (meta skip_stock_update), qty retur ditambahkan kembali.
+     */
+    public static function applyPurchaseReturnToAverage(StockMovement $movement): void
+    {
+        if (! in_array($movement->type, ['purchase_return', 'purchase_return_out'], true) || ! $movement->product_id) {
+            return;
+        }
+
+        $qtyOut = abs((float) $movement->quantity);
+        $returnValue = abs((float) $movement->value);
+        if ($qtyOut <= 0 || $returnValue <= 0) {
+            return;
+        }
+
+        $product = Product::withoutGlobalScopes()->find($movement->product_id);
+        if (! $product) {
+            return;
+        }
+
+        $qtyNow = (float) InventoryStock::query()->where('product_id', $product->id)->sum('qty_available');
+        $qtyBefore = (bool) data_get($movement->meta, 'skip_stock_update', false) ? $qtyNow + $qtyOut : $qtyNow;
+        $qtyAfter = $qtyBefore - $qtyOut;
+        if ($qtyAfter <= 0) {
+            // Stok habis: tidak ada sisa unit untuk menampung selisih; HPP dibiarkan (saldo sisa tercermin di GL).
+            return;
+        }
+
+        $newCost = (($qtyBefore * (float) ($product->cost_price ?? 0)) - $returnValue) / $qtyAfter;
+        if ($newCost <= 0) {
+            return;
+        }
+
+        $product->forceFill(['cost_price' => round($newCost, 4)])->saveQuietly();
     }
 
     private static function dateString(mixed $date): string

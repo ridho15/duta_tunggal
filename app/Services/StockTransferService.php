@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
+use App\Models\JournalEntry;
 use App\Models\StockMovement;
 use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
@@ -102,6 +104,9 @@ class StockTransferService
             foreach ($movements as $movement) {
                 $movement->delete();
             }
+
+            // Jurnal antar cabang dibalik (bukan dihapus) agar periode tertutup & jejak audit tetap utuh
+            app(JournalReversalService::class)->reverseSource($lockedTransfer, "Mutasi stok di-void: {$reason}");
 
             $notes = trim(($lockedTransfer->notes ? $lockedTransfer->notes . "\n\n" : '') . "DIVOID OLEH SUPER ADMIN: {$reason} (" . now()->format('d/m/Y H:i') . ')');
 
@@ -203,6 +208,8 @@ class StockTransferService
                 'status' => 'Approved',
             ]);
 
+            $this->syncInterBranchJournal($lockedTransfer->fresh());
+
             return $lockedTransfer->fresh();
         });
     }
@@ -216,6 +223,12 @@ class StockTransferService
         $this->upsertItemMovement($stockTransfer, $stockTransferItem, 'transfer_in', $stockTransferItem->to_warehouse_id, $stockTransferItem->to_rak_id, [
             'notes' => 'Transfer dari gudang ' . ($stockTransferItem->fromWarehouse?->name ?? '-'),
         ]);
+
+        // Saat approve, jurnal diposting sekali setelah semua item diproses; di luar itu (edit item mutasi yang sudah Approved)
+        // jurnal antar cabang diselaraskan ulang.
+        if (strtolower((string) $stockTransfer->status) === 'approved') {
+            $this->syncInterBranchJournal($stockTransfer->fresh());
+        }
     }
 
     public function deleteApprovedItemMovements(StockTransfer $stockTransfer, StockTransferItem $stockTransferItem, bool $forceDelete = false): void
@@ -235,6 +248,112 @@ class StockTransferService
 
             $movement->delete();
         }
+
+        if (strtolower((string) $stockTransfer->status) === 'approved') {
+            $this->syncInterBranchJournal($stockTransfer->fresh());
+        }
+    }
+
+    /**
+     * Jurnal mutasi ANTAR CABANG (keputusan 22 Nov 2026: per cabang, nilai HPP, dijurnal saat disetujui, lewat akun perantara
+     * Rekening Antar Cabang). Mutasi dalam satu cabang tidak dijurnal (persediaan cabang tidak berubah).
+     *
+     *   Cabang asal  : Dr Rekening Antar Cabang   / Cr Persediaan   (qty × HPP rata-rata)
+     *   Cabang tujuan: Dr Persediaan              / Cr Rekening Antar Cabang
+     *
+     * Saldo Rekening Antar Cabang kedua cabang saling meniadakan di laporan gabungan. Idempoten: bila jurnal yang ada sudah
+     * sama dengan yang seharusnya, tidak ada yang diposting; bila berbeda (item diubah), jurnal lama dibalik lalu diposting ulang.
+     */
+    public function syncInterBranchJournal(StockTransfer $stockTransfer): void
+    {
+        $stockTransfer->loadMissing(['stockTransferItem.product', 'stockTransferItem.fromWarehouse', 'stockTransferItem.toWarehouse']);
+
+        $lines = [];   // "coaId|cabangId" => net (debit − credit)
+        $add = function (int $coaId, int $cabangId, float $net) use (&$lines) {
+            $key = $coaId . '|' . $cabangId;
+            $lines[$key] = round(($lines[$key] ?? 0.0) + $net, 2);
+        };
+
+        $interBranchCoa = null;
+        foreach ($stockTransfer->stockTransferItem as $item) {
+            $fromCabang = (int) ($item->fromWarehouse?->cabang_id ?? 0);
+            $toCabang = (int) ($item->toWarehouse?->cabang_id ?? 0);
+            if (! $fromCabang || ! $toCabang || $fromCabang === $toCabang) {
+                continue;
+            }
+
+            $value = $this->transferValue($stockTransfer, $item);
+            if ($value <= 0) {
+                continue;
+            }
+
+            $inventoryCoa = $item->product?->resolveInventoryCoaOrDefault();
+            $interBranchCoa ??= ChartOfAccount::where('code', config('coa.inter_branch', '1180.02'))->where('is_active', true)->first();
+            if (! $inventoryCoa || ! $interBranchCoa) {
+                throw ValidationException::withMessages([
+                    'journal' => sprintf(
+                        'Mutasi antar cabang %s tidak dapat dijurnal: akun %s tidak ditemukan / tidak aktif. Solusi: tambahkan akun tersebut di Bagan Akun (COA), lalu setujui ulang mutasi.',
+                        $stockTransfer->transfer_number,
+                        ! $interBranchCoa ? 'Rekening Antar Cabang (kode ' . config('coa.inter_branch', '1180.02') . ')' : 'Persediaan produk ' . ($item->product?->name ?? $item->product_id)
+                    ),
+                ]);
+            }
+
+            $add($interBranchCoa->id, $fromCabang, $value);
+            $add($inventoryCoa->id, $fromCabang, -$value);
+            $add($inventoryCoa->id, $toCabang, $value);
+            $add($interBranchCoa->id, $toCabang, -$value);
+        }
+        $lines = array_filter($lines, fn (float $net) => abs($net) >= 0.005);
+
+        $existing = JournalEntry::withoutGlobalScopes()
+            ->where('source_type', $stockTransfer->getMorphClass())
+            ->where('source_id', $stockTransfer->id)
+            ->get()
+            ->groupBy(fn (JournalEntry $e) => $e->coa_id . '|' . (int) $e->cabang_id)
+            ->map(fn ($g) => round((float) $g->sum('debit') - (float) $g->sum('credit'), 2))
+            ->filter(fn (float $net) => abs($net) >= 0.005)
+            ->all();
+
+        ksort($lines);
+        ksort($existing);
+        if ($lines == $existing) {
+            return;
+        }
+
+        app(JournalReversalService::class)->reverseSource($stockTransfer, 'Mutasi antar cabang diubah, jurnal diposting ulang');
+
+        $date = $stockTransfer->transfer_date
+            ? \Illuminate\Support\Carbon::parse($stockTransfer->transfer_date)->toDateString()
+            : now()->toDateString();
+        foreach ($lines as $key => $net) {
+            [$coaId, $cabangId] = array_map('intval', explode('|', $key));
+            JournalEntry::create([
+                'coa_id' => $coaId,
+                'date' => $date,
+                'reference' => $stockTransfer->transfer_number,
+                'description' => "Mutasi stok antar cabang {$stockTransfer->transfer_number} (nilai HPP)",
+                'debit' => $net > 0 ? $net : 0,
+                'credit' => $net < 0 ? abs($net) : 0,
+                'journal_type' => 'stock_transfer',
+                'cabang_id' => $cabangId,
+                'source_type' => $stockTransfer->getMorphClass(),
+                'source_id' => $stockTransfer->id,
+            ]);
+        }
+    }
+
+    /** Nilai mutasi = nilai kartu stok transfer_out (qty × HPP saat disetujui) agar jurnal = Laporan Stok. */
+    private function transferValue(StockTransfer $stockTransfer, StockTransferItem $item): float
+    {
+        $movementValue = StockMovement::query()
+            ->where('from_model_type', StockTransfer::class)
+            ->where('from_model_id', $stockTransfer->id)
+            ->where('type', 'transfer_out')
+            ->where('meta->stock_transfer_item_id', $item->id)
+            ->value('value');
+
+        return round(abs((float) ($movementValue ?? ((float) $item->quantity * (float) ($item->product?->cost_price ?? 0)))), 2);
     }
 
     private function validateTransferItemShape(StockTransferItem $item): void
@@ -281,6 +400,8 @@ class StockTransferService
             'warehouse_id' => $warehouseId,
             'rak_id' => $rakId,
             'quantity' => $stockTransferItem->quantity,
+            // Nilai kartu stok mutasi = qty × HPP rata-rata produk (keluar & masuk bernilai sama, tanpa dampak GL)
+            'value' => round((float) $stockTransferItem->quantity * (float) ($stockTransferItem->product?->cost_price ?? 0), 2),
             'type' => $type,
             'reference_id' => $stockTransfer->transfer_number,
             'date' => $stockTransfer->transfer_date,

@@ -58,16 +58,39 @@ class AccountingPeriod extends Model
         static::addGlobalScope(new CabangScope);
     }
 
+    /**
+     * Tolak posting/ubah/hapus jurnal pada tanggal yang berada di periode tertutup.
+     * Periode "semua cabang" (cabang_id NULL) yang ditutup mengunci jurnal SEMUA cabang,
+     * selain periode milik cabang jurnal itu sendiri.
+     */
     public static function ensureDateIsOpen(string|Carbon $date, ?int $cabangId): void
     {
-        $period = static::withoutGlobalScope(CabangScope::class)
-            ->forCabang($cabangId)
-            ->coveringDate($date)
-            ->first();
+        $period = static::closedPeriodCovering($date, $cabangId);
 
-        if ($period && $period->status === 'closed') {
-            $formattedDate = $date instanceof Carbon ? $date->toDateString() : $date;
-            throw new ClosedPeriodException("Periode {$formattedDate} sudah ditutup.");
+        if ($period) {
+            $formattedDate = $date instanceof Carbon ? $date->toDateString() : Carbon::parse($date)->toDateString();
+            $scope = $period->cabang_id === null ? 'semua cabang' : 'cabang ini';
+            throw new ClosedPeriodException(
+                "Periode {$formattedDate} sudah ditutup ({$scope}, {$period->period_start->toDateString()} s/d {$period->period_end->toDateString()}). "
+                . 'Gunakan tanggal pada periode yang masih terbuka atau minta akuntansi membuka kembali periode tersebut.'
+            );
         }
+    }
+
+    /**
+     * Periode tertutup yang mencakup tanggal untuk cabang tertentu ATAU periode semua cabang.
+     */
+    public static function closedPeriodCovering(string|Carbon $date, ?int $cabangId): ?self
+    {
+        return static::withoutGlobalScope(CabangScope::class)
+            ->where(function (Builder $q) use ($cabangId) {
+                $q->whereNull('cabang_id');
+                if ($cabangId !== null) {
+                    $q->orWhere('cabang_id', $cabangId);
+                }
+            })
+            ->coveringDate($date)
+            ->where('status', 'closed')
+            ->first();
     }
 }
