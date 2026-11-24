@@ -194,22 +194,30 @@ class LedgerPostingService
                     ? 'Purchase invoice - fixed asset for ' . $invoice->invoice_number
                     : 'Purchase invoice - ' . ($hasReceipts ? 'unbilled purchase' : 'inventory') . ' for ' . $invoice->invoice_number;
 
-                $debitEntry = $this->createJournalEntry([
-                    'coa_id' => $debitCoa->id,
-                    'date' => $date,
-                    'reference' => $invoice->invoice_number,
-                    'description' => $descriptionText,
-                    'debit' => $unbilledAmount,
-                    'credit' => 0,
-                    'amounts_are_idr' => true,
-                    'journal_type' => 'purchase',
-                    'cabang_id' => $branchId,
-                    'department_id' => $departmentId,
-                    'project_id' => $projectId,
-                    'source_type' => Invoice::class,
-                    'source_id' => $invoice->id,
-                ], $currencyId, $exchangeRate);
-                $entries[] = $debitEntry;
+                // Penerimaan barang mengkredit akun "barang belum tertagih" MILIK PRODUK; faktur harus mendebit akun yang sama
+                // agar saldonya kembali 0. Dulu selalu ke 2100.10 → bila produk memakai akun lain (2190.10 / 1180.01), 2100.10
+                // bersaldo debit (terbaca seperti aset) dan akun produk tidak pernah tertutup (catatan akunting 24 Nov 2026).
+                $debitSplits = ($hasReceipts && ! $isAssetPurchase)
+                    ? $this->splitUnbilledByProductCoa($invoice, $unbilledAmount, $debitCoa)
+                    : [[$debitCoa, $unbilledAmount]];
+
+                foreach ($debitSplits as [$splitCoa, $splitAmount]) {
+                    $entries[] = $this->createJournalEntry([
+                        'coa_id' => $splitCoa->id,
+                        'date' => $date,
+                        'reference' => $invoice->invoice_number,
+                        'description' => $descriptionText,
+                        'debit' => $splitAmount,
+                        'credit' => 0,
+                        'amounts_are_idr' => true,
+                        'journal_type' => 'purchase',
+                        'cabang_id' => $branchId,
+                        'department_id' => $departmentId,
+                        'project_id' => $projectId,
+                        'source_type' => Invoice::class,
+                        'source_id' => $invoice->id,
+                    ], $currencyId, $exchangeRate);
+                }
             } else {
                 \Illuminate\Support\Facades\Log::info('DEBUG: Skipping debit entry for unbilled purchase / asset', [
                     'subtotal' => $subtotal,
@@ -1548,5 +1556,48 @@ class LedgerPostingService
             'currency_id' => $currencyId,
             'exchange_rate' => $exchangeRate,
         ];
+    }
+
+    /**
+     * Bagi nilai "barang belum tertagih" faktur pembelian per akun belum-tertagih milik produk (proporsional nilai baris faktur),
+     * sama dengan akun yang dikredit saat penerimaan barang. Produk tanpa akun khusus memakai $fallback (2100.10).
+     *
+     * @return array<int, array{0: ChartOfAccount, 1: float}>
+     */
+    public function splitUnbilledByProductCoa(Invoice $invoice, float $amount, ChartOfAccount $fallback): array
+    {
+        $invoice->loadMissing('invoiceItem.product');
+        $weights = [];
+        $coas = [];
+        foreach ($invoice->invoiceItem as $item) {
+            $weight = abs((float) ($item->subtotal ?? 0)) ?: abs((float) $item->quantity * (float) $item->price);
+            if ($weight <= 0) {
+                continue;
+            }
+            $coa = $item->product?->resolveUnbilledPurchaseCoaOrDefault();
+            $coa = ($coa && $coa->id) ? $coa : $fallback;
+            $coas[$coa->id] = $coa;
+            $weights[$coa->id] = ($weights[$coa->id] ?? 0.0) + $weight;
+        }
+
+        $totalWeight = array_sum($weights);
+        if ($totalWeight <= 0 || count($weights) === 1) {
+            return [[count($coas) === 1 ? reset($coas) : $fallback, $amount]];
+        }
+
+        $splits = [];
+        $allocated = 0.0;
+        $ids = array_keys($weights);
+        foreach ($ids as $i => $coaId) {
+            $part = $i === count($ids) - 1
+                ? round($amount - $allocated, 2)
+                : round($amount * $weights[$coaId] / $totalWeight, 2);
+            $allocated += $part;
+            if (abs($part) >= 0.005) {
+                $splits[] = [$coas[$coaId], $part];
+            }
+        }
+
+        return $splits;
     }
 }

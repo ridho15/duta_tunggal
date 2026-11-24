@@ -346,9 +346,16 @@ class PurchaseReturnService
                     '5120',
                 ]);
 
+                // Retur sebelum ditagih membalik akun belum-tertagih yang dikredit saat penerimaan = akun MILIK PRODUK (bila semua
+                // item retur memakai akun yang sama), selaras faktur pembelian (catatan akunting 24 Nov 2026).
+                $productUnbilledCoas = $hasAp ? collect() : $purchaseReturn->purchaseReturnItem
+                    ->map(fn ($item) => $item->product?->resolveUnbilledPurchaseCoaOrDefault())
+                    ->filter(fn ($coa) => $coa && $coa->id)
+                    ->unique('id');
+
                 $liabilityCoa = $hasAp
                     ? $this->accountsPayableCoa()
-                    : $this->findFirstExistingCoa([
+                    : ($productUnbilledCoas->count() === 1 ? $productUnbilledCoas->first() : null) ?? $this->findFirstExistingCoa([
                         config('coa.unbilled_purchase'),
                         '2100.10',
                         '2190.10',
