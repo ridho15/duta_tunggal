@@ -11,6 +11,7 @@ use App\Models\InvoiceItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseReceipt;
 use App\Models\Supplier;
+use App\Services\PurchaseInvoiceTaxAdjustment;
 use App\Services\InvoiceService;
 use App\Services\PurchaseInvoiceAccountingService;
 use App\Services\PurchaseInvoiceCancellationService;
@@ -352,6 +353,10 @@ class PurchaseInvoiceController extends Controller
                     ]);
                 }
 
+                // 4b. DPP/PPN disamakan dengan Faktur Pajak supplier (Finance, selisih maks. Rp500) — sebelum posting
+                app(PurchaseInvoiceTaxAdjustment::class)->apply($invoice, $this->moneyInput($request, 'faktur_dpp'), $this->moneyInput($request, 'faktur_ppn'), $request->user());
+                $invoice->refresh();
+
                 // 5. Jika langsung terbitkan, posting ke Buku Besar & Hutang Dagang (AP)
                 if ($action === 'save_and_post') {
                     $this->accountingService->finaliseInvoice($invoice);
@@ -363,6 +368,9 @@ class PurchaseInvoiceController extends Controller
             $msg = ($action === 'save_draft')
                 ? "Faktur Pembelian {$invoice->invoice_number} berhasil disimpan sebagai Draft."
                 : "Faktur Pembelian {$invoice->invoice_number} berhasil diterbitkan dan diposting ke Hutang Usaha (AP).";
+            if ($invoice->fresh()->tax_adjustment) {
+                $msg .= ' DPP/PPN disamakan dengan Faktur Pajak supplier — mohon informasikan ke Finance Manager.';
+            }
 
             return redirect()->route('pembelian.invoices.show', $invoice)->with('success', $msg);
         } catch (ValidationException $e) {
@@ -448,7 +456,7 @@ class PurchaseInvoiceController extends Controller
                             $poPrice = (float) ($item->po_price ?? $price);
                             $qty = (float) $item->quantity;
                             $lineTotal = round($price * $qty, 2);
-                            $lineTax = round($lineTotal * ((float)$item->tax_rate / 100), 2);
+                            $lineTax = round($lineTotal * (\App\Support\LineAmounts::effectiveRate((float) $item->tax_rate) / 100), 2);   // 12% → 11% efektif
                             $lineVariance = round(($price - $poPrice) * $qty, 2);
 
                             $item->update([
@@ -472,8 +480,15 @@ class PurchaseInvoiceController extends Controller
                         'dpp' => $subtotal,
                         'total' => $total,
                         'price_variance_amount' => round($totalVariance, 2),
+                        'tax_adjustment' => null,   // baris dihitung ulang dari angka sistem; penyesuaian diterapkan lagi di bawah
                     ]);
                     $invoice->forceFill(['dpp_nilai_lain' => $this->dppNilaiLain($subtotal, $taxTotal)])->saveQuietly();
+                }
+
+                // DPP/PPN sesuai Faktur Pajak supplier (Finance, selisih maks. Rp500); baris dihitung ulang = mulai dari angka sistem
+                if ($request->has('faktur_dpp') || $request->has('faktur_ppn') || ! empty($validated['items'])) {
+                    app(PurchaseInvoiceTaxAdjustment::class)->apply($invoice->refresh(), $this->moneyInput($request, 'faktur_dpp'), $this->moneyInput($request, 'faktur_ppn'), $request->user());
+                    $invoice->refresh();
                 }
 
                 // Jika aksi adalah update & post, posting ke GL & AP
@@ -485,12 +500,28 @@ class PurchaseInvoiceController extends Controller
             $msg = ($action === 'update_and_post')
                 ? "Faktur Pembelian {$invoice->invoice_number} berhasil diperbarui dan diposting ke Hutang Usaha."
                 : "Faktur Pembelian {$invoice->invoice_number} berhasil diperbarui.";
+            if ($invoice->fresh()->tax_adjustment) {
+                $msg .= ' DPP/PPN disamakan dengan Faktur Pajak supplier — mohon informasikan ke Finance Manager.';
+            }
 
             return redirect()->route('pembelian.invoices.show', $invoice)->with('success', $msg);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Throwable $e) {
             Log::error('PurchaseInvoiceController@update failed: ' . $e->getMessage());
             return back()->withInput()->with('error', 'Gagal memperbarui Faktur Pembelian: ' . $e->getMessage());
         }
+    }
+
+    /** Nilai uang dari form (boleh format "1.576.600"); kosong = null (pakai hitungan sistem). */
+    private function moneyInput(Request $request, string $key): ?float
+    {
+        $raw = $request->input($key);
+        if ($raw === null || trim((string) $raw) === '') {
+            return null;
+        }
+
+        return (float) \App\Helpers\MoneyHelper::safeParse($raw);
     }
 
     /**

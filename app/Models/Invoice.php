@@ -49,6 +49,7 @@ class Invoice extends Model
         'other_fee',
         'total',
         'price_variance_amount',
+        'tax_adjustment', // DPP/PPN disamakan dengan Faktur Pajak supplier (PurchaseInvoiceTaxAdjustment)
         'due_date',
         'status', // draft, sent, paid, partially_paid, overdue, cancelled
         'ppn_rate',
@@ -83,6 +84,7 @@ class Invoice extends Model
         'surat_jalan_ids' => 'array',
         'cancelled_at' => 'datetime',
         'purchase_receipts' => 'array',
+        'tax_adjustment' => 'array',
         'purchase_order_ids' => 'array', // Task 14: multiple POs per invoice
         'currency_id' => 'integer',
         'exchange_rate' => 'decimal:8',

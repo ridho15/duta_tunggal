@@ -93,7 +93,8 @@ class JournalCurrencyAmountResolver
         $taxType = strtolower(trim((string) ($poItem->tipe_pajak ?? 'eklusif')));
 
         if ($taxRate > 0 && in_array($taxType, ['inklusif', 'inclusive'], true)) {
-            return $afterDiscount / (1 + ($taxRate / 100));
+            // Tarif 12% = 12% × DPP Nilai Lain 11/12 (11% efektif, PMK 131/2024) — sama dengan total PO (LineAmounts)
+            return $afterDiscount / (1 + (\App\Support\LineAmounts::effectiveRate($taxRate) / 100));
         }
 
         return $afterDiscount;

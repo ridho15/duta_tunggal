@@ -20,6 +20,10 @@
         otherFee: {{ (float)old('other_fee', $invoice->other_fee_total ?? 0) }},
         invoiceDate: '{{ old('invoice_date', $invoice->invoice_date ? $invoice->invoice_date->format('Y-m-d') : date('Y-m-d')) }}',
         dueDate: '{{ old('due_date', $invoice->due_date ? $invoice->due_date->format('Y-m-d') : date('Y-m-d')) }}',
+        // DPP/PPN sesuai Faktur Pajak supplier: null = ikut hitungan sistem (keputusan Ko Handy 24 Nov 2026)
+        fakturDpp: {{ json_encode(old('faktur_dpp') !== null && old('faktur_dpp') !== '' ? (float) old('faktur_dpp') : ($invoice->tax_adjustment['faktur_dpp'] ?? null)) }},
+        fakturPpn: {{ json_encode(old('faktur_ppn') !== null && old('faktur_ppn') !== '' ? (float) old('faktur_ppn') : ($invoice->tax_adjustment['faktur_ppn'] ?? null)) }},
+        maxTaxDiff: {{ \App\Services\PurchaseInvoiceTaxAdjustment::MAX_DIFFERENCE }},
 
         calculateSubtotal() {
             return this.items.reduce((sum, it) => sum + (it.quantity * it.price), 0);
@@ -28,8 +32,27 @@
         calculateTax() {
             return this.items.reduce((sum, it) => {
                 const lineTotal = it.quantity * it.price;
-                return sum + (lineTotal * (it.tax_rate / 100));
+                // Tarif 12% = 12% × DPP Nilai Lain 11/12 → 11% efektif (PMK 131/2024), sama dengan server
+                const rate = Math.abs(parseFloat(it.tax_rate) - 12) < 0.0001 ? 11 : parseFloat(it.tax_rate || 0);
+                return sum + Math.round(lineTotal * (rate / 100) * 100) / 100;
             }, 0);
+        },
+
+        finalDpp() { return this.fakturDpp !== null ? this.fakturDpp : this.calculateSubtotal(); },
+        finalPpn() { return this.fakturPpn !== null ? this.fakturPpn : this.calculateTax(); },
+        diffDpp() { return this.fakturDpp !== null ? this.fakturDpp - this.calculateSubtotal() : 0; },
+        diffPpn() { return this.fakturPpn !== null ? this.fakturPpn - this.calculateTax() : 0; },
+        taxDiffTooLarge() { return Math.abs(this.diffDpp()) > this.maxTaxDiff || Math.abs(this.diffPpn()) > this.maxTaxDiff; },
+
+        // Angka format Indonesia: titik = ribuan, koma = desimal ("1.576.600,50" → 1576600.5)
+        parseIdr(val) {
+            const clean = String(val ?? '').replace(/[^0-9,.-]/g, '').replace(/\./g, '').replace(',', '.');
+            const n = parseFloat(clean);
+            return Number.isFinite(n) ? n : null;
+        },
+
+        formatIdr(val) {
+            return Number(val || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 });
         },
 
         calculateVariance() {
@@ -40,7 +63,7 @@
         },
 
         calculateTotal() {
-            return this.calculateSubtotal() + this.calculateTax() + parseFloat(this.otherFee || 0);
+            return this.finalDpp() + this.finalPpn() + parseFloat(this.otherFee || 0);
         },
 
         parseRupiah(val) {
@@ -306,6 +329,38 @@
                     <div class="flex items-center justify-between text-gray-600">
                         <span>PPN Masukan:</span>
                         <span class="font-bold text-gray-900 font-mono" x-text="formatMoney(calculateTax())"></span>
+                    </div>
+                    {{-- DPP/PPN sesuai Faktur Pajak supplier (keputusan Ko Handy 24 Nov 2026) --}}
+                    @php $canAdjustTax = \App\Services\PurchaseInvoiceTaxAdjustment::canAdjust(auth()->user()); @endphp
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2" x-show="items.length > 0">
+                        <p class="font-semibold text-gray-700">Sesuai Faktur Pajak Supplier</p>
+                        @if ($canAdjustTax)
+                            <p class="text-[11px] text-gray-500">Terisi otomatis dari hitungan sistem. Ubah hanya bila Faktur Pajak supplier beda karena pembulatan (maks. Rp {{ number_format(\App\Services\PurchaseInvoiceTaxAdjustment::MAX_DIFFERENCE, 0, ',', '.') }}).</p>
+                            <label class="flex items-center justify-between gap-2 text-gray-600">
+                                <span>DPP Faktur Pajak</span>
+                                <input type="text" inputmode="numeric" class="w-36 rounded-md border-gray-300 text-right font-mono text-xs"
+                                    :value="formatIdr(finalDpp())" @change="fakturDpp = parseIdr($event.target.value)" aria-label="DPP sesuai Faktur Pajak">
+                            </label>
+                            <label class="flex items-center justify-between gap-2 text-gray-600">
+                                <span>PPN Faktur Pajak</span>
+                                <input type="text" inputmode="numeric" class="w-36 rounded-md border-gray-300 text-right font-mono text-xs"
+                                    :value="formatIdr(finalPpn())" @change="fakturPpn = parseIdr($event.target.value)" aria-label="PPN sesuai Faktur Pajak">
+                            </label>
+                            <template x-if="fakturDpp !== null"><input type="hidden" name="faktur_dpp" :value="fakturDpp"></template>
+                            <template x-if="fakturPpn !== null"><input type="hidden" name="faktur_ppn" :value="fakturPpn"></template>
+                            <div x-show="Math.abs(diffDpp()) >= 0.5 || Math.abs(diffPpn()) >= 0.5" class="text-[11px] space-y-1">
+                                <p :class="taxDiffTooLarge() ? 'text-red-700 font-semibold' : 'text-amber-700'">
+                                    Selisih DPP <span x-text="formatMoney(diffDpp())"></span> · PPN <span x-text="formatMoney(diffPpn())"></span>
+                                </p>
+                                <p x-show="taxDiffTooLarge()" class="text-red-700">Melebihi batas — kemungkinan harga satuan salah. Cocokkan harga satuan dengan PO.</p>
+                                <p x-show="!taxDiffTooLarge()" class="text-amber-700">Selisih DPP diposting ke Selisih Pembelian. Wajib info ke Finance Manager.</p>
+                                <button type="button" class="text-[#15803d] font-semibold underline" @click="fakturDpp = null; fakturPpn = null">Kembalikan ke hitungan sistem</button>
+                            </div>
+                        @else
+                            <p class="text-[11px] text-gray-500">Mengikuti hitungan sistem. Bila beda dengan Faktur Pajak supplier, minta Finance / Finance Manager yang menyimpan faktur ini.</p>
+                        @endif
+                        @error('faktur_dpp')<p class="text-[11px] text-red-700">{{ $message }}</p>@enderror
+                        @error('faktur_ppn')<p class="text-[11px] text-red-700">{{ $message }}</p>@enderror
                     </div>
                     <div class="flex items-center justify-between text-gray-600">
                         <span>Ongkos Kirim / Biaya Lain:</span>

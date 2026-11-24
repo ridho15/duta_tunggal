@@ -72,7 +72,7 @@ class FixPrebillingPurchaseReturns extends Command
                 }
                 $lineDpp = round($overBilled * (float) $invoiceLine->price * $rate, 2);
                 $dpp += $lineDpp;
-                $vat += round($lineDpp * (float) $invoiceLine->tax_rate / 100, 2);
+                $vat += round($lineDpp * \App\Support\LineAmounts::effectiveRate((float) $invoiceLine->tax_rate) / 100, 2);
             }
             if ($dpp <= 0) {
                 continue;
