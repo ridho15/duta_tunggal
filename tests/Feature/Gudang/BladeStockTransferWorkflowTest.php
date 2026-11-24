@@ -291,6 +291,18 @@ class BladeStockTransferWorkflowTest extends TestCase
 
         $freshTransfer = $transfer->fresh();
         $this->assertEquals('Approved', $freshTransfer->status);
+        // Disetujui = dicadangkan, belum pindah
+        $this->assertEquals(50, (float) InventoryStock::where('warehouse_id', $this->fromWarehouse->id)->where('product_id', $product->id)->value('qty_available'));
+
+        // Gudang asal KIRIM sebagian (15 dari 20) → gudang tujuan TERIMA → kirim sisa 5 → terima
+        $this->post(route('gudang.transfer.ship', $transfer), ['quantities' => [$transferItem->id => 15], 'notes' => 'Mobil 1'])->assertSessionHas('success');
+        $this->assertEquals('Shipped', $transfer->fresh()->status);
+        $this->post(route('gudang.transfer.receive', $transfer->fresh()->shipments()->first()))->assertSessionHas('success');
+        $this->assertEquals(15, (float) InventoryStock::where('warehouse_id', $this->toWarehouse->id)->where('product_id', $product->id)->value('qty_available'));
+        $this->post(route('gudang.transfer.ship', $transfer), ['quantities' => [$transferItem->id => 5]])->assertSessionHas('success');
+        $this->post(route('gudang.transfer.receive', $transfer->fresh()->shipments()->whereNull('received_at')->first()))->assertSessionHas('success');
+        $this->assertEquals('Completed', $transfer->fresh()->status);
+        $this->get(route('gudang.transfer.show', $transfer))->assertOk()->assertSee('Selesai (Diterima)')->assertSee($transfer->transfer_number . '-K2');
 
         // Verifikasi mutasi stok fisik
         $stockFrom = InventoryStock::where('warehouse_id', $this->fromWarehouse->id)
@@ -308,7 +320,7 @@ class BladeStockTransferWorkflowTest extends TestCase
             ->where('from_model_id', $transfer->id)
             ->get();
 
-        $this->assertCount(2, $movements);
+        $this->assertCount(8, $movements);   // 2 pengiriman × (keluar asal, masuk transit, keluar transit, masuk tujuan)
         $this->assertTrue($movements->contains('type', 'transfer_out'));
         $this->assertTrue($movements->contains('type', 'transfer_in'));
     }

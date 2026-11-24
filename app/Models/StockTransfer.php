@@ -18,7 +18,8 @@ class StockTransfer extends Model
         'from_warehouse_id',
         'to_warehouse_id',
         'transfer_date',
-        'status', //Pending, completed, cancelled, Draft, Approved, Request, Reject
+        'status', // Draft → Request → Approved (stok dicadangkan) → Shipped (dikirim, bisa sebagian) → Completed (diterima); Reject, Cancelled
+        'remaining_closed_at', 'remaining_closed_by', 'remaining_close_reason',
         'notes', // keterangan mutasi (mis. supplier salah kirim gudang)
     ];
 
@@ -30,6 +31,28 @@ class StockTransfer extends Model
     public function toWarehouse()
     {
         return $this->belongsTo(Warehouse::class, 'to_warehouse_id')->withDefault();
+    }
+
+    public function shipments()
+    {
+        return $this->hasMany(StockTransferShipment::class, 'stock_transfer_id')->orderBy('id');
+    }
+
+    /** Label status untuk layar (Shipped dibedakan sebagian / penuh). */
+    public function statusLabel(): string
+    {
+        return match ($this->status) {
+            'Draft' => 'Draft', 'Request', 'Pending' => 'Menunggu Persetujuan', 'Approved' => 'Disetujui · Siap Dikirim',
+            'Shipped' => $this->hasRemainingToShip() ? 'Dikirim Sebagian' : 'Dikirim · Menunggu Diterima',
+            'Completed', 'completed' => 'Selesai (Diterima)', 'Reject' => 'Ditolak', 'Cancelled', 'cancelled' => 'Dibatalkan',
+            default => (string) $this->status,
+        };
+    }
+
+    public function hasRemainingToShip(): bool
+    {
+        return $this->remaining_closed_at === null
+            && $this->stockTransferItem->contains(fn (StockTransferItem $item) => $item->remainingToShip() > 0.0001);
     }
 
     public function stockTransferItem()

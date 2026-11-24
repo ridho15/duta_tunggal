@@ -124,9 +124,10 @@
             margin-bottom: 20px;
         }
 
+        .items-table td.right { white-space: nowrap; }   /* angka uang tidak terlipat (kolom pajak bertambah) */
         .items-table th,
         .items-table td {
-            padding: 8px;
+            padding: 6px 5px;
             border: 1px solid #ddd;
             text-align: left;
             vertical-align: middle;
@@ -280,20 +281,21 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="center" style="width: 4%;">No</th>
+                <th class="center" style="width: 3%;">No</th>
                 <th>Nama Barang</th>
-                <th class="center" style="width: 6%;">Qty</th>
-                <th class="center" style="width: 7%;">Satuan</th>
-                <th class="right" style="width: 11%;">Harga Satuan</th>
-                <th class="right" style="width: 8%;">Disc (%)</th>
-                <th class="right" style="width: 10%;">Disc (Rp)</th>
+                <th class="center" style="width: 5%;">Qty</th>
+                <th class="center" style="width: 6%;">Satuan</th>
+                <th class="right" style="width: 9%;">Harga Satuan</th>
+                <th class="right" style="width: 5%;">Disc (%)</th>
+                <th class="right" style="width: 7%;">Disc (Rp)</th>
                 @unless ($isImport)
-                    <th class="center" style="width: 9%;">Tipe Pajak</th>
-                    <th class="right" style="width: 7%;">Tax (%)</th>
-                    <th class="right" style="width: 11%;">DPP</th>
-                    <th class="right" style="width: 9%;">PPN</th>
+                    <th class="center" style="width: 7%;">Tipe Pajak</th>
+                    <th class="right" style="width: 5%;">Tax (%)</th>
+                    <th class="right" style="width: 9%;">Harga Jual (DPP)</th>
+                    <th class="right" style="width: 9%;">DPP Nilai Lain</th>
+                    <th class="right" style="width: 8%;">PPN</th>
                 @endunless
-                <th class="right" style="width: 12%;">Total</th>
+                <th class="right" style="width: 9%;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -303,7 +305,11 @@
                 $totalDiskon = 0;
                 $totalAfterDiskon = 0;
                 $totalDPP = 0;
+                $totalDppNilaiLain = 0;
                 $totalPPN = 0;
+                $hasNilaiLain = false;
+                $hasOtherTax = false;
+                $taxTypesSeen = [];
             @endphp
             @foreach ($purchaseOrder->purchaseOrderItem as $index => $item)
                 @php
@@ -323,6 +329,11 @@
                     $itemDPP = $taxResult['dpp'];
                     $itemPPN = $taxResult['ppn'];
                     $itemTotal = $taxResult['total'];
+                    // PMK 131/2024: barang non-mewah (tarif 11% / 12%) disajikan seperti Faktur Pajak —
+                    // Tax 12% × DPP Nilai Lain (11/12 × Harga Jual). Nilai PPN tidak berubah (= 11% × Harga Jual).
+                    $isNilaiLain = $taxType !== 'Non Pajak' && in_array(round($taxRate, 2), [11.0, 12.0], true);
+                    $displayRate = $isNilaiLain ? 12.0 : $taxRate;
+                    $itemDppNilaiLain = $isNilaiLain ? round($itemDPP * 11 / 12, 2) : null;
 
                     $summaryBruto =
                         $headerCurrencyId && $lineCurrencyId !== $headerCurrencyId
@@ -377,6 +388,10 @@
                     $totalDiskon += $discountAmount;
                     $totalAfterDiskon += $afterDiscount;
                     $totalDPP += $itemDPP;
+                    $totalDppNilaiLain += $itemDppNilaiLain ?? 0;
+                    $hasOtherTax = ($hasOtherTax ?? false) || (! $isNilaiLain && $itemPPN > 0);
+                    $hasNilaiLain = $hasNilaiLain || $isNilaiLain;
+                    $taxTypesSeen[$taxType] = true;
                     $totalPPN += $itemPPN;
                     $grandTotal += $itemTotal;
                 @endphp
@@ -390,8 +405,9 @@
                     <td class="right">{{ $formatMoney($discountAmount, $lineCurrencyId) }}</td>
                     @unless ($isImport)
                         <td class="center">{{ $taxType }}</td>
-                        <td class="right">{{ number_format($taxRate, 2, ',', '.') }}%</td>
+                        <td class="right">{{ number_format($displayRate, 2, ',', '.') }}%</td>
                         <td class="right">{{ $formatMoney($itemDPP, $lineCurrencyId) }}</td>
+                        <td class="right">{{ $itemDppNilaiLain !== null ? $formatMoney($itemDppNilaiLain, $lineCurrencyId) : '-' }}</td>
                         <td class="right">{{ $formatMoney($itemPPN, $lineCurrencyId) }}</td>
                     @endunless
                     <td class="right">{{ $formatMoney($itemTotal, $lineCurrencyId) }}</td>
@@ -400,29 +416,44 @@
 
             {{-- Summary Breakdown --}}
             <tr class="summary-row">
-                <td colspan="{{ $isImport ? 7 : 11 }}" class="right">Subtotal Bruto</td>
+                <td colspan="{{ $isImport ? 7 : 12 }}" class="right">Subtotal Bruto</td>
                 <td class="right">{{ $formatMoney($totalBruto, $headerCurrencyId) }}</td>
             </tr>
             <tr class="summary-row">
-                <td colspan="{{ $isImport ? 7 : 11 }}" class="right">Total Diskon</td>
+                <td colspan="{{ $isImport ? 7 : 12 }}" class="right">Total Diskon</td>
                 <td class="right">({{ $formatMoney($totalDiskon, $headerCurrencyId) }})</td>
             </tr>
             <tr class="summary-row">
-                <td colspan="{{ $isImport ? 7 : 11 }}" class="right">Sub Total (setelah diskon)</td>
+                @php
+                    $subLabel = match (true) {
+                        $isImport => '',
+                        array_keys($taxTypesSeen) === ['Inklusif'] => ' (termasuk PPN)',
+                        array_keys($taxTypesSeen) === ['Eksklusif'] => ' (belum termasuk PPN)',
+                        default => '',
+                    };
+                @endphp
+                <td colspan="{{ $isImport ? 7 : 12 }}" class="right">Sub Total setelah diskon{{ $subLabel }}</td>
                 <td class="right">{{ $formatMoney($totalAfterDiskon, $headerCurrencyId) }}</td>
             </tr>
             @unless ($isImport)
+                {{-- Urutan seperti Faktur Pajak: Harga Jual (tanpa PPN) → DPP Nilai Lain → PPN 12% → Grand Total --}}
                 <tr class="summary-row">
-                    <td colspan="11" class="right">DPP (Dasar Pengenaan Pajak)</td>
+                    <td colspan="12" class="right">Harga Jual / DPP (tanpa PPN)</td>
                     <td class="right">{{ $formatMoney($totalDPP, $headerCurrencyId) }}</td>
                 </tr>
+                @if ($hasNilaiLain)
+                    <tr class="summary-row">
+                        <td colspan="12" class="right">DPP Nilai Lain (11/12 × Harga Jual{{ $hasOtherTax ? ', barang tarif 12%' : '' }})</td>
+                        <td class="right">{{ $formatMoney($totalDppNilaiLain, $headerCurrencyId) }}</td>
+                    </tr>
+                @endif
                 <tr class="summary-row">
-                    <td colspan="11" class="right">PPN</td>
+                    <td colspan="12" class="right">{{ $hasNilaiLain && ! $hasOtherTax ? 'PPN 12% × DPP Nilai Lain' : 'PPN' }}</td>
                     <td class="right">{{ $formatMoney($totalPPN, $headerCurrencyId) }}</td>
                 </tr>
             @endunless
             <tr class="summary-row total">
-                <td colspan="{{ $isImport ? 7 : 11 }}" class="right">GRAND TOTAL</td>
+                <td colspan="{{ $isImport ? 7 : 12 }}" class="right">GRAND TOTAL</td>
                 <td class="right">{{ $formatMoney($grandTotal, $headerCurrencyId) }}</td>
             </tr>
         </tbody>

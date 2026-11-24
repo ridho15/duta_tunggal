@@ -367,12 +367,24 @@
                     <div>Termin Pembayaran: <strong class="text-gray-900">{{ $invoice->due_date ? $invoice->invoice_date?->diffInDays($invoice->due_date) : 30 }} hari</strong></div>
                 </div>
                 <div class="w-full sm:w-72 space-y-1.5 text-xs">
+                    @php
+                        // PMK 131/2024: tarif 11%/12% disajikan seperti Faktur Pajak — 12% × DPP Nilai Lain (11/12 × Harga Jual)
+                        $invRate = (float) ($invoice->ppn_rate ?? 0);
+                        $invNl = in_array(round($invRate, 2), [11.0, 12.0], true);
+                        $invDppNl = $invoice->dpp_nilai_lain !== null ? (float) $invoice->dpp_nilai_lain : round((float) $invoice->subtotal * 11 / 12, 2);
+                    @endphp
                     <div class="flex justify-between text-gray-600">
-                        <span>Subtotal DPP:</span>
+                        <span>Harga Jual / DPP (tanpa PPN):</span>
                         <span class="font-bold text-gray-900 font-mono">Rp {{ number_format((float)$invoice->subtotal, 0, ',', '.') }}</span>
                     </div>
+                    @if ($invNl)
+                        <div class="flex justify-between text-gray-600">
+                            <span>DPP Nilai Lain (11/12):</span>
+                            <span class="font-bold text-gray-900 font-mono">Rp {{ number_format($invDppNl, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
                     <div class="flex justify-between text-gray-600">
-                        <span>PPN Masukan ({{ (float)($invoice->ppn_rate ?? 0) }}%):</span>
+                        <span>{{ $invNl ? 'PPN Masukan 12% × DPP Nilai Lain' : 'PPN Masukan (' . $invRate . '%)' }}:</span>
                         {{-- Σ PPN baris = dasar jurnal PPN Masukan (12% → 11% efektif; termasuk penyesuaian Faktur Pajak) --}}
                         <span class="font-bold text-gray-900 font-mono">Rp {{ number_format($invoice->invoiceItem->isNotEmpty() ? (float) $invoice->invoiceItem->sum('tax_amount') : $invoice->ppn_amount, 0, ',', '.') }}</span>
                     </div>

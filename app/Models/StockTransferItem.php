@@ -29,6 +29,31 @@ class StockTransferItem extends Model
         static::observe(StockTransferItemObserver::class);
     }
 
+    public function shipmentItems()
+    {
+        return $this->hasMany(StockTransferShipmentItem::class, 'stock_transfer_item_id');
+    }
+
+    public function shippedQuantity(): float
+    {
+        return (float) $this->shipmentItems()->sum('quantity');
+    }
+
+    public function receivedQuantity(): float
+    {
+        return (float) $this->shipmentItems()->whereHas('shipment', fn ($q) => $q->whereNotNull('received_at'))->sum('quantity');
+    }
+
+    /** Sisa yang masih boleh dikirim (0 bila sisa sudah ditutup). */
+    public function remainingToShip(): float
+    {
+        if ($this->stockTransfer?->remaining_closed_at !== null) {
+            return 0.0;
+        }
+
+        return max(0.0, (float) $this->quantity - $this->shippedQuantity());
+    }
+
     public function stockTransfer()
     {
         return $this->belongsTo(StockTransfer::class, 'stock_transfer_id')->withDefault();

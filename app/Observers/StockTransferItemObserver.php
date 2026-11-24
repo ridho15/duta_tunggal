@@ -92,7 +92,9 @@ class StockTransferItemObserver
             ? $stockTransferItem->stockTransfer
             : $stockTransferItem->stockTransfer()->withTrashed()->first();
 
-        return $stockTransfer?->status === 'Approved';
+        // Sejak 24 Nov 2026 stok mutasi baru bergerak saat Kirim/Terima (StockTransferService::shipTransfer / receiveShipment),
+        // bukan saat disetujui; ubah item setelah disetujui tidak lagi memindahkan stok.
+        return false && $stockTransfer?->status === 'Approved';
     }
 
     private function stockTransferService(): StockTransferService

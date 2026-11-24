@@ -200,14 +200,15 @@ test('UAT-INV-01: End-to-End Siklus Lengkap Persediaan Gudang (Stok Awal -> Tran
     $transfer = stfCreate($ctx);
     stfItem($transfer, $ctx, ['quantity' => 30.0]);
     $trfService->requestTransfer($transfer);
-    $approvedTransfer = $trfService->approveStockTransfer($transfer);
-    expect($approvedTransfer->status)->toBe('Approved');
+    $trfService->approveStockTransfer($transfer);
+    $approvedTransfer = stkCompleteTransfer($transfer);   // kirim semua & diterima gudang tujuan
+    expect($approvedTransfer->status)->toBe('Completed');
 
     // Verifikasi Mutasi StockMovement Transfer
     $trfMovements = StockMovement::where('from_model_type', StockTransfer::class)
         ->where('from_model_id', $transfer->id)
         ->get();
-    expect($trfMovements)->toHaveCount(2);
+    expect($trfMovements)->toHaveCount(4);   // keluar asal → masuk transit → keluar transit → masuk tujuan
     expect($trfMovements->where('type', 'transfer_out')->first()->quantity)->toBe(30.0);
     expect($trfMovements->where('type', 'transfer_in')->first()->quantity)->toBe(30.0);
 
@@ -266,7 +267,7 @@ test('UAT-INV-01: End-to-End Siklus Lengkap Persediaan Gudang (Stok Awal -> Tran
 
     // --- 4-LAYER INTEGRITY VERIFICATION ---
     // Lapis 1: Status Dokumen Transaksi Sah
-    expect($approvedTransfer->status)->toBe('Approved');
+    expect($approvedTransfer->status)->toBe('Completed');
     expect($approvedAdj->status)->toBe('approved');
     expect($approvedOpname->status)->toBe('approved');
 

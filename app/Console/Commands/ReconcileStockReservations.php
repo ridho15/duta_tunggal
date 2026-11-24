@@ -118,6 +118,7 @@ class ReconcileStockReservations extends Command
             ->leftJoin('delivery_orders as d', 'd.id', '=', 'r.delivery_order_id')
             ->leftJoin('sale_orders as s', 's.id', '=', 'r.sale_order_id')
             ->whereNull('r.material_issue_id')
+            ->whereNull('r.stock_transfer_item_id')   // cadangan mutasi dikelola StockTransferService
             ->when($saleOrderId, fn ($q) => $q->where('r.sale_order_id', $saleOrderId))
             ->select('r.id', 'r.product_id', 'r.warehouse_id', 'r.rak_id', 'r.quantity', 'r.sale_order_id', 'r.delivery_order_id',
                 'd.status as do_status', 'd.deleted_at as do_deleted', 'd.do_number', 's.status as so_status', 's.deleted_at as so_deleted', 's.so_number')

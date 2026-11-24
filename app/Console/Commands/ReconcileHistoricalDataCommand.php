@@ -313,7 +313,7 @@ class ReconcileHistoricalDataCommand extends Command
                   ->orWhereHas('deliveryOrder', fn ($dq) => $dq->whereIn('status', $endedDoStatuses))
                   ->orWhere(fn ($sub) => $sub->whereNotNull('sale_order_id')->whereDoesntHave('saleOrder'))
                   ->orWhere(fn ($sub) => $sub->whereNotNull('delivery_order_id')->whereDoesntHave('deliveryOrder'))
-                  ->orWhere(fn ($sub) => $sub->whereNull('sale_order_id')->whereNull('delivery_order_id')->whereNull('material_issue_id'));
+                  ->orWhere(fn ($sub) => $sub->whereNull('sale_order_id')->whereNull('delivery_order_id')->whereNull('material_issue_id')->whereNull('stock_transfer_item_id'));
             })
             ->get();
 

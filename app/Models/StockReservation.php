@@ -17,6 +17,7 @@ class StockReservation extends Model
         'warehouse_id',
         'rak_id',
         'delivery_order_id',
+        'stock_transfer_item_id', // cadangan stok asal mutasi yang sudah disetujui, belum dikirim
     ];
 
     public function saleOrder()

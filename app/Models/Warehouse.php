@@ -21,11 +21,13 @@ class Warehouse extends Model
         'tipe',
         'status',
         'is_quarantine',
+        'is_transit', // gudang transit: barang mutasi dalam perjalanan (bukan stok jual)
         'warna_background',
     ];
 
     protected $casts = [
         'is_quarantine' => 'boolean',
+        'is_transit' => 'boolean',
     ];
 
     public function rak()

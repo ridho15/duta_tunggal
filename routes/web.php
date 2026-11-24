@@ -390,6 +390,9 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/transfer/{transfer}/request', [\App\Http\Controllers\Gudang\StockTransferController::class, 'requestTransfer'])->name('transfer.request');
         Route::post('/transfer/{transfer}/approve', [\App\Http\Controllers\Gudang\StockTransferController::class, 'approve'])->name('transfer.approve');
         Route::post('/transfer/{transfer}/reject', [\App\Http\Controllers\Gudang\StockTransferController::class, 'reject'])->name('transfer.reject');
+        Route::post('/transfer/{transfer}/ship', [\App\Http\Controllers\Gudang\StockTransferController::class, 'ship'])->name('transfer.ship');
+        Route::post('/transfer/{transfer}/close-remaining', [\App\Http\Controllers\Gudang\StockTransferController::class, 'closeRemaining'])->name('transfer.close-remaining');
+        Route::post('/transfer-shipment/{shipment}/receive', [\App\Http\Controllers\Gudang\StockTransferController::class, 'receive'])->name('transfer.receive');
         Route::post('/transfer/{transfer}/revert-draft', [\App\Http\Controllers\Gudang\StockTransferController::class, 'revertDraft'])->name('transfer.revert-draft');
         Route::post('/transfer/{transfer}/void', [\App\Http\Controllers\Gudang\StockTransferController::class, 'void'])->name('transfer.void');
         Route::get('/transfer/{transfer}/pdf', [\App\Http\Controllers\Gudang\StockTransferController::class, 'pdf'])->name('transfer.pdf');

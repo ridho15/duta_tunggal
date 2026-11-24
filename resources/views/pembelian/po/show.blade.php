@@ -454,8 +454,9 @@
                                 <td class="py-3 px-4 text-right">{{ $item->currency?->symbol ?? 'Rp' }} {{ number_format((float)$item->unit_price, 2, ',', '.') }}</td>
                                 <td class="py-3 px-4 text-right">{{ $item->discount > 0 ? $item->discount . '%' : '-' }}</td>
                                 <td class="py-3 px-4 text-center text-xs">
+                                    @php $rateShown = in_array(round((float) $item->tax, 2), [11.0, 12.0], true) ? 12 : (float) $item->tax; @endphp
                                     <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700">
-                                        {{ ucfirst($item->tipe_pajak ?? 'none') }}
+                                        {{ ucfirst($item->tipe_pajak ?? 'none') }}@if ((float) $item->tax > 0 && \App\Services\TaxService::normalizeType($item->tipe_pajak) !== 'Non Pajak') · {{ rtrim(rtrim(number_format($rateShown, 2, ',', '.'), '0'), ',') }}%@endif
                                     </span>
                                 </td>
                                 <td class="py-3 px-4 text-right font-extrabold text-[#15803d] whitespace-nowrap">
@@ -514,6 +515,33 @@
                     </div>
                 @endforeach
             </div>
+
+            {{-- Ringkasan pajak seperti Faktur Pajak (PMK 131/2024): Harga Jual → DPP Nilai Lain → PPN 12% → Total --}}
+            @php
+                $taxSum = ['bruto' => 0.0, 'dpp' => 0.0, 'dppNl' => 0.0, 'ppn' => 0.0, 'total' => 0.0, 'nl' => false, 'other' => false];
+                foreach ($purchaseOrder->purchaseOrderItem as $it) {
+                    $type = \App\Services\TaxService::normalizeType($it->tipe_pajak);
+                    $la = \App\Support\LineAmounts::calculate((float) $it->quantity, (float) $it->unit_price, (float) $it->discount, (float) $it->tax, $it->tipe_pajak);
+                    $isNl = $type !== 'Non Pajak' && in_array(round((float) $it->tax, 2), [11.0, 12.0], true);
+                    $taxSum['dpp'] += $la['dpp']; $taxSum['ppn'] += $la['ppn']; $taxSum['total'] += $la['total'];
+                    $taxSum['dppNl'] += $isNl ? round($la['dpp'] * 11 / 12, 2) : 0;
+                    $taxSum['nl'] = $taxSum['nl'] || $isNl;
+                    $taxSum['other'] = $taxSum['other'] || (! $isNl && $la['ppn'] > 0);
+                }
+                $cur = $purchaseOrder->purchaseOrderItem->first()?->currency?->symbol ?? 'Rp';
+            @endphp
+            @if ($taxSum['ppn'] > 0)
+                <div class="flex justify-end px-4 pb-4">
+                    <dl class="w-full sm:w-96 text-xs space-y-1.5 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <div class="flex justify-between"><dt class="text-gray-500">Harga Jual / DPP (tanpa PPN)</dt><dd class="font-mono font-semibold">{{ $cur }} {{ number_format($taxSum['dpp'], 0, ',', '.') }}</dd></div>
+                        @if ($taxSum['nl'])
+                            <div class="flex justify-between"><dt class="text-gray-500">DPP Nilai Lain (11/12)</dt><dd class="font-mono font-semibold">{{ $cur }} {{ number_format($taxSum['dppNl'], 0, ',', '.') }}</dd></div>
+                        @endif
+                        <div class="flex justify-between"><dt class="text-gray-500">{{ $taxSum['nl'] && ! $taxSum['other'] ? 'PPN 12% × DPP Nilai Lain' : 'PPN' }}</dt><dd class="font-mono font-semibold">{{ $cur }} {{ number_format($taxSum['ppn'], 0, ',', '.') }}</dd></div>
+                        <div class="flex justify-between border-t border-gray-200 pt-1.5"><dt class="font-bold text-gray-900">Total</dt><dd class="font-mono font-extrabold text-[#15803d]">{{ $cur }} {{ number_format($taxSum['total'], 0, ',', '.') }}</dd></div>
+                    </dl>
+                </div>
+            @endif
         </div>
 
         {{-- Tab 2: Penerimaan Gudang --}}

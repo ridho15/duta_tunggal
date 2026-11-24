@@ -31,6 +31,7 @@ class StockAvailability
             ->whereNull('deleted_at')
             ->where(fn ($q) => $q->where('status', 1)->orWhereNull('status'))
             ->where(fn ($q) => $q->where('is_quarantine', false)->orWhereNull('is_quarantine'))   // gudang karantina/rusak bukan stok jual
+            ->where(fn ($q) => $q->where('is_transit', false)->orWhereNull('is_transit'))         // barang mutasi dalam perjalanan bukan stok jual
             ->when(! $seeOthers && $cabangId, fn ($q) => $q->where('cabang_id', $cabangId))
             ->orderBy('id')
             ->pluck('id')

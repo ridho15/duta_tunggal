@@ -9,6 +9,7 @@ use App\Models\PurchaseReceipt;
 use App\Models\Rak;
 use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
+use App\Models\StockTransferShipment;
 use App\Models\Warehouse;
 use App\Services\StockTransferService;
 use App\Support\MenuAccess;
@@ -93,7 +94,7 @@ class StockTransferController extends Controller
             'total' => StockTransfer::count(),
             'draft' => StockTransfer::where('status', 'Draft')->count(),
             'request' => StockTransfer::whereIn('status', ['Request', 'Pending'])->count(),
-            'approved' => StockTransfer::whereIn('status', ['Approved', 'completed'])->count(),
+            'approved' => StockTransfer::whereIn('status', ['Approved', 'Shipped', 'Completed', 'completed'])->count(),
             'rejected' => StockTransfer::whereIn('status', ['Reject', 'cancelled'])->count(),
         ];
 
@@ -123,7 +124,7 @@ class StockTransferController extends Controller
         // "Buat Mutasi Stok" dari detail GRN: isi awal gudang asal (gudang GRN/tujuan PO), barang, dan keterangan; gudang tujuan dipilih user.
         $prefill = $this->prefillFromPurchaseReceipt($request->query('from_purchase_receipt'));
 
-        $warehouses = Warehouse::where('status', 1)
+        $warehouses = Warehouse::where('status', 1)->where(fn ($q) => $q->where('is_transit', false)->orWhereNull('is_transit'))
             ->when($prefill, fn ($q) => $q->orWhere('id', $prefill['from_warehouse_id']))
             ->orderBy('name')->get();
         $suggestedNumber = $this->stockTransferService->generateTransferNumber();
@@ -277,6 +278,9 @@ class StockTransferController extends Controller
             'stockTransferItem.product.uom',
             'stockTransferItem.fromRak',
             'stockTransferItem.toRak',
+            'shipments.items.transferItem.product',
+            'shipments.shipper',
+            'shipments.receiver',
         ]);
 
         return view('gudang.transfer.show', compact('transfer'));
@@ -295,7 +299,7 @@ class StockTransferController extends Controller
         }
 
         $transfer->load(['stockTransferItem.product.uom', 'stockTransferItem.fromRak', 'stockTransferItem.toRak']);
-        $warehouses = Warehouse::where('status', 1)->orderBy('name')->get();
+        $warehouses = Warehouse::where('status', 1)->where(fn ($q) => $q->where('is_transit', false)->orWhereNull('is_transit'))->orderBy('name')->get();
 
         return view('gudang.transfer.edit', compact('transfer', 'warehouses'));
     }
@@ -475,10 +479,70 @@ class StockTransferController extends Controller
         try {
             $this->stockTransferService->approveStockTransfer($transfer);
             return redirect()->route('gudang.transfer.show', $transfer)
-                ->with('success', "Transfer {$transfer->transfer_number} berhasil disetujui! Mutasi stok fisik telah diproses.");
+                ->with('success', "Transfer {$transfer->transfer_number} disetujui. Stok gudang asal sudah dicadangkan — lanjutkan dengan Kirim Barang oleh gudang asal.");
         } catch (ValidationException $e) {
             return redirect()->route('gudang.transfer.show', $transfer)
                 ->with('error', collect($e->errors())->flatten()->first());
+        }
+    }
+
+    /**
+     * KIRIM oleh gudang asal: qty yang benar-benar naik kendaraan (boleh sebagian item & sebagian qty).
+     */
+    public function ship(Request $request, StockTransfer $transfer)
+    {
+        $this->authorizeAccess('update stock transfer');
+        $validated = $request->validate([
+            'quantities' => 'required|array',
+            'quantities.*' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:500',
+        ], ['quantities.required' => 'Isi qty kirim minimal satu barang.']);
+
+        try {
+            $shipment = $this->stockTransferService->shipTransfer($transfer, $validated['quantities'], $validated['notes'] ?? null, Auth::id());
+
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('success', "Pengiriman {$shipment->shipment_number} tercatat. Stok keluar dari gudang asal dan menunggu diterima gudang tujuan.");
+        } catch (ValidationException $e) {
+            return redirect()->route('gudang.transfer.show', $transfer)->with('error', collect($e->errors())->flatten()->first());
+        }
+    }
+
+    /**
+     * TERIMA oleh gudang tujuan untuk satu pengiriman.
+     */
+    public function receive(StockTransferShipment $shipment)
+    {
+        $this->authorizeAccess('update stock transfer');
+        $transfer = $shipment->stockTransfer;
+
+        try {
+            $this->stockTransferService->receiveShipment($shipment, Auth::id());
+
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('success', "Pengiriman {$shipment->shipment_number} diterima. Stok gudang tujuan sudah bertambah.");
+        } catch (ValidationException $e) {
+            return redirect()->route('gudang.transfer.show', $transfer)->with('error', collect($e->errors())->flatten()->first());
+        }
+    }
+
+    /**
+     * TUTUP SISA: qty yang belum dikirim dibatalkan, cadangan stok asal dilepas.
+     */
+    public function closeRemaining(Request $request, StockTransfer $transfer)
+    {
+        $this->authorizeAccess('response stock transfer');
+        $validated = $request->validate(['reason' => 'required|string|min:5|max:500'], [
+            'reason.required' => 'Alasan menutup sisa wajib diisi.', 'reason.min' => 'Alasan minimal 5 karakter.',
+        ]);
+
+        try {
+            $this->stockTransferService->closeRemaining($transfer, $validated['reason'], Auth::id());
+
+            return redirect()->route('gudang.transfer.show', $transfer)
+                ->with('success', "Sisa mutasi {$transfer->transfer_number} ditutup; cadangan stok gudang asal dilepas.");
+        } catch (ValidationException $e) {
+            return redirect()->route('gudang.transfer.show', $transfer)->with('error', collect($e->errors())->flatten()->first());
         }
     }
 

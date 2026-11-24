@@ -6,6 +6,11 @@ use App\Models\ChartOfAccount;
 use App\Models\InventoryStock;
 use App\Models\JournalEntry;
 use App\Models\StockMovement;
+use App\Models\StockReservation;
+use App\Models\StockTransferShipment;
+use App\Models\StockTransferShipmentItem;
+use App\Models\Warehouse;
+use App\Models\Cabang;
 use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
 use Illuminate\Support\Facades\DB;
@@ -89,11 +94,14 @@ class StockTransferService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (strtolower((string) $lockedTransfer->status) !== 'approved') {
+            if (! in_array(strtolower((string) $lockedTransfer->status), ['approved', 'shipped', 'completed'], true)) {
                 throw ValidationException::withMessages([
-                    'status' => 'Hanya transfer stok berstatus Approved yang dapat di-void.',
+                    'status' => 'Hanya mutasi yang sudah disetujui / dikirim / diterima yang dapat di-void.',
                 ]);
             }
+
+            // Lepas cadangan stok asal yang belum dikirim
+            $this->releaseReservations($lockedTransfer);
 
             // Hapus pergerakan stok mutasi
             $movements = StockMovement::query()
@@ -109,6 +117,9 @@ class StockTransferService
             app(JournalReversalService::class)->reverseSource($lockedTransfer, "Mutasi stok di-void: {$reason}");
 
             $notes = trim(($lockedTransfer->notes ? $lockedTransfer->notes . "\n\n" : '') . "DIVOID OLEH SUPER ADMIN: {$reason} (" . now()->format('d/m/Y H:i') . ')');
+
+            StockTransferShipmentItem::query()->whereIn('stock_transfer_shipment_id', $lockedTransfer->shipments()->pluck('id'))->delete();
+            $lockedTransfer->shipments()->delete();
 
             $lockedTransfer->update([
                 'status' => 'Cancelled',
@@ -193,22 +204,27 @@ class StockTransferService
 
                 if ($freeStock < (float) $item->quantity) {
                     $productCode = $item->product?->sku ?: ($item->product?->name ?? $item->product_id);
-                    $qtyTransfer = rtrim(rtrim((string) $item->quantity, '0'), '.');
-                    $qtyFree = rtrim(rtrim((string) $freeStock, '0'), '.');
+                    $qtyTransfer = $this->qty((float) $item->quantity);   // rtrim('10', '0') dulu menampilkan "1"
+                    $qtyFree = $this->qty((float) $freeStock);
                     $whName = $item->fromWarehouse?->name ?? 'Gudang Asal';
                     throw ValidationException::withMessages([
                         'stock' => "Kuantitas transfer untuk {$productCode} ({$qtyTransfer} pcs) melebihi stok bebas yang tersedia di {$whName} ({$qtyFree} pcs).",
                     ]);
                 }
 
-                $this->syncApprovedItemMovements($lockedTransfer, $item);
+                // Disetujui = stok asal DICADANGKAN (belum pindah). Stok baru keluar saat gudang asal menekan Kirim.
+                StockReservation::create([
+                    'stock_transfer_item_id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'warehouse_id' => $item->from_warehouse_id,
+                    'rak_id' => $item->from_rak_id ?? $sourceStock->rak_id,
+                    'quantity' => (float) $item->quantity,
+                ]);
             }
 
             $lockedTransfer->update([
                 'status' => 'Approved',
             ]);
-
-            $this->syncInterBranchJournal($lockedTransfer->fresh());
 
             return $lockedTransfer->fresh();
         });
@@ -255,7 +271,8 @@ class StockTransferService
     }
 
     /**
-     * Jurnal mutasi ANTAR CABANG (keputusan 22 Nov 2026: per cabang, nilai HPP, dijurnal saat disetujui, lewat akun perantara
+     * Jurnal mutasi ANTAR CABANG (keputusan 22 Nov 2026: per cabang, nilai HPP, lewat akun perantara
+     * Rekening Antar Cabang; sejak 24 Nov dijurnal saat DIKIRIM sebesar barang yang keluar dari gudang asal —
      * Rekening Antar Cabang). Mutasi dalam satu cabang tidak dijurnal (persediaan cabang tidak berubah).
      *
      *   Cabang asal  : Dr Rekening Antar Cabang   / Cr Persediaan   (qty × HPP rata-rata)
@@ -292,7 +309,7 @@ class StockTransferService
             if (! $inventoryCoa || ! $interBranchCoa) {
                 throw ValidationException::withMessages([
                     'journal' => sprintf(
-                        'Mutasi antar cabang %s tidak dapat dijurnal: akun %s tidak ditemukan / tidak aktif. Solusi: tambahkan akun tersebut di Bagan Akun (COA), lalu setujui ulang mutasi.',
+                        'Mutasi antar cabang %s tidak dapat dijurnal: akun %s tidak ditemukan / tidak aktif. Solusi: tambahkan akun tersebut di Bagan Akun (COA), lalu ulangi Kirim Barang.',
                         $stockTransfer->transfer_number,
                         ! $interBranchCoa ? 'Rekening Antar Cabang (kode ' . config('coa.inter_branch', '1180.02') . ')' : 'Persediaan produk ' . ($item->product?->name ?? $item->product_id)
                     ),
@@ -343,17 +360,213 @@ class StockTransferService
         }
     }
 
-    /** Nilai mutasi = nilai kartu stok transfer_out (qty × HPP saat disetujui) agar jurnal = Laporan Stok. */
+    /** Nilai mutasi = Σ nilai kartu stok yang keluar dari gudang asal (qty dikirim × HPP) agar jurnal = Laporan Stok. */
     private function transferValue(StockTransfer $stockTransfer, StockTransferItem $item): float
     {
-        $movementValue = StockMovement::query()
+        // Nilai = barang yang SUDAH keluar dari gudang asal (dikirim); sebelum dikirim belum ada perpindahan persediaan
+        return round(abs((float) StockMovement::query()
             ->where('from_model_type', StockTransfer::class)
             ->where('from_model_id', $stockTransfer->id)
             ->where('type', 'transfer_out')
+            ->where('warehouse_id', $item->from_warehouse_id)
             ->where('meta->stock_transfer_item_id', $item->id)
-            ->value('value');
+            ->sum('value')), 2);
+    }
 
-        return round(abs((float) ($movementValue ?? ((float) $item->quantity * (float) ($item->product?->cost_price ?? 0)))), 2);
+    /**
+     * KIRIM (gudang asal): boleh sebagian item & sebagian qty, boleh beberapa kali. Stok keluar dari gudang asal dan masuk
+     * gudang transit cabang tujuan (barang dalam perjalanan); cadangan stok asal dilepas sebesar qty yang dikirim.
+     *
+     * @param  array<int|string, float|int|string|null>  $quantities  [stock_transfer_item_id => qty dikirim]
+     */
+    public function shipTransfer(StockTransfer $stockTransfer, array $quantities, ?string $notes = null, ?int $userId = null): StockTransferShipment
+    {
+        return DB::transaction(function () use ($stockTransfer, $quantities, $notes, $userId) {
+            $transfer = StockTransfer::query()->whereKey($stockTransfer->getKey())->lockForUpdate()->firstOrFail();
+            $transfer->load(['stockTransferItem.product', 'stockTransferItem.toWarehouse', 'stockTransferItem.fromWarehouse']);
+
+            if (! in_array($transfer->status, ['Approved', 'Shipped'], true) || $transfer->remaining_closed_at !== null) {
+                throw ValidationException::withMessages(['status' => 'Mutasi ini tidak bisa dikirim: harus berstatus Disetujui / Dikirim Sebagian dan sisanya belum ditutup.']);
+            }
+
+            $lines = [];
+            foreach ($transfer->stockTransferItem as $item) {
+                $qty = round((float) ($quantities[$item->id] ?? 0), 2);
+                if ($qty <= 0) {
+                    continue;
+                }
+                $remaining = $item->remainingToShip();
+                if ($qty > $remaining + 0.0001) {
+                    throw ValidationException::withMessages(['quantities' => sprintf(
+                        'Qty kirim %s (%s) melebihi sisa yang belum dikirim (%s). Solusi: isi maksimal %s.',
+                        $item->product?->name ?? $item->product_id, $this->qty($qty), $this->qty($remaining), $this->qty($remaining)
+                    )]);
+                }
+                $physical = (float) InventoryStock::query()->where('product_id', $item->product_id)->where('warehouse_id', $item->from_warehouse_id)->lockForUpdate()->sum('qty_available');
+                if ($physical + 0.0001 < $qty) {
+                    throw ValidationException::withMessages(['quantities' => sprintf(
+                        'Stok fisik %s di %s hanya %s, kurang dari qty kirim %s. Solusi: cek fisik gudang / stock opname, lalu kirim sesuai stok yang ada.',
+                        $item->product?->name ?? $item->product_id, $item->fromWarehouse?->name ?? 'gudang asal', $this->qty($physical), $this->qty($qty)
+                    )]);
+                }
+                $lines[] = [$item, $qty];
+            }
+
+            if ($lines === []) {
+                throw ValidationException::withMessages(['quantities' => 'Isi qty kirim minimal satu barang (lebih dari 0).']);
+            }
+
+            $toCabangId = $lines[0][0]->toWarehouse?->cabang_id;
+            $transit = $this->transitWarehouse($toCabangId);
+            $shipment = StockTransferShipment::create([
+                'stock_transfer_id' => $transfer->id,
+                'shipment_number' => $transfer->transfer_number . '-K' . ($transfer->shipments()->count() + 1),
+                'transit_warehouse_id' => $transit->id,
+                'shipped_at' => now(),
+                'shipped_by' => $userId,
+                'notes' => $notes,
+            ]);
+
+            foreach ($lines as [$item, $qty]) {
+                $shipmentItem = $shipment->items()->create(['stock_transfer_item_id' => $item->id, 'quantity' => $qty]);
+                $this->consumeReservation($item, $qty);
+                $meta = ['stock_transfer_item_id' => $item->id, 'shipment_id' => $shipment->id, 'shipment_item_id' => $shipmentItem->id];
+                $this->createMovement($transfer, $item, 'transfer_out', $item->from_warehouse_id, $item->from_rak_id, $qty, $meta + ['leg' => 'kirim'],
+                    'Dikirim ke ' . ($item->toWarehouse?->name ?? '-') . ' (' . $shipment->shipment_number . ')');
+                $this->createMovement($transfer, $item, 'transfer_in', $transit->id, null, $qty, $meta + ['leg' => 'transit'],
+                    'Barang dalam perjalanan ' . $shipment->shipment_number);
+            }
+
+            $transfer->update(['status' => 'Shipped']);
+            $this->syncInterBranchJournal($transfer->fresh());
+
+            return $shipment->fresh('items');
+        });
+    }
+
+    /** TERIMA (gudang tujuan): seluruh isi satu pengiriman pindah dari gudang transit ke gudang/rak tujuan. */
+    public function receiveShipment(StockTransferShipment $shipment, ?int $userId = null): StockTransferShipment
+    {
+        return DB::transaction(function () use ($shipment, $userId) {
+            $locked = StockTransferShipment::query()->whereKey($shipment->getKey())->lockForUpdate()->firstOrFail();
+            if ($locked->received_at !== null) {
+                throw ValidationException::withMessages(['shipment' => "Pengiriman {$locked->shipment_number} sudah diterima sebelumnya."]);
+            }
+            $transfer = $locked->stockTransfer()->with('stockTransferItem')->firstOrFail();
+            if ($transfer->status !== 'Shipped') {
+                throw ValidationException::withMessages(['shipment' => 'Mutasi ini tidak dalam status Dikirim, sehingga tidak bisa diterima.']);
+            }
+
+            foreach ($locked->items()->with('transferItem.fromWarehouse')->get() as $line) {
+                $item = $line->transferItem;
+                $meta = ['stock_transfer_item_id' => $item->id, 'shipment_id' => $locked->id, 'shipment_item_id' => $line->id];
+                $this->createMovement($transfer, $item, 'transfer_out', $locked->transit_warehouse_id, null, (float) $line->quantity, $meta + ['leg' => 'transit'],
+                    'Diterima gudang tujuan ' . $locked->shipment_number);
+                $this->createMovement($transfer, $item, 'transfer_in', $item->to_warehouse_id, $item->to_rak_id, (float) $line->quantity, $meta + ['leg' => 'terima'],
+                    'Diterima dari ' . ($item->fromWarehouse?->name ?? '-') . ' (' . $locked->shipment_number . ')');
+            }
+
+            $locked->update(['received_at' => now(), 'received_by' => $userId]);
+            $this->completeIfDone($transfer->fresh('stockTransferItem'));
+
+            return $locked->fresh();
+        });
+    }
+
+    /** TUTUP SISA: qty yang belum dikirim batal dikirim; cadangan stok asal dilepas. */
+    public function closeRemaining(StockTransfer $stockTransfer, string $reason, ?int $userId = null): StockTransfer
+    {
+        return DB::transaction(function () use ($stockTransfer, $reason, $userId) {
+            $transfer = StockTransfer::query()->whereKey($stockTransfer->getKey())->lockForUpdate()->firstOrFail();
+            if (! in_array($transfer->status, ['Approved', 'Shipped'], true) || $transfer->remaining_closed_at !== null) {
+                throw ValidationException::withMessages(['status' => 'Sisa mutasi ini sudah ditutup atau mutasi belum disetujui.']);
+            }
+
+            $this->releaseReservations($transfer);
+            $transfer->update(['remaining_closed_at' => now(), 'remaining_closed_by' => $userId, 'remaining_close_reason' => $reason]);
+
+            if (! $transfer->shipments()->exists()) {
+                $transfer->update(['status' => 'Cancelled']);   // belum ada yang dikirim: mutasi batal seluruhnya
+            } else {
+                $this->completeIfDone($transfer->fresh('stockTransferItem'));
+            }
+
+            return $transfer->fresh();
+        });
+    }
+
+    private function completeIfDone(StockTransfer $transfer): void
+    {
+        $allReceived = ! $transfer->shipments()->whereNull('received_at')->exists();
+        if ($allReceived && ! $transfer->hasRemainingToShip() && $transfer->shipments()->exists()) {
+            $transfer->update(['status' => 'Completed']);
+        }
+    }
+
+    /** Kurangi cadangan stok asal item sebesar qty yang dikirim. */
+    private function consumeReservation(StockTransferItem $item, float $qty): void
+    {
+        $left = $qty;
+        foreach (StockReservation::query()->where('stock_transfer_item_id', $item->id)->orderBy('id')->lockForUpdate()->get() as $reservation) {
+            if ($left <= 0.0001) {
+                break;
+            }
+            $take = min($left, (float) $reservation->quantity);
+            $rest = round((float) $reservation->quantity - $take, 2);
+            $rest > 0.0001 ? $reservation->update(['quantity' => $rest]) : $reservation->delete();
+            $left -= $take;
+        }
+    }
+
+    private function releaseReservations(StockTransfer $transfer): void
+    {
+        StockReservation::query()->whereIn('stock_transfer_item_id', $transfer->stockTransferItem()->withTrashed()->pluck('id'))
+            ->get()->each->delete();   // observer menurunkan qty_reserved
+    }
+
+    private function createMovement(StockTransfer $transfer, StockTransferItem $item, string $type, int $warehouseId, ?int $rakId, float $qty, array $meta, string $notes): void
+    {
+        $item->loadMissing('product');
+        StockMovement::create([
+            'product_id' => $item->product_id,
+            'warehouse_id' => $warehouseId,
+            'rak_id' => $rakId,
+            'quantity' => $qty,
+            // Nilai kartu stok mutasi = qty × HPP rata-rata produk
+            'value' => round($qty * (float) ($item->product?->cost_price ?? 0), 2),
+            'type' => $type,
+            'reference_id' => $transfer->transfer_number,
+            'date' => now()->toDateString(),
+            'notes' => $notes,
+            'from_model_type' => StockTransfer::class,
+            'from_model_id' => $transfer->id,
+            'meta' => $meta,
+        ]);
+    }
+
+    /** Gudang transit per cabang (dibuat otomatis): barang mutasi dalam perjalanan, bukan stok jual. */
+    public function transitWarehouse(?int $cabangId): Warehouse
+    {
+        $existing = Warehouse::query()->where('is_transit', true)->where('cabang_id', $cabangId)->first();
+        if ($existing) {
+            return $existing;
+        }
+        $cabang = $cabangId ? Cabang::query()->find($cabangId) : null;
+
+        return Warehouse::create([
+            'kode' => 'TRS-' . strtoupper((string) ($cabang?->kode ?: ($cabangId ?: 'ALL'))),
+            'name' => 'Transit / Barang Dalam Perjalanan' . ($cabang?->nama ? ' - ' . $cabang->nama : ''),
+            'cabang_id' => $cabangId,
+            'location' => 'Barang mutasi yang sedang dikirim',
+            'tipe' => 'Kecil',
+            'status' => 1,
+            'is_transit' => true,
+        ]);
+    }
+
+    private function qty(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, ',', '.'), '0'), ',');
     }
 
     private function validateTransferItemShape(StockTransferItem $item): void

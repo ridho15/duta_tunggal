@@ -257,8 +257,9 @@ class OperationalAuditStage3Test extends TestCase
         // Approve transfer
         $service = app(StockTransferService::class);
         $service->approveStockTransfer($transfer);
+        stkCompleteTransfer($transfer);
 
-        $this->assertEquals('Approved', $transfer->fresh()->status);
+        $this->assertEquals('Completed', $transfer->fresh()->status);
         $this->assertEquals(30.0, (float) $stockOrigin->fresh()->qty_available);
         $this->assertEquals(20.0, (float) $stockDest->fresh()->qty_available);
 

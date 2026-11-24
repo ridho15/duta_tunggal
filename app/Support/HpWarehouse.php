@@ -19,6 +19,7 @@ class HpWarehouse
     {
         return Warehouse::query()
             ->where(fn ($q) => $q->whereNull('is_quarantine')->orWhere('is_quarantine', false))
+            ->where(fn ($q) => $q->whereNull('is_transit')->orWhere('is_transit', false))
             ->orderBy('name')
             ->get(['id', 'kode', 'name', 'cabang_id'])
             ->filter(fn (Warehouse $warehouse) => $user->canAccessCabang($warehouse->cabang_id))

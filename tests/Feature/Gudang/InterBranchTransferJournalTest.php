@@ -1,8 +1,9 @@
 <?php
 
 /**
- * Keputusan 22 Nov 2026: mutasi stok antar cabang dijurnal per cabang pada nilai HPP, saat disetujui, lewat akun perantara
- * Rekening Antar Cabang (1180.02). Mutasi dalam satu cabang tidak dijurnal.
+ * Keputusan 22 Nov 2026: mutasi stok antar cabang dijurnal per cabang pada nilai HPP lewat akun perantara Rekening Antar Cabang
+ * (1180.02). Sejak alur 4 tahap (24 Nov) jurnal dibuat saat barang DIKIRIM, sebesar qty yang keluar dari gudang asal.
+ * Mutasi dalam satu cabang tidak dijurnal.
  */
 
 use App\Models\Cabang;
@@ -21,11 +22,7 @@ function ibtTransfer(array $ctx, $toWarehouse, float $qty): StockTransfer
         'transfer_date' => now()->toDateString(), 'status' => 'Draft']);
     StockTransferItem::create(['stock_transfer_id' => $st->id, 'product_id' => $ctx['product']->id, 'quantity' => $qty,
         'from_warehouse_id' => $ctx['warehouse']->id, 'to_warehouse_id' => $toWarehouse->id]);
-    $svc = app(StockTransferService::class);
-    $svc->requestTransfer($st->fresh());
-    $svc->approveStockTransfer($st->fresh());
-
-    return $st->fresh();
+    return stkCompleteTransfer($st);
 }
 
 /** Saldo bersih (debit − kredit) per kode akun per cabang dari jurnal mutasi. */
@@ -66,13 +63,23 @@ it('mutasi dalam satu cabang tidak membuat jurnal', function () {
     expect(JournalEntry::withoutGlobalScopes()->where('source_type', StockTransfer::class)->where('source_id', $st->id)->count())->toBe(0);
 });
 
-it('qty item mutasi yang sudah disetujui diubah: jurnal lama dibalik dan nilai baru diposting', function () {
-    $st = ibtTransfer($this->ctx, $this->gudangB, 5);
-    $st->stockTransferItem()->first()->update(['quantity' => 3]);
+it('disetujui belum dijurnal; kirim sebagian dijurnal sebesar qty yang dikirim, kirim sisa menambah jurnal', function () {
+    $st = StockTransfer::create(['transfer_number' => 'ST-IBT-'.uniqid(), 'from_warehouse_id' => $this->ctx['warehouse']->id, 'to_warehouse_id' => $this->gudangB->id,
+        'transfer_date' => now()->toDateString(), 'status' => 'Draft']);
+    $item = StockTransferItem::create(['stock_transfer_id' => $st->id, 'product_id' => $this->ctx['product']->id, 'quantity' => 5,
+        'from_warehouse_id' => $this->ctx['warehouse']->id, 'to_warehouse_id' => $this->gudangB->id]);
+    $svc = app(StockTransferService::class);
+    $svc->requestTransfer($st->fresh());
+    $svc->approveStockTransfer($st->fresh());
+    expect(JournalEntry::withoutGlobalScopes()->where('source_type', StockTransfer::class)->where('source_id', $st->id)->count())->toBe(0);
 
+    $svc->shipTransfer($st->fresh(), [$item->id => 3]);
     expect(ibtNet($st, '1140.10', $this->cabangB->id))->toBe(15000.0)
-        ->and(ibtNet($st, '1140.10', $this->ctx['cabang']->id))->toBe(-15000.0)
-        ->and(JournalEntry::withoutGlobalScopes()->where('source_type', StockTransfer::class)->where('source_id', $st->id)->where('is_reversal', true)->count())->toBeGreaterThan(0);
+        ->and(ibtNet($st, '1140.10', $this->ctx['cabang']->id))->toBe(-15000.0);
+
+    $svc->shipTransfer($st->fresh(), [$item->id => 2]);
+    expect(ibtNet($st, '1140.10', $this->cabangB->id))->toBe(25000.0)
+        ->and(ibtNet($st, '1180.02', $this->cabangB->id))->toBe(-25000.0);
 });
 
 it('void mutasi antar cabang membalik jurnal (tidak menghapus) sehingga saldo bersih 0', function () {
@@ -86,7 +93,7 @@ it('void mutasi antar cabang membalik jurnal (tidak menghapus) sehingga saldo be
         ->and(ibtNet($st, '1180.02', $this->ctx['cabang']->id))->toBe(0.0);
 });
 
-it('akun Rekening Antar Cabang tidak ada: persetujuan ditolak dengan sebab & solusi, stok tidak berpindah', function () {
+it('akun Rekening Antar Cabang tidak ada: pengiriman ditolak dengan sebab & solusi, stok tidak berpindah', function () {
     ChartOfAccount::where('code', '1180.02')->delete();
 
     expect(fn () => ibtTransfer($this->ctx, $this->gudangB, 5))
