@@ -19,27 +19,20 @@
                     {{ $transfer->transfer_number }}
                 </h1>
                 {{-- Status Badge --}}
-                @if (in_array($transfer->status, ['Approved', 'completed']))
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f0fdf4] text-[#15803d] border border-[#86efac]">
-                        <span class="w-2 h-2 rounded-full bg-[#15803d]"></span>
-                        Disetujui / Selesai
-                    </span>
-                @elseif (in_array($transfer->status, ['Request', 'Pending']))
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                        <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                        Menunggu Persetujuan
-                    </span>
-                @elseif (in_array($transfer->status, ['Reject', 'cancelled']))
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                        <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                        Ditolak
-                    </span>
-                @else
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
-                        <span class="w-2 h-2 rounded-full bg-gray-400"></span>
-                        Draft
-                    </span>
-                @endif
+                @php
+                    $badge = match ($transfer->status) {
+                        'Approved' => 'bg-sky-50 text-sky-700 border-sky-200',
+                        'Shipped' => 'bg-amber-50 text-amber-800 border-amber-200',
+                        'Completed', 'completed' => 'bg-[#f0fdf4] text-[#15803d] border-[#86efac]',
+                        'Request', 'Pending' => 'bg-amber-50 text-amber-700 border-amber-200',
+                        'Reject', 'Cancelled', 'cancelled' => 'bg-rose-50 text-rose-700 border-rose-200',
+                        default => 'bg-gray-100 text-gray-700 border-gray-200',
+                    };
+                @endphp
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border {{ $badge }}">
+                    <span class="w-2 h-2 rounded-full bg-current opacity-70"></span>
+                    {{ $transfer->statusLabel() }}
+                </span>
             </div>
         </div>
 
@@ -85,7 +78,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
-                    <span>Setujui & Mutasi Stok</span>
+                    <span>Setujui Mutasi</span>
                 </button>
             @endif
 
@@ -105,7 +98,18 @@
                 </button>
             @endif
 
-            @if (in_array($transfer->status, ['Approved', 'completed']))
+            @if (in_array($transfer->status, ['Approved', 'Shipped']) && $transfer->hasRemainingToShip())
+                <button type="button" @click="$dispatch('open-modal-ship-transfer')"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl transition shadow-sm active:scale-[0.98]">
+                    <span>Kirim Barang</span>
+                </button>
+                <button type="button" @click="$dispatch('open-modal-close-remaining')"
+                        class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                    Tutup Sisa
+                </button>
+            @endif
+
+            @if (in_array($transfer->status, ['Approved', 'Shipped', 'Completed', 'completed']))
                 <a href="{{ route('gudang.transfer.pdf', $transfer) }}"
                    target="_blank"
                    class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
@@ -130,20 +134,35 @@
     </div>
 
 
-    {{-- Banner Status Approved --}}
-    @if (in_array($transfer->status, ['Approved', 'completed']))
-        <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-3">
-            <div class="w-7 h-7 rounded-lg bg-[#15803d] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M5 13l4 4L19 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-            </div>
-            <div class="space-y-1">
-                <h4 class="font-bold">Transfer Stok Telah Disetujui & Selesai</h4>
-                <p class="text-emerald-800 text-xs">
-                    Kuantitas barang telah otomatis dikeluarkan dari <strong>{{ $transfer->fromWarehouse?->name }}</strong> dan dimasukkan ke <strong>{{ $transfer->toWarehouse?->name }}</strong> pada buku mutasi stok.
-                </p>
-            </div>
+    {{-- Tahapan mutasi: Buat → Disetujui → Dikirim (gudang asal) → Diterima (gudang tujuan) --}}
+    @php
+        $steps = ['Dibuat', 'Disetujui', 'Dikirim', 'Diterima'];
+        $stepNow = match ($transfer->status) { 'Request', 'Pending' => 1, 'Approved' => 2, 'Shipped' => 3, 'Completed', 'completed' => 4, default => 1 };
+        $pendingShipments = $transfer->shipments->whereNull('received_at');
+    @endphp
+    @if (! in_array($transfer->status, ['Reject', 'Cancelled', 'cancelled']))
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <ol class="grid grid-cols-4 gap-2 text-[11px] font-semibold">
+                @foreach ($steps as $i => $label)
+                    <li class="flex flex-col gap-1">
+                        <span class="h-1.5 rounded-full {{ $i < $stepNow ? 'bg-[#15803d]' : 'bg-gray-200' }}"></span>
+                        <span class="{{ $i < $stepNow ? 'text-[#15803d]' : 'text-gray-400' }}">{{ $label }}</span>
+                    </li>
+                @endforeach
+            </ol>
+            <p class="mt-3 text-xs text-gray-600">
+                @if ($transfer->status === 'Approved')
+                    Stok di <strong>{{ $transfer->fromWarehouse?->name }}</strong> sudah <strong>dicadangkan</strong> (belum berpindah). Gudang asal menekan <strong>Kirim Barang</strong> sesuai qty yang benar-benar naik kendaraan.
+                @elseif ($transfer->status === 'Shipped')
+                    @if ($pendingShipments->isNotEmpty()) Ada {{ $pendingShipments->count() }} pengiriman dalam perjalanan — gudang tujuan menekan <strong>Terima</strong> saat barang tiba. @endif
+                    @if ($transfer->hasRemainingToShip()) Masih ada sisa yang belum dikirim (bisa dikirim lagi atau <strong>Tutup Sisa</strong>). @endif
+                @elseif (in_array($transfer->status, ['Completed', 'completed']))
+                    Semua barang yang dikirim sudah diterima di <strong>{{ $transfer->toWarehouse?->name }}</strong>.
+                    @if ($transfer->remaining_closed_at) Sisa ditutup: {{ $transfer->remaining_close_reason }}. @endif
+                @else
+                    Mutasi menunggu persetujuan.
+                @endif
+            </p>
         </div>
     @endif
 
@@ -208,7 +227,10 @@
                         <th class="py-3 px-4 text-center">Satuan</th>
                         <th class="py-3 px-4">Rak Asal</th>
                         <th class="py-3 px-4">Rak Tujuan</th>
-                        <th class="py-3 px-4 text-right">Kuantitas Pindah</th>
+                        <th class="py-3 px-4 text-right">Qty Mutasi</th>
+                        <th class="py-3 px-4 text-right">Dikirim</th>
+                        <th class="py-3 px-4 text-right">Diterima</th>
+                        <th class="py-3 px-4 text-right">Sisa</th>
                         <th class="py-3 px-4 text-center">Kartu Stok</th>
                     </tr>
                 </thead>
@@ -236,9 +258,12 @@
                             <td class="py-3 px-4 text-gray-600">
                                 {{ $item->toRak?->name ?? '-' }}
                             </td>
-                            <td class="py-3 px-4 text-right font-mono font-bold text-[#15803d] text-sm">
+                            <td class="py-3 px-4 text-right font-mono font-bold text-gray-900 text-sm">
                                 {{ number_format($item->quantity, 0, ',', '.') }}
                             </td>
+                            <td class="py-3 px-4 text-right font-mono">{{ number_format($item->shippedQuantity(), 0, ',', '.') }}</td>
+                            <td class="py-3 px-4 text-right font-mono text-[#15803d] font-semibold">{{ number_format($item->receivedQuantity(), 0, ',', '.') }}</td>
+                            <td class="py-3 px-4 text-right font-mono {{ $item->remainingToShip() > 0 ? 'text-amber-700 font-semibold' : 'text-gray-400' }}">{{ number_format($item->remainingToShip(), 0, ',', '.') }}</td>
                             <td class="py-3 px-4 text-center">
                                 @if ($item->product)
                                     <a href="{{ route('gudang.stok.card', $item->product) }}"
@@ -261,15 +286,54 @@
                         <td colspan="5" class="py-3 px-4 text-right uppercase tracking-wider text-[11px]">
                             Total Kuantitas:
                         </td>
-                        <td class="py-3 px-4 text-right font-mono text-[#15803d] text-sm">
+                        <td class="py-3 px-4 text-right font-mono text-gray-900 text-sm">
                             {{ number_format($transfer->stockTransferItem->sum('quantity'), 0, ',', '.') }}
                         </td>
+                        <td class="py-3 px-4 text-right font-mono">{{ number_format($transfer->stockTransferItem->sum(fn ($i) => $i->shippedQuantity()), 0, ',', '.') }}</td>
+                        <td class="py-3 px-4 text-right font-mono text-[#15803d]">{{ number_format($transfer->stockTransferItem->sum(fn ($i) => $i->receivedQuantity()), 0, ',', '.') }}</td>
+                        <td class="py-3 px-4 text-right font-mono">{{ number_format($transfer->stockTransferItem->sum(fn ($i) => $i->remainingToShip()), 0, ',', '.') }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
             </table>
         </div>
     </div>
+
+    {{-- Daftar pengiriman (gudang asal) & penerimaan (gudang tujuan) --}}
+    @if ($transfer->shipments->isNotEmpty())
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden" x-data>
+            <div class="px-5 py-3.5 bg-gray-50/80 border-b border-gray-100">
+                <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider">Pengiriman ({{ $transfer->shipments->count() }})</h3>
+            </div>
+            <div class="divide-y divide-gray-100">
+                @foreach ($transfer->shipments as $shipment)
+                    <div class="px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                        <div>
+                            <div class="font-bold font-mono text-gray-900">{{ $shipment->shipment_number }}</div>
+                            <div class="text-gray-500">Dikirim {{ $shipment->shipped_at?->translatedFormat('d M Y H:i') }} oleh {{ $shipment->shipper?->name ?? '-' }}
+                                @if ($shipment->notes) · {{ $shipment->notes }} @endif</div>
+                            <div class="text-gray-700 mt-1">
+                                @foreach ($shipment->items as $line)
+                                    <span class="inline-block mr-3">{{ $line->transferItem?->product?->name ?? '-' }}: <strong>{{ number_format($line->quantity, 0, ',', '.') }}</strong></span>
+                                @endforeach
+                            </div>
+                        </div>
+                        @if ($shipment->received_at)
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#f0fdf4] text-[#15803d] border border-[#86efac] font-semibold whitespace-nowrap">
+                                Diterima {{ $shipment->received_at->translatedFormat('d M H:i') }} · {{ $shipment->receiver?->name ?? '-' }}
+                            </span>
+                        @else
+                            <button type="button"
+                                    @click="$dispatch('open-modal-receive-shipment', { action: @js(route('gudang.transfer.receive', $shipment)), number: @js($shipment->shipment_number) })"
+                                    class="px-3.5 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl shadow-sm whitespace-nowrap">
+                                Terima di Gudang Tujuan
+                            </button>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
 </div>
 
 {{-- Modal Penolakan Transfer --}}
@@ -349,7 +413,7 @@
         name="approve-transfer"
         title="Setujui Transfer Stok Antar Gudang"
         variant="success"
-        confirm-text="Ya, Setujui dan Mutasi Stok"
+        confirm-text="Ya, Setujui"
         cancel-text="Batal"
         action="{{ route('gudang.transfer.approve', $transfer) }}"
         method="POST"
@@ -358,7 +422,7 @@
             Setujui transfer stok <strong>{{ $transfer->transfer_number }}</strong>?
         </p>
         <p class="text-xs text-[#15803d] mt-2 font-medium">
-            Stok barang di gudang asal akan langsung berkurang dan dialokasikan/ditambahkan ke gudang tujuan sesuai surat jalan transfer.
+            Stok di gudang asal akan <strong>dicadangkan</strong> (belum berpindah). Stok baru keluar saat gudang asal menekan Kirim Barang, dan masuk ke gudang tujuan saat diterima.
         </p>
     </x-confirmation-modal>
 
@@ -387,5 +451,40 @@
             <label class="block text-xs font-semibold text-gray-700 mb-1">Alasan Void (Wajib Diisi):</label>
             <input type="text" name="cancel_reason" required placeholder="Contoh: Muatan rusak di jalan / salah gudang tujuan" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
         </div>
+    </x-confirmation-modal>
+    {{-- Modal KIRIM BARANG (gudang asal): qty yang benar-benar naik kendaraan, boleh sebagian --}}
+    @if (in_array($transfer->status, ['Approved', 'Shipped']) && $transfer->hasRemainingToShip())
+    <x-confirmation-modal name="ship-transfer" title="Kirim Barang dari Gudang Asal" variant="success"
+        confirm-text="Kirim" cancel-text="Batal" action="{{ route('gudang.transfer.ship', $transfer) }}" method="POST">
+        <p class="text-xs text-gray-600 text-left">Isi qty yang <strong>benar-benar naik kendaraan</strong>. Barang yang tidak ikut dikirim isi 0 — sisanya bisa dikirim berikutnya atau ditutup.</p>
+        <div class="mt-3 space-y-2 text-left">
+            @foreach ($transfer->stockTransferItem as $item)
+                @if ($item->remainingToShip() > 0)
+                    <label class="flex items-center justify-between gap-3 text-xs">
+                        <span class="flex-1"><span class="font-semibold text-gray-900">{{ $item->product?->name }}</span>
+                            <span class="block text-[11px] text-gray-500">Sisa {{ number_format($item->remainingToShip(), 0, ',', '.') }} {{ $item->product?->uom?->name ?? '' }}</span></span>
+                        <input type="number" name="quantities[{{ $item->id }}]" min="0" max="{{ $item->remainingToShip() }}" step="1" value="{{ (float) $item->remainingToShip() }}"
+                               class="w-24 text-right text-xs rounded-xl border border-gray-300 px-2 py-1.5 focus:ring-[#15803d] focus:border-[#15803d]">
+                    </label>
+                @endif
+            @endforeach
+            <input type="text" name="notes" maxlength="500" placeholder="Catatan (mis. kendaraan / driver) — opsional"
+                   class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-[#15803d] focus:border-[#15803d]">
+        </div>
+    </x-confirmation-modal>
+
+    <x-confirmation-modal name="close-remaining" title="Tutup Sisa Mutasi" variant="warning"
+        confirm-text="Ya, Tutup Sisa" cancel-text="Batal" action="{{ route('gudang.transfer.close-remaining', $transfer) }}" method="POST">
+        <p class="text-sm text-gray-600 text-left">Qty yang belum dikirim akan <strong>dibatalkan</strong> dan cadangan stok di gudang asal dilepas.@if ($transfer->shipments->isEmpty()) Karena belum ada yang dikirim, mutasi ini menjadi <strong>Dibatalkan</strong>.@endif</p>
+        <input type="text" name="reason" required minlength="5" maxlength="500" placeholder="Alasan, mis. kendaraan tidak muat"
+               class="mt-3 w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-amber-500 focus:border-amber-500">
+    </x-confirmation-modal>
+    @endif
+
+    {{-- Modal TERIMA (gudang tujuan) --}}
+    <x-confirmation-modal name="receive-shipment" title="Terima Barang di Gudang Tujuan" variant="success"
+        confirm-text="Ya, Barang Diterima" cancel-text="Batal" method="POST">
+        <p class="text-sm text-gray-600">Konfirmasi seluruh barang pada pengiriman <strong x-text="data.number"></strong> sudah tiba di <strong>{{ $transfer->toWarehouse?->name }}</strong>?</p>
+        <p class="text-xs text-[#15803d] mt-2 font-medium">Stok gudang tujuan langsung bertambah.</p>
     </x-confirmation-modal>
 @endsection

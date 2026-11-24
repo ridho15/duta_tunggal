@@ -35,6 +35,7 @@ test('INV-RC-01: rekonsiliasi tiga arah stok fisik, pergerakan stock movement, d
     stfItem($trf, $ctx, ['quantity' => 15.0]);
     $trfService->requestTransfer($trf);
     $trfService->approveStockTransfer($trf);
+    stkCompleteTransfer($trf);
 
     // Hitung seluruh mutasi StockMovement untuk Gudang 1
     $movementsGudang1 = StockMovement::where('warehouse_id', $ctx['warehouse']->id)

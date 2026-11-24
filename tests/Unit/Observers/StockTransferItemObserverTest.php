@@ -79,8 +79,10 @@ class StockTransferItemObserverTest extends TestCase
     }
 
     #[Test]
-    public function it_creates_and_applies_movements_for_approved_transfer_items(): void
+    public function it_does_not_move_stock_when_items_of_an_approved_transfer_are_created_changed_or_deleted(): void
     {
+        // Alur 4 tahap (24 Nov 2026): stok mutasi hanya bergerak lewat Kirim (gudang asal) & Terima (gudang tujuan),
+        // tidak lagi lewat observer item saat transfer berstatus Approved.
         InventoryStock::factory()->create([
             'product_id' => $this->product->id,
             'warehouse_id' => $this->fromWarehouse->id,
@@ -103,153 +105,11 @@ class StockTransferItemObserverTest extends TestCase
             'to_warehouse_id' => $this->toWarehouse->id,
             'to_rak_id' => $this->toRak->id,
         ]);
-
-        $this->assertDatabaseCount('stock_movements', 2);
-        $this->assertNotNull($item->stockMovement()->where('type', 'transfer_out')->first());
-        $this->assertNotNull($item->stockMovement()->where('type', 'transfer_in')->first());
-
-        $sourceStock = InventoryStock::where('product_id', $this->product->id)
-            ->where('warehouse_id', $this->fromWarehouse->id)
-            ->where('rak_id', $this->fromRak->id)
-            ->first();
-
-        $destinationStock = InventoryStock::where('product_id', $this->product->id)
-            ->where('warehouse_id', $this->toWarehouse->id)
-            ->where('rak_id', $this->toRak->id)
-            ->first();
-
-        $this->assertEquals(90.0, $sourceStock->qty_available);
-        $this->assertEquals(10.0, $destinationStock->qty_available);
-    }
-
-    #[Test]
-    public function it_syncs_existing_movements_when_an_approved_item_quantity_changes(): void
-    {
-        InventoryStock::factory()->create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->fromWarehouse->id,
-            'rak_id' => $this->fromRak->id,
-            'qty_available' => 100,
-        ]);
-
-        $transfer = StockTransfer::factory()->create([
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'status' => 'Approved',
-        ]);
-
-        $item = StockTransferItem::factory()->create([
-            'stock_transfer_id' => $transfer->id,
-            'product_id' => $this->product->id,
-            'quantity' => 10,
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'from_rak_id' => $this->fromRak->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'to_rak_id' => $this->toRak->id,
-        ]);
-
-        $item->update(['quantity' => 20]);
-
-        $this->assertEquals(2, StockMovement::count());
-        $this->assertEquals(20.0, $item->stockMovement()->where('type', 'transfer_out')->value('quantity'));
-        $this->assertEquals(20.0, $item->stockMovement()->where('type', 'transfer_in')->value('quantity'));
-
-        $sourceStock = InventoryStock::where('product_id', $this->product->id)
-            ->where('warehouse_id', $this->fromWarehouse->id)
-            ->where('rak_id', $this->fromRak->id)
-            ->first();
-
-        $destinationStock = InventoryStock::where('product_id', $this->product->id)
-            ->where('warehouse_id', $this->toWarehouse->id)
-            ->where('rak_id', $this->toRak->id)
-            ->first();
-
-        $this->assertEquals(80.0, $sourceStock->qty_available);
-        $this->assertEquals(20.0, $destinationStock->qty_available);
-    }
-
-    #[Test]
-    public function it_reverses_movements_when_an_approved_item_is_deleted(): void
-    {
-        InventoryStock::factory()->create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->fromWarehouse->id,
-            'rak_id' => $this->fromRak->id,
-            'qty_available' => 100,
-        ]);
-
-        $transfer = StockTransfer::factory()->create([
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'status' => 'Approved',
-        ]);
-
-        $item = StockTransferItem::factory()->create([
-            'stock_transfer_id' => $transfer->id,
-            'product_id' => $this->product->id,
-            'quantity' => 10,
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'from_rak_id' => $this->fromRak->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'to_rak_id' => $this->toRak->id,
-        ]);
-
+        $item->update(['quantity' => 15]);
         $item->delete();
 
-        $this->assertEquals(2, StockMovement::onlyTrashed()->count());
-        $this->assertEquals(100.0, InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->fromWarehouse->id)->where('rak_id', $this->fromRak->id)->value('qty_available'));
-        $this->assertEquals(0.0, InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->toWarehouse->id)->where('rak_id', $this->toRak->id)->value('qty_available'));
-    }
-
-    #[Test]
-    public function it_only_deletes_movements_for_the_deleted_item_when_same_product_exists_multiple_times(): void
-    {
-        InventoryStock::factory()->create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->fromWarehouse->id,
-            'rak_id' => $this->fromRak->id,
-            'qty_available' => 50,
-        ]);
-
-        InventoryStock::factory()->create([
-            'product_id' => $this->product->id,
-            'warehouse_id' => $this->fromWarehouse->id,
-            'rak_id' => $this->fromRakTwo->id,
-            'qty_available' => 40,
-        ]);
-
-        $transfer = StockTransfer::factory()->create([
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'status' => 'Approved',
-        ]);
-
-        $firstItem = StockTransferItem::factory()->create([
-            'stock_transfer_id' => $transfer->id,
-            'product_id' => $this->product->id,
-            'quantity' => 10,
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'from_rak_id' => $this->fromRak->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'to_rak_id' => $this->toRak->id,
-        ]);
-
-        $secondItem = StockTransferItem::factory()->create([
-            'stock_transfer_id' => $transfer->id,
-            'product_id' => $this->product->id,
-            'quantity' => 5,
-            'from_warehouse_id' => $this->fromWarehouse->id,
-            'from_rak_id' => $this->fromRakTwo->id,
-            'to_warehouse_id' => $this->toWarehouse->id,
-            'to_rak_id' => $this->toRakTwo->id,
-        ]);
-
-        $firstItem->delete();
-
-        $this->assertCount(2, $secondItem->stockMovement()->get());
-        $this->assertEquals(2, StockMovement::query()->count());
-        $this->assertEquals(2, StockMovement::onlyTrashed()->count());
-        $this->assertEquals(50.0, InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->fromWarehouse->id)->where('rak_id', $this->fromRak->id)->value('qty_available'));
-        $this->assertEquals(35.0, InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->fromWarehouse->id)->where('rak_id', $this->fromRakTwo->id)->value('qty_available'));
+        $this->assertDatabaseCount('stock_movements', 0);
+        $this->assertEquals(100.0, (float) InventoryStock::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->fromWarehouse->id)->where('rak_id', $this->fromRak->id)->value('qty_available'));
     }
 }

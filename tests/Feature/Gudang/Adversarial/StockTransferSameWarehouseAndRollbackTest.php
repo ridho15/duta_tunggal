@@ -59,46 +59,30 @@ test('TRF-BV-02: menolak transfer jika kuantitas non-positif atau spesifikasi lo
         ->toThrow(ValidationException::class);
 });
 
-test('TRF-BV-03: observer auto-sync memperbarui movement saat item diubah dan membersihkan saat dihapus', function () {
+test('TRF-BV-03: alur 4 tahap — disetujui hanya mencadangkan; kirim & terima yang memindahkan stok lewat gudang transit', function () {
     $ctx = opnContext();
     $service = app(StockTransferService::class);
-
-    // Persiapkan stok sumber yang memadai
     opnSetStock($ctx['product'], $ctx['warehouse'], $ctx['rakSource'], 100.0);
 
     $transfer = stfCreate($ctx);
     $item = stfItem($transfer, $ctx, ['quantity' => 10.0]);
-
     $service->requestTransfer($transfer);
     $approvedTransfer = $service->approveStockTransfer($transfer);
 
-    expect($approvedTransfer->status)->toBe('Approved');
+    expect($approvedTransfer->status)->toBe('Approved')
+        ->and(StockMovement::where('from_model_type', StockTransfer::class)->where('from_model_id', $transfer->id)->count())->toBe(0);
 
-    // Pastikan 2 StockMovement terbit: transfer_out dan transfer_in
-    $movements = StockMovement::where('from_model_type', StockTransfer::class)
-        ->where('from_model_id', $transfer->id)
-        ->get();
+    // Kirim 4 dulu (sebagian), lalu sisanya
+    $first = $service->shipTransfer($transfer->fresh(), [$item->id => 4]);
+    $movements = StockMovement::where('from_model_type', StockTransfer::class)->where('from_model_id', $transfer->id)->get();
+    expect($movements)->toHaveCount(2)
+        ->and((float) $movements->firstWhere('warehouse_id', $ctx['warehouse']->id)->quantity)->toBe(4.0)
+        ->and($transfer->fresh()->status)->toBe('Shipped');
 
-    expect($movements)->toHaveCount(2);
-    expect($movements->where('type', 'transfer_out')->first()->quantity)->toBe(10.0);
-    expect($movements->where('type', 'transfer_in')->first()->quantity)->toBe(10.0);
+    $service->receiveShipment($first);
+    $service->shipTransfer($transfer->fresh(), [$item->id => 6]);
+    $service->receiveShipment($transfer->fresh()->shipments()->whereNull('received_at')->first());
 
-    // Update kuantitas item: Observer otomatis memperbarui mutasi
-    $item->update(['quantity' => 15.0]);
-
-    $updatedMovements = StockMovement::where('from_model_type', StockTransfer::class)
-        ->where('from_model_id', $transfer->id)
-        ->get();
-
-    expect($updatedMovements->where('type', 'transfer_out')->first()->quantity)->toBe(15.0);
-    expect($updatedMovements->where('type', 'transfer_in')->first()->quantity)->toBe(15.0);
-
-    // Hapus item: Observer otomatis menghapus mutasi
-    $item->delete();
-
-    $remainingMovements = StockMovement::where('from_model_type', StockTransfer::class)
-        ->where('from_model_id', $transfer->id)
-        ->get();
-
-    expect($remainingMovements)->toHaveCount(0);
+    expect($transfer->fresh()->status)->toBe('Completed')
+        ->and(StockMovement::where('from_model_type', StockTransfer::class)->where('from_model_id', $transfer->id)->count())->toBe(8);
 });

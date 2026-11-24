@@ -48,7 +48,8 @@ class WarehouseStockOptions
         }
 
         // Gudang karantina/rusak (retur DO yang reject) bukan sumber stok jual: tidak ditawarkan, kecuali sudah terpilih.
-        $query = Warehouse::query()->where('status', 1)->where(fn ($q) => $q->where('is_quarantine', false)->orWhereNull('is_quarantine'));
+        $query = Warehouse::query()->where('status', 1)->where(fn ($q) => $q->where('is_quarantine', false)->orWhereNull('is_quarantine'))
+            ->where(fn ($q) => $q->where('is_transit', false)->orWhereNull('is_transit'));
 
         if ($cabangId) {
             // Filter eksplisit dari parameter (prioritas utama — misalnya cabang SO).

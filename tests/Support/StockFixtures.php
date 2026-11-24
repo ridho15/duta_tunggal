@@ -209,3 +209,28 @@ function stkCompleteSoAndInvoice(\App\Models\SaleOrder $saleOrder): void
     $m->setAccessible(true);
     $m->invoke(app(\App\Observers\SaleOrderObserver::class), $saleOrder->fresh());
 }
+
+/**
+ * Alur mutasi 4 tahap (24 Nov 2026) dalam satu langkah untuk tes: setujui (cadangkan) → kirim SEMUA sisa → terima semua.
+ * Mengembalikan transfer terbaru. Tes yang menguji pengiriman sebagian memanggil service langsung.
+ */
+function stkCompleteTransfer(\App\Models\StockTransfer $transfer): \App\Models\StockTransfer
+{
+    $svc = app(\App\Services\StockTransferService::class);
+    if (in_array($transfer->fresh()->status, ['Draft'], true)) {
+        $svc->requestTransfer($transfer->fresh());
+    }
+    if (in_array($transfer->fresh()->status, ['Request', 'Pending'], true)) {
+        $svc->approveStockTransfer($transfer->fresh());
+    }
+    $transfer = $transfer->fresh('stockTransferItem');
+    $qty = $transfer->stockTransferItem->mapWithKeys(fn ($i) => [$i->id => $i->remainingToShip()])->all();
+    if (array_sum($qty) > 0) {
+        $svc->shipTransfer($transfer, $qty);
+    }
+    foreach ($transfer->fresh()->shipments()->whereNull('received_at')->get() as $shipment) {
+        $svc->receiveShipment($shipment);
+    }
+
+    return $transfer->fresh();
+}

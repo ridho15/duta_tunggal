@@ -103,7 +103,7 @@
             <div class="text-2xl font-bold text-[#15803d] tracking-tight">
                 {{ number_format($kpi['approved'], 0, ',', '.') }}
             </div>
-            <p class="text-[11px] text-gray-500 mt-1">Stok telah terpotong & terpindah</p>
+            <p class="text-[11px] text-gray-500 mt-1">Disetujui, dikirim & selesai</p>
         </div>
     </div>
 
@@ -145,7 +145,9 @@
                     <option value="all" {{ $status === 'all' ? 'selected' : '' }}>Semua Status</option>
                     <option value="Draft" {{ $status === 'Draft' ? 'selected' : '' }}>Draft</option>
                     <option value="Request" {{ $status === 'Request' ? 'selected' : '' }}>Menunggu Approval (Request)</option>
-                    <option value="Approved" {{ $status === 'Approved' ? 'selected' : '' }}>Disetujui (Approved)</option>
+                    <option value="Approved" {{ $status === 'Approved' ? 'selected' : '' }}>Disetujui · Siap Dikirim</option>
+                    <option value="Shipped" {{ $status === 'Shipped' ? 'selected' : '' }}>Dikirim</option>
+                    <option value="Completed" {{ $status === 'Completed' ? 'selected' : '' }}>Selesai (Diterima)</option>
                     <option value="Reject" {{ $status === 'Reject' ? 'selected' : '' }}>Ditolak (Reject)</option>
                 </select>
             </div>
@@ -230,27 +232,20 @@
 
                             {{-- Status Badge --}}
                             <td class="py-3 px-4 text-center">
-                                @if (in_array($tf->status, ['Approved', 'completed']))
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#f0fdf4] text-[#15803d] border border-[#86efac]">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-[#15803d]"></span>
-                                        Disetujui
-                                    </span>
-                                @elseif (in_array($tf->status, ['Request', 'Pending']))
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                        Menunggu Approval
-                                    </span>
-                                @elseif (in_array($tf->status, ['Reject', 'cancelled']))
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                        Ditolak
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-700 border border-gray-200">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                                        Draft
-                                    </span>
-                                @endif
+                                @php
+                                    $tfBadge = match ($tf->status) {
+                                        'Approved' => 'bg-sky-50 text-sky-700 border-sky-200',
+                                        'Shipped' => 'bg-amber-50 text-amber-800 border-amber-200',
+                                        'Completed', 'completed' => 'bg-[#f0fdf4] text-[#15803d] border-[#86efac]',
+                                        'Request', 'Pending' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                        'Reject', 'Cancelled', 'cancelled' => 'bg-rose-50 text-rose-700 border-rose-200',
+                                        default => 'bg-gray-50 text-gray-700 border-gray-200',
+                                    };
+                                @endphp
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $tfBadge }}">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-current opacity-70"></span>
+                                    {{ $tf->statusLabel() }}
+                                </span>
                             </td>
 
                             {{-- Tombol Aksi --}}
@@ -270,7 +265,7 @@
                                         </a>
                                     @endif
 
-                                    @if (in_array($tf->status, ['Approved', 'completed']))
+                                    @if (in_array($tf->status, ['Approved', 'Shipped', 'Completed', 'completed']))
                                         <a href="{{ route('gudang.transfer.pdf', $tf) }}"
                                            target="_blank"
                                            class="p-1 text-gray-500 hover:text-[#15803d] transition"

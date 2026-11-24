@@ -196,9 +196,16 @@ class StockTransferTest extends TestCase
 
         $this->stockTransferService->approveStockTransfer($stockTransfer);
 
-        // Check that status is updated to Approved
+        // Disetujui = stok asal dicadangkan, BELUM berpindah (alur 4 tahap, 24 Nov 2026)
         $this->assertEquals('Approved', $stockTransfer->fresh()->status);
-        $this->assertDatabaseCount('stock_movements', 2);
+        $this->assertDatabaseCount('stock_movements', 0);
+        $this->assertEquals(15.0, (float) InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->fromWarehouse->id)->sum('qty_reserved'));
+
+        // Kirim semua lalu diterima gudang tujuan: keluar asal → transit → masuk tujuan
+        $done = stkCompleteTransfer($stockTransfer);
+        $this->assertEquals('Completed', $done->status);
+        $this->assertDatabaseCount('stock_movements', 4);
+        $this->assertEquals(0.0, (float) InventoryStock::where('product_id', $this->product->id)->where('warehouse_id', $this->fromWarehouse->id)->sum('qty_reserved'));
 
         // Check that stock movements are created
         $this->assertDatabaseHas('stock_movements', [
@@ -299,7 +306,7 @@ class StockTransferTest extends TestCase
         ]);
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Stok tidak cukup');
+        $this->expectExceptionMessage('melebihi stok bebas');
 
         try {
             $this->stockTransferService->approveStockTransfer($stockTransfer);

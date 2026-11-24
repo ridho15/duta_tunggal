@@ -89,6 +89,7 @@ it('ST-1 mutasi antar gudang (satu cabang): qty total tetap, tanpa dampak GL, ni
     $svc = app(StockTransferService::class);
     $svc->requestTransfer($st->fresh());
     $svc->approveStockTransfer($st->fresh());
+    stkCompleteTransfer($st);   // alur 4 tahap: kirim semua & terima
 
     $mv = StockMovement::where('from_model_type', StockTransfer::class)->where('from_model_id', $st->id)->get(['type', 'warehouse_id', 'quantity', 'value']);
     audIcLog('ST-1 mutasi', $mv->toArray());
@@ -97,7 +98,7 @@ it('ST-1 mutasi antar gudang (satu cabang): qty total tetap, tanpa dampak GL, ni
 
     expect(stkStock($ctx['product'], $ctx['warehouse'])['available'] + stkStock($ctx['product'], $w2)['available'])->toBe(20.0)
         ->and(audIcJ(StockTransfer::class, $st->id)['_TOTAL']['debit'])->toBe(0.0)
-        ->and($mv->pluck('value')->map(fn ($v) => (float) $v)->all())->toBe([25000.0, 25000.0]);
+        ->and($mv->pluck('value')->map(fn ($v) => (float) $v)->all())->toBe([25000.0, 25000.0, 25000.0, 25000.0]);   // asal → transit → tujuan
 });
 
 it('ST-2 mutasi antar CABANG: persediaan GL per cabang harus ikut berpindah', function () {
@@ -112,6 +113,7 @@ it('ST-2 mutasi antar CABANG: persediaan GL per cabang harus ikut berpindah', fu
     $svc = app(StockTransferService::class);
     $svc->requestTransfer($st->fresh());
     $svc->approveStockTransfer($st->fresh());
+    stkCompleteTransfer($st);   // alur 4 tahap: kirim semua & terima
 
     $inv = ChartOfAccount::where('code', '1140.10')->first();
     $glA = (float) JournalEntry::withoutGlobalScopes()->where('coa_id', $inv->id)->where('cabang_id', $ctx['cabang']->id)->selectRaw('SUM(debit-credit) s')->value('s');
@@ -190,6 +192,7 @@ it('REKON Σ(qty × HPP) semua gudang = saldo GL persediaan setelah mutasi, peny
     StockTransferItem::create(['stock_transfer_id' => $st->id, 'product_id' => $ctx['product']->id, 'quantity' => 5, 'from_warehouse_id' => $ctx['warehouse']->id, 'to_warehouse_id' => $w2->id]);
     app(StockTransferService::class)->requestTransfer($st->fresh());
     app(StockTransferService::class)->approveStockTransfer($st->fresh());
+    stkCompleteTransfer($st);
     audIcAdjust($ctx, 'increase', 4);         // G1: 15 → 19
     audIcAdjust($ctx, 'decrease', -2);        // G1: 19 → 17
     audIcOpname($ctx, 16);                    // G1: 17 → 16 (kurang 1)
