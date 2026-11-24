@@ -551,7 +551,7 @@
                         <span class="font-bold text-gray-900 font-mono" x-text="formatMoney(calculateTax())"></span>
                     </div>
                     {{-- DPP/PPN sesuai Faktur Pajak supplier (keputusan Ko Handy 24 Nov 2026) --}}
-                    @php($canAdjustTax = \App\Services\PurchaseInvoiceTaxAdjustment::canAdjust(auth()->user()))
+                    @php $canAdjustTax = \App\Services\PurchaseInvoiceTaxAdjustment::canAdjust(auth()->user()); @endphp
                     <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2" x-show="items.length > 0">
                         <p class="font-semibold text-gray-700">Sesuai Faktur Pajak Supplier</p>
                         @if ($canAdjustTax)

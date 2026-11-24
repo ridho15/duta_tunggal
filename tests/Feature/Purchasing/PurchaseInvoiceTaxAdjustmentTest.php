@@ -110,3 +110,14 @@ it('draft: penyesuaian bisa diubah ulang lalu dikembalikan ke hitungan sistem ta
         ->and(round((float) $fresh->subtotal, 2))->toBe(1576576.58)
         ->and(round((float) $fresh->price_variance_amount, 2))->toBe(0.0);
 });
+
+it('halaman create, edit draft & detail tampil dengan isian/tanda Faktur Pajak', function () {
+    [$ctx, $receipt] = ptaSetup();
+    ptaFinance($ctx);
+    $this->actingAs($ctx['user'])->get(route('pembelian.invoices.create'))->assertOk()->assertSee('Sesuai Faktur Pajak Supplier');
+
+    ptaPost($this, $ctx, $receipt, ['action' => 'save_draft', 'faktur_dpp' => '1576600', 'faktur_ppn' => '173426'])->assertSessionHasNoErrors();
+    $invoice = Invoice::latest('id')->firstOrFail();
+    $this->get(route('pembelian.invoices.edit', $invoice))->assertOk()->assertSee('Sesuai Faktur Pajak Supplier');
+    $this->get(route('pembelian.invoices.show', $invoice))->assertOk()->assertSee('DPP/PPN disamakan dengan Faktur Pajak supplier');
+});

@@ -377,7 +377,7 @@
                         <span class="font-bold text-gray-900 font-mono">Rp {{ number_format($invoice->invoiceItem->isNotEmpty() ? (float) $invoice->invoiceItem->sum('tax_amount') : $invoice->ppn_amount, 0, ',', '.') }}</span>
                     </div>
                     @if (! empty($invoice->tax_adjustment))
-                        @php($adj = $invoice->tax_adjustment)
+                        @php $adj = $invoice->tax_adjustment; @endphp
                         <div class="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 space-y-0.5">
                             <p class="font-semibold">DPP/PPN disamakan dengan Faktur Pajak supplier</p>
                             <p>Sistem: DPP Rp {{ number_format((float) $adj['system_dpp'], 0, ',', '.') }} · PPN Rp {{ number_format((float) $adj['system_ppn'], 0, ',', '.') }}</p>
