@@ -253,6 +253,14 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 |---|---|
 | Jurnal mutasi antar cabang | **Sudah.** Laporan per cabang dipakai; mutasi dinilai **HPP** (tanpa margin), dijurnal **saat disetujui** lewat akun perantara **1180.02 Rekening Antar Cabang** (dibuat otomatis oleh migrasi). Cabang asal: Dr Rek. Antar Cabang / Cr Persediaan; cabang tujuan: Dr Persediaan / Cr Rek. Antar Cabang — saling meniadakan di laporan gabungan. Mutasi satu cabang tidak dijurnal. Ubah qty mutasi yang sudah disetujui → jurnal dibalik & diposting ulang; Void → jurnal pembalik. Mutasi antar cabang yang disetujui **sebelum** deploy tidak dijurnal ulang otomatis. |
 
+**Catatan akuntansi — 24 Nov 2026**
+
+| Item | Penyelesaian |
+|---|---|
+| Penjualan & PPN Keluaran tanpa koma (Coretax) | **Sudah.** Baris faktur penjualan (DPP, PPN, total) dihitung rupiah bulat (`sales.invoice_rounding_decimals` = 0), jadi jurnal Penjualan & PPN Keluaran tanpa sen. Nota kredit / retur sebagian ikut rupiah bulat. Quotation/SO & pembelian tetap 2 desimal. Hanya faktur baru. |
+| Penerimaan barang belum tertagih harus aset? | **Tetap kewajiban** (2100.10, di bawah Hutang Lancar) — standar PSAK: barang sudah diterima, tagihan belum. Saat faktur pembelian akun ini DIDEBIT untuk menutup saldo (Dr 2100.10 / Cr Hutang Dagang), bukan menjadi aset. |
+| Selisih GRNI vs Persediaan saat penerimaan | Versi kini: tidak ada selisih (persediaan = harga beli aktual, keputusan HPP averaging 21 Nov). Selisih yang terlihat berasal dari penerimaan dengan aturan 10–21 Nov (persediaan dinilai HPP master; beda harga ke 5160 Selisih Pembelian) atau server belum di-update. |
+
 ## 9. Cara Menguji
 
 **Aturan praktis**

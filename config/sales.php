@@ -27,6 +27,12 @@ return [
     'line_rounding_decimals' => (int) env('SALES_LINE_ROUNDING_DECIMALS', 2),
 
     /*
+    | Desimal DPP & PPN per baris FAKTUR PENJUALAN (catatan akuntansi 24 Nov 2026): 0 = rupiah bulat, sama dengan data yang
+    | diunggah ke Coretax, sehingga jurnal Penjualan & PPN Keluaran tidak bersen. Hanya faktur baru; faktur lama tidak dihitung ulang.
+    */
+    'invoice_rounding_decimals' => (int) env('SALES_INVOICE_ROUNDING_DECIMALS', 0),
+
+    /*
     |--------------------------------------------------------------------------
     | Kontrol stok & pengiriman (T2 — docs/PLAN-T2-STOK-PENGIRIMAN.md)
     |--------------------------------------------------------------------------

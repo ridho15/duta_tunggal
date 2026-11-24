@@ -39,6 +39,8 @@ uses(RefreshDatabase::class);
 
 // Tes lama membuat DO tanpa stok; sejak Tahap 3 stok dipotong saat DO dibuat. Tunda pemotongan (perilaku sebelum Tahap 3).
 beforeEach(function () {
+    // Test ini menguji kebijakan sen 2 desimal (D6); faktur default kini rupiah bulat (Coretax) — diuji di test "Coretax" di akhir file ini.
+    config(['sales.invoice_rounding_decimals' => 2]);
     config(['sales.invoice.auto_on_do_complete' => true]);   // tes ini menguji jalur invoice otomatis (default mati sejak B25)
     \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
         $this->beforeApplicationDestroyed(fn () => \App\Observers\DeliveryOrderObserver::$deferStockDeduction = false);

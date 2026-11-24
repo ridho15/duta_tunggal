@@ -294,7 +294,7 @@ class SalesInvoiceController extends Controller
                 'subtotal' => $subtotal,
                 'dpp' => $subtotal,
                 // DPP Nilai Lain (PMK 131/2024) untuk Faktur Pajak; PPN baris = 12% × DPP Nilai Lain (= 11% × DPP)
-                'dpp_nilai_lain' => $taxable ? round($subtotal * 11 / 12, 2) : 0,
+                'dpp_nilai_lain' => $taxable ? round($subtotal * 11 / 12, SalesInvoiceLineBuilder::invoiceDecimals()) : 0,
                 'tax' => $totalTax,
                 'other_fee' => $otherFee,
                 'total' => $totalAmount,

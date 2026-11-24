@@ -23,6 +23,12 @@ class SalesInvoiceLineBuilder
 {
     private static ?bool $hasBreakdownColumns = null;
 
+    /** Desimal baris faktur penjualan (default 0 = rupiah bulat, selaras Coretax). */
+    public static function invoiceDecimals(): int
+    {
+        return max(0, min(4, (int) config('sales.invoice_rounding_decimals', 0)));
+    }
+
     /**
      * @param  callable|null  $convert  fn (float $amount): float — konversi ke IDR bila perlu (mata uang asing)
      * @return array<string, mixed>
@@ -37,8 +43,13 @@ class SalesInvoiceLineBuilder
         int|string|null $coaId = null,
         ?callable $convert = null,
     ): array {
-        $amounts = LineAmounts::calculate($quantity, $unitPriceGross, $discountPct, $taxRate, $taxType);
-        $convert ??= fn (float $amount): float => $amount;
+        // Faktur penjualan = dasar Faktur Pajak Coretax: DPP & PPN per baris dalam RUPIAH BULAT (catatan akuntansi 24 Nov 2026),
+        // sehingga akun Penjualan & PPN Keluaran tanpa sen. Quotation/SO tetap memakai kebijakan baris umum (sales.line_rounding_decimals).
+        $decimals = self::invoiceDecimals();
+        $amounts = LineAmounts::calculate($quantity, $unitPriceGross, $discountPct, $taxRate, $taxType, $decimals);
+        $convert = $convert
+            ? fn (float $amount): float => round($convert($amount), $decimals)
+            : fn (float $amount): float => $amount;
 
         $attributes = [
             'product_id' => $productId,

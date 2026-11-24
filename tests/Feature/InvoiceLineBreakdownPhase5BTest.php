@@ -38,6 +38,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    // Test ini menguji kebijakan sen 2 desimal (D6); faktur default kini rupiah bulat (Coretax) — diuji di test "Coretax" di akhir file ini.
+    config(['sales.invoice_rounding_decimals' => 2]);
     \App\Observers\DeliveryOrderObserver::$deferStockDeduction = true;
     config(['sales.invoice.auto_on_do_complete' => true]);   // jalur invoice otomatis (default mati sejak B25)
 });
@@ -437,3 +439,27 @@ it('Isu 10: retur customer memakai harga bersih (setelah diskon), bukan harga gr
         ->not->toContain('invoiceItem?->net_unit_price');
 });
 
+
+it('Coretax (24 Nov 2026): faktur penjualan default rupiah bulat — DPP/PPN baris & jurnal Penjualan/PPN Keluaran tanpa sen', function () {
+    config(['sales.invoice_rounding_decimals' => 0]);   // default produksi
+    $ctx = p5bContext();
+    [$so] = p5bSaleOrder($ctx);
+    expect(round((float) $so->total_amount, 2))->toBe(183208.83);   // SO tetap 2 desimal
+
+    $invoice = p5bInvoiceViaSaleOrder($so);
+    $item = $invoice->invoiceItem()->firstOrFail();
+    expect((float) $item->subtotal)->toBe(165053.0)
+        ->and((float) $item->tax_amount)->toBe(18156.0)            // 18.155,83 → 18.156
+        ->and((float) $item->total)->toBe(183209.0)
+        ->and((float) $invoice->total)->toBe(183209.0);
+
+    $lines = \App\Models\JournalEntry::withoutGlobalScopes()->where('source_type', Invoice::class)->where('source_id', $invoice->id)
+        ->where('journal_type', 'sales')->with('coa')->get();
+    $byCode = fn (string $code) => $lines->filter(fn ($l) => $l->coa?->code === $code);
+    expect((float) $byCode('4000')->sum('credit'))->toBe(165053.0)
+        ->and((float) $byCode('2120.06')->sum('credit'))->toBe(18156.0)
+        ->and((float) $byCode('1120')->sum('debit'))->toBe(183209.0);
+    foreach ($byCode('4000')->merge($byCode('2120.06')) as $line) {
+        expect(fmod((float) $line->credit, 1.0))->toBe(0.0, 'akun Penjualan/PPN Keluaran tidak boleh bersen');
+    }
+});
