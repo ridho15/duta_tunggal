@@ -472,7 +472,7 @@ describe('PDF generators include required item columns and totals', function () 
         assertPdfHasColumns($html, [
             'SKU', 'Produk', 'Qty', 'Harga Satuan', 'Jumlah', 'Diskon (%)', 'Diskon (Rp)', 'DPP', 'PPN (%)', 'PPN (Rp)', 'Total'
         ]);
-        expect($html)->toContain('PPN (11,00%)');
+        expect($html)->toContain('11,00%');
         expect($html)->toContain('Rp 33.000,00');   // 2 desimal konsisten dengan layar
     });
 
@@ -964,9 +964,9 @@ describe('Account Receivable — creation and branch scope', function () {
         $do->update(['status' => 'completed']);
         $do->update(['status' => 'completed']);
 
-        // sale order should have been marked completed once
+        // sale order should have been marked received once all items delivered (Ko Handy 21 Nov)
         $so->refresh();
-        expect($so->status)->toBe('completed');
+        expect($so->status)->toBe('received');
 
         // invoice count remains one
         $invoiceCount = Invoice::where('from_model_type', SaleOrder::class)

@@ -113,7 +113,7 @@ test('ADV-SO-01: Sales Order rejects unit price below bottom price limit', funct
     }
 });
 
-test('ADV-SO-02: Sales Order rejects total amount exceeding customer credit limit', function () {
+test('ADV-SO-02: Sales Order flags warning on total amount exceeding customer credit limit and requires override', function () {
     $payload = [
         'customer_id' => $this->customer->id,
         'cabang_id' => $this->cabang1->id,
@@ -135,8 +135,10 @@ test('ADV-SO-02: Sales Order rejects total amount exceeding customer credit limi
     $response = $this->actingAs($this->salesUser)->post(route('penjualan.so.store'), $payload);
 
     $response->assertRedirect();
-    $response->assertSessionHasErrors(['customer_id']);
-    expect(SaleOrder::where('customer_id', $this->customer->id)->count())->toBe(0);
+    $response->assertSessionHas('warning');
+    $so = SaleOrder::where('customer_id', $this->customer->id)->first();
+    expect($so)->not->toBeNull();
+    expect($so->notes)->toContain('PERINGATAN PLAFON KREDIT');
 });
 
 test('ADV-SO-03: Sales Order validation rejects negative quantity and extreme discounts', function () {
