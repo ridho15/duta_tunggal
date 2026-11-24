@@ -261,6 +261,13 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 | Penerimaan barang belum tertagih harus aset? | **Tetap kewajiban** (2100.10, di bawah Hutang Lancar) — standar PSAK: barang sudah diterima, tagihan belum. Saat faktur pembelian akun ini DIDEBIT untuk menutup saldo (Dr 2100.10 / Cr Hutang Dagang), bukan menjadi aset. |
 | Selisih GRNI vs Persediaan saat penerimaan | Versi kini: tidak ada selisih (persediaan = harga beli aktual, keputusan HPP averaging 21 Nov). Selisih yang terlihat berasal dari penerimaan dengan aturan 10–21 Nov (persediaan dinilai HPP master; beda harga ke 5160 Selisih Pembelian) atau server belum di-update. |
 
+**Keputusan Ko Handy — 24 Nov 2026 (PO & Mutasi)**
+
+| Item | Penyelesaian |
+|---|---|
+| PDF PO: DPP 180.180 vs 165.165 | **Sudah.** Tarif 11%/12% disajikan seperti Faktur Pajak: kolom Tax 12%, Harga Jual (DPP), DPP Nilai Lain (11/12), PPN; ringkasan Harga Jual → DPP Nilai Lain → PPN 12% → Grand Total. Nilai uang tidak berubah. Sama di layar detail PO & Faktur Pembelian. |
+| Mutasi tidak bisa diubah setelah disetujui | **Sudah.** Mutasi 4 tahap: Buat → **Disetujui** (stok asal dicadangkan, belum pindah) → **Dikirim** oleh gudang asal (boleh sebagian item & qty, boleh berkali-kali; barang di Gudang Transit cabang tujuan) → **Diterima** gudang tujuan per pengiriman. Sisa yang batal dikirim: **Tutup Sisa** (cadangan dilepas). Jurnal antar cabang dibuat saat dikirim. Mutasi Approved lama (stok sudah pindah) otomatis berstatus Selesai. |
+
 ## 9. Cara Menguji
 
 **Aturan praktis**
