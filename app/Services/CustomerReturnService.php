@@ -135,8 +135,10 @@ class CustomerReturnService
                         $invQty = max(0.0001, (float) $invItem->quantity);
                         $dppPerUnit = (float) $invItem->subtotal / $invQty;
                         $ppnPerUnit = (float) $invItem->tax_amount / $invQty;
-                        $totalDpp += round($qty * $dppPerUnit, 2);
-                        $totalPpn += round($qty * $ppnPerUnit, 2);
+                        // Rupiah bulat seperti faktur penjualan (Coretax)
+                        $dec = \App\Services\SalesInvoiceLineBuilder::invoiceDecimals();
+                        $totalDpp += round($qty * $dppPerUnit, $dec);
+                        $totalPpn += round($qty * $ppnPerUnit, $dec);
                     }
                 }
 

@@ -200,8 +200,8 @@ it('B2 Invoice Inklusif 11%: DPP = total × 100/111, PPN = sisa; Tanpa Pajak: PP
     $inv = audInvoice($this, $ctx, audSj($this, $ctx));
     audLog('B2 inklusif', ['subtotal' => (float) $inv->subtotal, 'tax' => (float) $inv->tax, 'total' => (float) $inv->total, 'GL4000' => audGl('4000'), 'GL2120.06' => audGl('2120.06')]);
     expect((float) $inv->total)->toBe(100000.0)
-        ->and(audGl('4000'))->toBe(-90090.09)
-        ->and(audGl('2120.06'))->toBe(-9909.91)
+        ->and(audGl('4000'))->toBe(-90090.0)     // rupiah bulat (Coretax, 24 Nov 2026)
+        ->and(audGl('2120.06'))->toBe(-9910.0)
         ->and(audGl('1120'))->toBe(100000.0);
 });
 

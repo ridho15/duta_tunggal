@@ -1229,11 +1229,12 @@ describe('Inclusive tax invoice workflow', function () {
             ->first();
 
         // Invoice subtotal (DPP) should be 1,000,000
-        expect((float) $invoice->subtotal)->toBe(1_009_009.01);
+        // Faktur penjualan dalam rupiah bulat (Coretax, 24 Nov 2026): DPP 1.009.009 + PPN 110.991 = 1.120.000
+        expect((float) $invoice->subtotal)->toBe(1_009_009.0);
 
         // Invoice items should have correct tax_amount
         $item = InvoiceItem::where('invoice_id', $invoice->id)->first();
-        expect((float) $item->tax_amount)->toBe(110_990.99);
+        expect((float) $item->tax_amount)->toBe(110_991.0);
 
         // total = DPP + PPN = 1,120,000
         expect((float) $invoice->total)->toBe(1_120_000.0);

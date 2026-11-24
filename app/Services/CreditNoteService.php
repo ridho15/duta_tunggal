@@ -440,8 +440,10 @@ class CreditNoteService
 
         // Sisa terakhir memakai selisih terhadap nilai baris agar kumulatif tepat (tanpa sisa pembulatan)
         $isLast = $qty >= $remainingQty - 0.0001;
-        $subtotal = $isLast ? round((float) $item->subtotal - $creditedSubtotal, 2) : round($qty * ((float) $item->subtotal / max($invoiceQty, 0.0001)), 2);
-        $tax = $isLast ? round((float) $item->tax_amount - $creditedTax, 2) : round($qty * ((float) $item->tax_amount / max($invoiceQty, 0.0001)), 2);
+        // Nota retur ke Coretax: rupiah bulat sama dengan faktur penjualan (SalesInvoiceLineBuilder::invoiceDecimals)
+        $dec = \App\Services\SalesInvoiceLineBuilder::invoiceDecimals();
+        $subtotal = $isLast ? round((float) $item->subtotal - $creditedSubtotal, $dec) : round($qty * ((float) $item->subtotal / max($invoiceQty, 0.0001)), $dec);
+        $tax = $isLast ? round((float) $item->tax_amount - $creditedTax, $dec) : round($qty * ((float) $item->tax_amount / max($invoiceQty, 0.0001)), $dec);
 
         return [
             'invoice_item_id' => $item->id, 'product_id' => $item->product_id, 'description' => $item->product?->name,
