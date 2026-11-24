@@ -20,7 +20,8 @@
 
         const num = Number(value);
         const isNegative = num < 0;
-        const absVal = Math.abs(num);
+        // Maks. 2 desimal (sen); tanpa ini DPP Nilai Lain 11/12 tampil "1.350.919,1666666"
+        const absVal = Math.round(Math.abs(num) * 100) / 100;
 
         // Pisahkan bagian integer dan pecahan (jika ada desimal)
         const parts = absVal.toString().split('.');
