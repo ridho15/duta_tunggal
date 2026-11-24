@@ -131,12 +131,13 @@
                 @php
                     $tabs = [
                         'semua' => ['label' => 'Semua Modul', 'count' => $counts['semua']],
+                        // Urutan mengikuti alur: barang diterima (Persediaan) → tagihan supplier (Pembelian) — permintaan akunting 24 Nov 2026
+                        'persediaan' => ['label' => 'Persediaan', 'count' => $counts['persediaan']],
                         'pembelian' => ['label' => 'Pembelian', 'count' => $counts['pembelian']],
                         'penjualan' => ['label' => 'Penjualan', 'count' => $counts['penjualan']],
                         'kasbank' => ['label' => 'Kas & Bank', 'count' => $counts['kasbank']],
                         'transfer' => ['label' => 'Transfer', 'count' => $counts['transfer']],
                         'pembayaran' => ['label' => 'Pembayaran', 'count' => $counts['pembayaran']],
-                        'persediaan' => ['label' => 'Persediaan', 'count' => $counts['persediaan']],
                         'manual' => ['label' => 'Manual / Penyesuaian', 'count' => $counts['manual']],
                     ];
                 @endphp
