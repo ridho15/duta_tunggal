@@ -39,6 +39,9 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'items.*.price' => 'required_with:items|numeric|min:0',
             'items.*.po_price' => 'nullable|numeric|min:0',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
+            // DPP/PPN sesuai Faktur Pajak supplier (kosong = hitungan sistem) — PurchaseInvoiceTaxAdjustment
+            'faktur_dpp' => 'nullable|numeric|min:0',
+            'faktur_ppn' => 'nullable|numeric|min:0',
         ];
     }
 

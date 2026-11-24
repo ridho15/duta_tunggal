@@ -68,7 +68,7 @@ class PurchaseInvoiceAccountingService
 
                 $taxRate = (float) ($expItem['tax_rate'] ?? 0);
                 $lineTotal = round($unitPrice * $quantity, 2);
-                $lineTaxAmount = round($lineTotal * ($taxRate / 100), 2);
+                $lineTaxAmount = round($lineTotal * (\App\Support\LineAmounts::effectiveRate($taxRate) / 100), 2);   // 12% → 11% efektif (PMK 131/2024)
                 $lineVariance = round(($unitPrice - $poPrice) * $quantity, 2);
                 $totalVariance += $lineVariance;
 
@@ -595,6 +595,10 @@ class PurchaseInvoiceAccountingService
             if ($expected === null) {
                 throw new \RuntimeException("Invoice {$invoice->id} tidak memiliki purchase receipt yang dapat dijadikan source of truth.");
             }
+            if (! empty($invoice->tax_adjustment)) {
+                throw new \RuntimeException("Faktur {$invoice->invoice_number} sudah disamakan dengan Faktur Pajak supplier oleh Finance (DPP/PPN), "
+                    . 'sehingga tidak diperbaiki otomatis. Solusi: periksa manual bersama Finance Manager.');
+            }
 
             $hasOpenJournal = false;
             if ($reverseExistingJournals) {
@@ -693,6 +697,13 @@ class PurchaseInvoiceAccountingService
         return DB::transaction(function () use ($invoice, $replaceExistingJournals): Invoice {
             $invoice->refresh();
 
+            // Penyesuaian Faktur Pajak (Finance) dilepas dulu agar hitung ulang mulai dari angka sistem, lalu diterapkan lagi
+            $taxAdjustment = $invoice->tax_adjustment;
+            if (! empty($taxAdjustment)) {
+                app(PurchaseInvoiceTaxAdjustment::class)->apply($invoice, null, null, null, authorized: true);
+                $invoice->refresh();
+            }
+
             $itemSubtotal = (float) $invoice->invoiceItem()->sum('total');
             $subtotal = $itemSubtotal > 0 ? $itemSubtotal : (float) $invoice->subtotal;
             $taxSummary = $this->resolveTaxSummaryForInvoice($invoice->fresh('invoiceItem'), persistItems: true);
@@ -726,6 +737,15 @@ class PurchaseInvoiceAccountingService
                 'price_variance_amount' => round($totalVariance, 2),
                 'cabang_id' => $cabangId,
             ])->saveQuietly();
+
+            if (! empty($taxAdjustment)) {
+                app(PurchaseInvoiceTaxAdjustment::class)->apply(
+                    $invoice, (float) $taxAdjustment['faktur_dpp'], (float) $taxAdjustment['faktur_ppn'], null, authorized: true,
+                    keepAudit: $taxAdjustment
+                );
+                $invoice->refresh();
+                $total = (float) $invoice->total;
+            }
 
             // Only sync AP and post journals if invoice is NOT in draft status
             if (strtolower((string) $invoice->status) !== Invoice::STATUS_DRAFT) {
@@ -895,7 +915,7 @@ class PurchaseInvoiceAccountingService
                     $taxRate = min(100.0, round(($lineTaxAmount / $lineTotal) * 100, 2));
                 } else {
                     $taxRate = min(100.0, max(0.0, $taxRate));
-                    $lineTaxAmount = round($lineTotal * $taxRate / 100, 2);
+                    $lineTaxAmount = round($lineTotal * \App\Support\LineAmounts::effectiveRate($taxRate) / 100, 2);
                 }
             } else {
                 $taxRate = (float) MoneyHelper::safeParse($item['tax_rate'] ?? 0);
@@ -909,7 +929,7 @@ class PurchaseInvoiceAccountingService
                 }
                 $lineTaxAmount = (float) MoneyHelper::safeParse($item['tax_amount'] ?? 0);
                 if ($lineTaxAmount <= 0 && $lineTotal > 0 && $taxRate > 0) {
-                    $lineTaxAmount = round($lineTotal * $taxRate / 100, 2);
+                    $lineTaxAmount = round($lineTotal * \App\Support\LineAmounts::effectiveRate($taxRate) / 100, 2);
                 }
             }
 
@@ -983,7 +1003,7 @@ class PurchaseInvoiceAccountingService
         $dppUnitPrice = \App\Support\JournalCurrencyAmountResolver::purchaseOrderItemDppUnitPrice($purchaseOrderItem);
 
         $lineTotal = round($dppUnitPrice * $quantity, 2);
-        $lineTaxAmount = round($lineTotal * ($taxRate / 100), 2);
+        $lineTaxAmount = round($lineTotal * (\App\Support\LineAmounts::effectiveRate($taxRate) / 100), 2);   // 12% → 11% efektif (PMK 131/2024)
 
         $product = $receiptItem->product ?? $purchaseOrderItem->product ?? null;
 

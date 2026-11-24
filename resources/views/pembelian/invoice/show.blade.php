@@ -373,8 +373,19 @@
                     </div>
                     <div class="flex justify-between text-gray-600">
                         <span>PPN Masukan ({{ (float)($invoice->ppn_rate ?? 0) }}%):</span>
-                        <span class="font-bold text-gray-900 font-mono">Rp {{ number_format($invoice->ppn_amount, 0, ',', '.') }}</span>
+                        {{-- Σ PPN baris = dasar jurnal PPN Masukan (12% → 11% efektif; termasuk penyesuaian Faktur Pajak) --}}
+                        <span class="font-bold text-gray-900 font-mono">Rp {{ number_format($invoice->invoiceItem->isNotEmpty() ? (float) $invoice->invoiceItem->sum('tax_amount') : $invoice->ppn_amount, 0, ',', '.') }}</span>
                     </div>
+                    @if (! empty($invoice->tax_adjustment))
+                        @php($adj = $invoice->tax_adjustment)
+                        <div class="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800 space-y-0.5">
+                            <p class="font-semibold">DPP/PPN disamakan dengan Faktur Pajak supplier</p>
+                            <p>Sistem: DPP Rp {{ number_format((float) $adj['system_dpp'], 0, ',', '.') }} · PPN Rp {{ number_format((float) $adj['system_ppn'], 0, ',', '.') }}</p>
+                            <p>Faktur: DPP Rp {{ number_format((float) $adj['faktur_dpp'], 0, ',', '.') }} · PPN Rp {{ number_format((float) $adj['faktur_ppn'], 0, ',', '.') }}</p>
+                            <p>Selisih DPP Rp {{ number_format((float) $adj['selisih_dpp'], 0, ',', '.') }} (ke Selisih Pembelian) · PPN Rp {{ number_format((float) $adj['selisih_ppn'], 0, ',', '.') }}</p>
+                            <p>Oleh {{ $adj['by_name'] ?? '-' }} · {{ $adj['at'] ?? '' }}</p>
+                        </div>
+                    @endif
                     @if ($invoice->other_fee_total > 0)
                         <div class="flex justify-between text-gray-600">
                             <span>Ongkir / Biaya Lain:</span>
