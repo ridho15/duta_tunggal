@@ -55,18 +55,26 @@ class Warehouse extends Model
         static::addGlobalScope(new CabangScope);
 
         static::created(function ($warehouse) {
-            $products = \App\Models\Product::all(['id']);
-            foreach ($products as $product) {
-                \App\Models\InventoryStock::firstOrCreate([
-                    'product_id' => $product->id,
-                    'warehouse_id' => $warehouse->id,
-                ], [
-                    'qty_available' => 0,
-                    'qty_reserved' => 0,
-                    'qty_min' => 0,
-                    'rak_id' => null,
-                ]);
+            // Gudang transit (barang mutasi dalam perjalanan) tidak perlu baris stok kosong per produk: baris dibuat saat barang lewat.
+            // Dulu dibuat satu per satu untuk SEMUA produk (± 5 query/produk + log aktivitas) sehingga pengiriman mutasi pertama
+            // ke suatu cabang sangat lambat / tidak merespons (UAT 25 Nov 2026).
+            if ($warehouse->is_transit) {
+                return;
             }
+
+            // Baris stok kosong (qty 0) dibuat massal per 1.000 produk; observer InventoryStock tidak berbuat apa pun untuk qty 0.
+            $now = now();
+            \App\Models\Product::query()->select('id')->orderBy('id')->chunkById(1000, function ($products) use ($warehouse, $now) {
+                $existing = \App\Models\InventoryStock::withoutGlobalScopes()->where('warehouse_id', $warehouse->id)
+                    ->whereIn('product_id', $products->pluck('id'))->pluck('product_id')->flip();
+                $rows = $products->reject(fn ($product) => $existing->has($product->id))->map(fn ($product) => [
+                    'product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'rak_id' => null,
+                    'qty_available' => 0, 'qty_reserved' => 0, 'qty_min' => 0, 'created_at' => $now, 'updated_at' => $now,
+                ])->values()->all();
+                if ($rows !== []) {
+                    \App\Models\InventoryStock::insert($rows);
+                }
+            });
         });
 
         static::deleting(function ($warehouse) {
