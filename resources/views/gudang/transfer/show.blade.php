@@ -287,7 +287,7 @@
                             <td class="py-3 px-4 text-right font-mono text-[#15803d] font-semibold">{{ number_format($item->receivedQuantity(), 0, ',', '.') }}</td>
                             <td class="py-3 px-4 text-right font-mono {{ $item->remainingToShip() > 0 ? 'text-amber-700 font-semibold' : 'text-gray-400' }}">{{ number_format($item->remainingToShip(), 0, ',', '.') }}</td>
                             <td class="py-3 px-4 text-center">
-                                @if ($item->product)
+                                @if ($item->product?->getKey())
                                     <a href="{{ route('gudang.stok.card', $item->product) }}"
                                        target="_blank"
                                        class="inline-flex items-center gap-1 text-[11px] font-semibold text-[#15803d] hover:text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition shadow-sm">

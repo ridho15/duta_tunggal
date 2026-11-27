@@ -208,7 +208,7 @@
                                 <span class="text-gray-500 font-normal text-[11px]">{{ $order->productionPlan?->uom?->name ?? 'Pcs' }}</span>
                             </td>
                             <td class="py-3 px-4">
-                                @if ($bom)
+                                @if ($bom?->getKey())
                                     <a href="{{ route('manufaktur.bom.show', $bom) }}" class="font-bold text-[#15803d] hover:underline">
                                         {{ $bom->code }}
                                     </a>
