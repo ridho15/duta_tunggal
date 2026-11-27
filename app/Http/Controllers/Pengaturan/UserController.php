@@ -31,6 +31,9 @@ class UserController extends Controller
         if (! $user) {
             abort(401);
         }
+        if (\App\Support\Access::grantedByChecklist()) {
+            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
+        }
 
         $allowedRoles = ['OWN', 'IT'];
         if (MenuAccess::isSuper($user) || ! empty(array_intersect($allowedRoles, MenuAccess::codesFor($user)))) {
@@ -147,7 +150,8 @@ class UserController extends Controller
             $user->warehouse_id = $validated['warehouse_id'] ?? null;
             $user->save();
 
-            if (! empty($validated['roles'])) {
+            // Memberi / mengganti peran = mengatur hak akses: hanya Owner / Super Admin (keputusan Ko Handy 27 Nov 2026).
+            if (! empty($validated['roles']) && \App\Support\Access::canManageRoles()) {
                 $user->syncRoles($validated['roles']);
             }
 
@@ -223,7 +227,7 @@ class UserController extends Controller
 
             $user->save();
 
-            if (isset($validated['roles'])) {
+            if (isset($validated['roles']) && \App\Support\Access::canManageRoles()) {
                 $user->syncRoles($validated['roles']);
             }
 

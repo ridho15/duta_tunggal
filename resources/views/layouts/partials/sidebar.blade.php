@@ -3,10 +3,13 @@
     $codes = \App\Support\MenuAccess::codesFor($user);
     $isSuper = \App\Support\MenuAccess::isSuper($user);
 
-    // Helper untuk cek izin tampil menu
-    $canSee = function (array $allowedCodes) use ($codes, $isSuper) {
-        if ($isSuper) return true;
-        return (bool) array_intersect($codes, $allowedCodes);
+    // Menu tampil sesuai checklist "Lihat (menu)" di Pengaturan → Peran & Hak Akses (Owner / Super Admin selalu tampil)
+    $can = fn (string $routeName) => \Illuminate\Support\Facades\Route::has($routeName) && \App\Support\Access::allowsRoute($routeName, $user);
+    $canAny = function (array $routeNames) use ($can) {
+        foreach ($routeNames as $routeName) {
+            if ($can($routeName)) return true;
+        }
+        return false;
     };
 
     // Helper untuk route yang aman
@@ -80,14 +83,14 @@
         </div>
 
         {{-- MODUL PENJUALAN --}}
-        @if ($canSee(['OWN', 'SM', 'SLS', 'KSR', 'ADP']))
+        @if ($canAny(['penjualan.quotations.index', 'penjualan.so.index', 'penjualan.do.index', 'penjualan.sj.index', 'penjualan.schedules.index', 'penjualan.invoices.index', 'penjualan.receipts.index', 'penjualan.returns.index', 'penjualan.credit-notes.index', 'penjualan.laporan.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Penjualan
                 </div>
 
 
-                @if ($canSee(['OWN', 'SM', 'SLS']))
+                    @if ($can('penjualan.quotations.index'))
                     <a href="{{ route('penjualan.quotations.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/penawaran*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 12V3h9l9 9-9 9z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -95,8 +98,9 @@
                         </svg>
                         <span>Penawaran Harga</span>
                     </a>
-                @endif
+                    @endif
 
+                @if ($can('penjualan.so.index'))
                 <a href="{{ route('penjualan.so.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/so*') || request()->is('penjualan/pesanan*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -104,8 +108,9 @@
                     </svg>
                     <span>Pesanan Penjualan</span>
                 </a>
+                @endif
 
-                @if ($canSee(['OWN', 'ADP', 'SLS', 'KSR']))
+                    @if ($can('penjualan.do.index'))
                     <a href="{{ route('penjualan.do.index') ?? '#' }}" class="{{ $itemClass(request()->is('pengiriman/do*') || request()->is('penjualan/do*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h11v10H3zM14 9h4l3 3v4h-7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -114,9 +119,9 @@
                         </svg>
                         <span>Perintah Kirim (DO)</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'ADP']))
+                    @if ($can('penjualan.sj.index'))
                     <a href="{{ route('penjualan.sj.index') ?? '#' }}" class="{{ $itemClass(request()->is('pengiriman/surat-jalan*') || request()->is('penjualan/sj*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.8"></path>
@@ -125,7 +130,9 @@
                         </svg>
                         <span>Surat Jalan</span>
                     </a>
+                    @endif
 
+                    @if ($can('penjualan.schedules.index'))
                     <a href="{{ route('penjualan.schedules.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/jadwal-kirim*') || request()->is('penjualan/delivery-schedules*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <rect x="3" y="4" width="18" height="18" rx="2" stroke-width="1.8"></rect>
@@ -133,10 +140,10 @@
                         </svg>
                         <span>Jadwal Kirim</span>
                     </a>
-                @endif
+                    @endif
 
 
-                @if ($canSee(['OWN', 'KSR', 'ADP', 'FIN']))
+                    @if ($can('penjualan.invoices.index'))
                     <a href="{{ route('penjualan.invoices.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/invoice*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" stroke-width="1.8" stroke-linecap="round"></path>
@@ -144,9 +151,9 @@
                         </svg>
                         <span>Invoice Penjualan</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'KSR', 'FIN']))
+                    @if ($can('penjualan.receipts.index'))
                     <a href="{{ route('penjualan.receipts.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/terima-pembayaran*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <rect x="3" y="6" width="18" height="14" rx="2" stroke-width="1.8"></rect>
@@ -154,9 +161,9 @@
                         </svg>
                         <span>Terima Pembayaran</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'SM', 'SLS', 'GDG', 'FIN']))
+                    @if ($can('penjualan.returns.index'))
                     <a href="{{ route('penjualan.returns.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/retur*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M9 14 4 9l5-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -164,9 +171,9 @@
                         </svg>
                         <span>Retur Penjualan</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'SM', 'KSR', 'FIN']))
+                    @if ($can('penjualan.credit-notes.index'))
                     <a href="{{ route('penjualan.credit-notes.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/nota-kredit*') || request()->is('penjualan/credit-notes*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M16 15v-1a4 4 0 0 0-4-4H4m0 0l3-3m-3 3l3 3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -174,27 +181,27 @@
                         </svg>
                         <span>Nota Kredit</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'SM', 'SLS', 'FIN']))
+                    @if ($can('penjualan.laporan.index'))
                     <a href="{{ route('penjualan.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('penjualan/laporan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                         <span>Laporan Penjualan</span>
                     </a>
-                @endif
+                    @endif
             </div>
         @endif
 
         {{-- MODUL GUDANG --}}
-        @if ($canSee(['OWN', 'GDG', 'PUR', 'FIN']))
+        @if ($canAny(['gudang.kiriman.index', 'gudang.retur-do.index', 'gudang.penerimaan.index', 'gudang.stok.index', 'gudang.transfer.index', 'gudang.opname.index', 'gudang.adjustment.index', 'gudang.laporan.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Gudang & Stok
                 </div>
 
-                @if ($canSee(['OWN', 'GDG']))
+                    @if ($can('gudang.kiriman.index'))
                     <a href="{{ route('gudang.kiriman.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/kiriman*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 6h11v10H3zM14 9h4l3 3v4h-7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -203,13 +210,13 @@
                         </svg>
                         <span>Siapkan & Kirim</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'GDG']))
                     @php
                         $pendingDoReturns = \App\Models\ReturnProduct::query()
                             ->where('from_model_type', \App\Models\DeliveryOrder::class)->where('status', 'draft')->count();
                     @endphp
+                    @if ($can('gudang.retur-do.index'))
                     <a href="{{ route('gudang.retur-do.index') }}" class="{{ $itemClass(request()->is('gudang/retur-do*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M9 14 4 9l5-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -220,9 +227,9 @@
                             <span class="min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">{{ $pendingDoReturns }}</span>
                         @endif
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'GDG', 'PUR']))
+                    @if ($can('gudang.penerimaan.index'))
                     <a href="{{ route('gudang.penerimaan.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/penerimaan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M22 12h-6l-2 3h-4l-2-3H2" stroke-width="1.8" stroke-linecap="round"></path>
@@ -230,8 +237,9 @@
                         </svg>
                         <span>Terima Barang</span>
                     </a>
-                @endif
+                    @endif
 
+                @if ($can('gudang.stok.index'))
                 <a href="{{ route('gudang.stok.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/stok*') || request()->is('gudang/cek-stok*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M21 8 12 3 3 8v8l9 5 9-5z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -239,15 +247,18 @@
                     </svg>
                     <span>Cek Stok</span>
                 </a>
+                @endif
 
-                @if ($canSee(['OWN', 'GDG']))
+                    @if ($can('gudang.transfer.index'))
                     <a href="{{ route('gudang.transfer.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/transfer*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M7 7h13l-3-3M17 17H4l3 3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                         <span>Pindah Stok</span>
                     </a>
+                    @endif
 
+                    @if ($can('gudang.opname.index'))
                     <a href="{{ route('gudang.opname.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/opname*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.8"></path>
@@ -256,80 +267,90 @@
                         </svg>
                         <span>Stock Opname</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'GDG', 'FIN']))
+                    @if ($can('gudang.adjustment.index'))
                     <a href="{{ route('gudang.adjustment.index') }}" class="{{ $itemClass(request()->is('gudang/penyesuaian*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"></path>
                         </svg>
                         <span>Penyesuaian Stok</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'GDG', 'PUR', 'FIN']))
+                    @if ($can('gudang.laporan.index'))
                     <a href="{{ route('gudang.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('gudang/laporan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                         <span>Laporan Stok & Mutasi</span>
                     </a>
-                @endif
+                    @endif
             </div>
         @endif
 
         {{-- MODUL PRODUKSI & MANUFAKTUR --}}
-        @if ($canSee(['OWN', 'GDG']))
+        @if ($canAny(['manufaktur.bom.index', 'manufaktur.spk.index', 'manufaktur.material-issue.index', 'manufaktur.production.index', 'manufaktur.qc.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Produksi & Manufaktur
                 </div>
 
+                @if ($can('manufaktur.bom.index'))
                 <a href="{{ route('manufaktur.bom.index') }}" class="{{ $itemClass(request()->is('manufaktur/bom*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>Resep Produksi (BOM)</span>
                 </a>
+                @endif
 
+                @if ($can('manufaktur.spk.index'))
                 <a href="{{ route('manufaktur.spk.index') }}" class="{{ $itemClass(request()->is('manufaktur/spk*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>Perintah Kerja (SPK)</span>
                 </a>
+                @endif
 
+                @if ($can('manufaktur.material-issue.index'))
                 <a href="{{ route('manufaktur.material-issue.index') }}" class="{{ $itemClass(request()->is('manufaktur/material-issue*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>Pengeluaran Bahan</span>
                 </a>
+                @endif
 
+                @if ($can('manufaktur.production.index'))
                 <a href="{{ route('manufaktur.production.index') }}" class="{{ $itemClass(request()->is('manufaktur/production*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>Hasil Produksi</span>
                 </a>
+                @endif
 
+                @if ($can('manufaktur.qc.index'))
                 <a href="{{ route('manufaktur.qc.index') }}" class="{{ $itemClass(request()->is('manufaktur/qc*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                     <span>QC Pabrik</span>
                 </a>
+                @endif
             </div>
         @endif
 
         {{-- MODUL PEMBELIAN --}}
-        @if ($canSee(['OWN', 'PUR', 'GDG', 'FIN']))
+        @if ($canAny(['pembelian.or.index', 'pembelian.po.index', 'pembelian.invoices.index', 'pembelian.payments.index', 'pembelian.returns.index', 'pembelian.laporan.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Pembelian
                 </div>
 
-                @if ($canSee(['OWN', 'PUR', 'GDG', 'SLS']))
+                    @if ($can('pembelian.or.index'))
                     <a href="{{ route('pembelian.or.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/permintaan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -337,9 +358,9 @@
                         </svg>
                         <span>Permintaan (OR)</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'PUR']))
+                    @if ($can('pembelian.po.index'))
                     <a href="{{ route('pembelian.po.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/po*') || request()->is('pembelian/pesanan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <rect x="2" y="4" width="20" height="16" rx="2" stroke-width="1.8"></rect>
@@ -347,9 +368,9 @@
                         </svg>
                         <span>Pesanan (PO)</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'PUR', 'FIN']))
+                    @if ($can('pembelian.invoices.index'))
                     <a href="{{ route('pembelian.invoices.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/invoice*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" stroke-width="1.8" stroke-linecap="round"></path>
@@ -357,7 +378,9 @@
                         </svg>
                         <span>Invoice Pembelian</span>
                     </a>
+                    @endif
 
+                    @if ($can('pembelian.payments.index'))
                     <a href="{{ route('pembelian.payments.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/pembayaran*') || request()->is('pembelian/vendor-payments*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <rect x="3" y="6" width="18" height="14" rx="2" stroke-width="1.8"></rect>
@@ -365,7 +388,9 @@
                         </svg>
                         <span>Pembayaran Hutang</span>
                     </a>
+                    @endif
 
+                    @if ($can('pembelian.returns.index'))
                     <a href="{{ route('pembelian.returns.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/retur*') || request()->is('pembelian/purchase-returns*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M9 14 4 9l5-5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -373,32 +398,36 @@
                         </svg>
                         <span>Retur Pembelian</span>
                     </a>
+                    @endif
 
+                    @if ($can('pembelian.laporan.index'))
                     <a href="{{ route('pembelian.laporan.index') ?? '#' }}" class="{{ $itemClass(request()->is('pembelian/laporan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                         <span>Laporan Pembelian</span>
                     </a>
-                @endif
+                    @endif
             </div>
         @endif
 
         {{-- MODUL KEUANGAN & LAPORAN --}}
-        @if ($canSee(['OWN', 'FIN', 'KSR']))
+        @if ($canAny(['keuangan.cashbank.index', 'keuangan.journal.index', 'keuangan.period.index', 'master.coa.index', 'keuangan.asset.index', 'laporan.financial.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Keuangan
                 </div>
 
+                @if ($can('keuangan.cashbank.index'))
                 <a href="{{ route('keuangan.cashbank.index') ?? '#' }}" class="{{ $itemClass(request()->is('keuangan/kas-bank*') || request()->is('keuangan/transfer*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path d="M3 10 12 4l9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18" stroke-width="1.8"></path>
                     </svg>
                     <span>Kas & Bank</span>
                 </a>
+                @endif
 
-                @if ($canSee(['OWN', 'FIN']))
+                    @if ($can('keuangan.journal.index'))
                     <a href="{{ route('keuangan.journal.index') ?? '#' }}" class="{{ $itemClass(request()->is('keuangan/jurnal*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" stroke-width="1.8"></path>
@@ -406,28 +435,36 @@
                         </svg>
                         <span>Buku Besar & Jurnal</span>
                     </a>
+                    @endif
 
+                    @if ($can('keuangan.period.index'))
                     <a href="{{ route('keuangan.period.index') }}" class="{{ $itemClass(request()->is('keuangan/tutup-buku*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"></path>
                         </svg>
                         <span>Tutup Buku</span>
                     </a>
+                    @endif
 
+                    @if ($can('master.coa.index'))
                     <a href="{{ route('master.coa.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/coa*') || request()->is('keuangan/coa*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
                         <span>Bagan Akun (COA)</span>
                     </a>
+                    @endif
 
+                    @if ($can('keuangan.asset.index'))
                     <a href="{{ route('keuangan.asset.index') ?? '#' }}" class="{{ $itemClass(request()->is('keuangan/aset*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                         <span>Aset Tetap</span>
                     </a>
+                    @endif
 
+                    @if ($can('laporan.financial.index'))
                     <a href="{{ route('laporan.financial.index') ?? '#' }}" class="{{ $itemClass(request()->is('laporan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 3v18h18" stroke-width="1.8" stroke-linecap="round"></path>
@@ -435,18 +472,18 @@
                         </svg>
                         <span>Laporan Keuangan</span>
                     </a>
-                @endif
+                    @endif
             </div>
         @endif
 
         {{-- MASTER DATA --}}
-        @if ($canSee(['OWN', 'PUR', 'FIN', 'SM', 'SLS', 'KSR', 'GDG', 'ADP', 'IT']))
+        @if ($canAny(['master.products.index', 'master.customers.index', 'master.suppliers.index', 'master.cabang.index', 'master.gudang.index', 'master.kategori.index', 'master.satuan.index', 'master.kendaraan.index', 'master.mata-uang.index', 'master.pajak.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Master Data
                 </div>
 
-                @if ($canSee(['OWN', 'PUR']))
+                    @if ($can('master.products.index'))
                     <a href="{{ route('master.products.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/produk*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="m20.5 8.5-8.5-5-8.5 5 8.5 5 8.5-5Z" stroke-width="1.8" stroke-linecap="round"></path>
@@ -454,9 +491,9 @@
                         </svg>
                         <span>Produk</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'SM', 'SLS', 'KSR', 'FIN']))
+                    @if ($can('master.customers.index'))
                     <a href="{{ route('master.customers.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/customer*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <circle cx="9" cy="8" r="3.5" stroke-width="1.8"></circle>
@@ -464,9 +501,9 @@
                         </svg>
                         <span>Customer</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'PUR', 'FIN']))
+                    @if ($can('master.suppliers.index'))
                     <a href="{{ route('master.suppliers.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/supplier*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-width="1.8"></path>
@@ -475,94 +512,107 @@
                         </svg>
                         <span>Supplier</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'FIN', 'IT']))
+                    @if ($can('master.cabang.index'))
                     <a href="{{ route('master.cabang.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/cabang*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3M9 11h2M13 11h2M9 15h2M13 15h2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                         </svg>
                         <span>Cabang</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'GDG', 'ADP', 'PUR', 'IT']))
+                    @if ($can('master.gudang.index'))
                     <a href="{{ route('master.gudang.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/gudang*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
                         <span>Gudang & Rak</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'PUR', 'SM', 'SLS', 'IT']))
+                    @if ($can('master.kategori.index'))
                     <a href="{{ route('master.kategori.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/kategori*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
                         </svg>
                         <span>Kategori</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'PUR', 'GDG', 'IT']))
+                    @if ($can('master.satuan.index'))
                     <a href="{{ route('master.satuan.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/satuan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
                         </svg>
                         <span>Satuan</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'ADP', 'GDG', 'IT']))
+                    @if ($can('master.kendaraan.index'))
                     <a href="{{ route('master.kendaraan.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/kendaraan*') || request()->is('master/driver*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8m-8 4h8m-8 4h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
                         </svg>
                         <span>Armada & Driver</span>
                     </a>
-                @endif
+                    @endif
 
-                @if ($canSee(['OWN', 'FIN', 'IT']))
+                    @if ($can('master.mata-uang.index'))
                     <a href="{{ route('master.mata-uang.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/mata-uang*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <span>Mata Uang & Kurs</span>
                     </a>
+                    @endif
 
+                    @if ($can('master.pajak.index'))
                     <a href="{{ route('master.pajak.index') ?? '#' }}" class="{{ $itemClass(request()->is('master/pajak*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path>
                         </svg>
                         <span>Tarif Pajak</span>
                     </a>
-                @endif
+                    @endif
             </div>
         @endif
 
         {{-- PENGATURAN --}}
-        @if ($canSee(['OWN', 'IT']))
+        @if ($canAny(['settings.users.index', 'settings.approval-rules.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Pengaturan
                 </div>
 
+                @if ($can('settings.users.index'))
                 <a href="{{ route('settings.users.index') ?? '#' }}" class="{{ $itemClass(request()->is('pengaturan/pengguna*')) }}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <circle cx="12" cy="12" r="3" stroke-width="1.8"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.8"></path>
                     </svg>
-                    <span>Pengguna & Peran</span>
+                    <span>Pengguna</span>
                 </a>
+                @endif
 
-                @if ($isSuper)
+                @if (\App\Support\Access::canManageRoles($user))
+                <a href="{{ route('settings.roles.index') }}" class="{{ $itemClass(request()->is('pengaturan/peran*') || request()->is('pengaturan/pengguna/*/akses*')) }}">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"></path>
+                    </svg>
+                    <span>Peran &amp; Hak Akses</span>
+                </a>
+                @endif
+
+                    @if ($can('settings.approval-rules.index'))
                     <a href="{{ route('settings.approval-rules.index') }}" class="{{ $itemClass(request()->is('pengaturan/aturan-persetujuan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
                         </svg>
                         <span>Aturan Persetujuan</span>
                     </a>
-                @endif
+                    @endif
             </div>
         @endif
 

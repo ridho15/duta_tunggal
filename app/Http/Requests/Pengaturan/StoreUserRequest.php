@@ -20,7 +20,7 @@ class StoreUserRequest extends FormRequest
             'email' => 'required|email|max:255|unique:users,email',
             'telepon' => 'nullable|string|max:50',
             'password' => 'required|string|min:6|confirmed',
-            'roles' => 'required|array|min:1',
+            'roles' => [\Illuminate\Validation\Rule::requiredIf(fn () => \App\Support\Access::canManageRoles()), 'nullable', 'array'],
             'roles.*' => 'string|exists:roles,name',
             'manage_type' => 'required|array|min:1',
             'manage_type.*' => 'string|in:all,cabang,warehouse',

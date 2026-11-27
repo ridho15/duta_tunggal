@@ -198,6 +198,9 @@
                 </div>
             </div>
 
+            @unless (\App\Support\Access::canManageRoles())
+                <p class="text-xs font-semibold text-amber-800">Hanya Owner / Super Admin yang bisa memberi atau mengganti peran.</p>
+            @endunless
             @error('roles')
                 <p class="text-xs text-rose-600">{{ $message }}</p>
             @enderror
@@ -212,6 +215,7 @@
                             type="checkbox"
                             name="roles[]"
                             value="{{ $r->name }}"
+                            @disabled(! \App\Support\Access::canManageRoles())
                             class="mt-0.5 rounded text-[#15803d] focus:ring-[#15803d]"
                             {{ in_array($r->name, $selectedRoles) ? 'checked' : '' }}
                         >

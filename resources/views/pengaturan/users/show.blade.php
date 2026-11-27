@@ -36,6 +36,14 @@
                 </svg>
                 Edit Pengguna
             </a>
+            @if (\App\Support\Access::canManageRoles())
+                <a
+                    href="{{ route('settings.users.access.edit', $user) }}"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 text-sm font-semibold rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
+                >
+                    Atur akses
+                </a>
+            @endif
         </div>
     </div>
 

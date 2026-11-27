@@ -720,6 +720,16 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::prefix('pengaturan')->name('settings.')->group(function () {
         Route::post('/pengguna/{user}/toggle-active', [\App\Http\Controllers\Pengaturan\UserController::class, 'toggleActive'])->name('users.toggle-active');
         Route::post('/pengguna/{user}/reset-password', [\App\Http\Controllers\Pengaturan\UserController::class, 'resetPassword'])->name('users.reset-password');
+        // Peran & Hak Akses (checklist), khusus Owner / Super Admin
+        Route::get('/pengguna/{user}/akses', [\App\Http\Controllers\Pengaturan\UserAccessController::class, 'edit'])->name('users.access.edit');
+        Route::put('/pengguna/{user}/akses', [\App\Http\Controllers\Pengaturan\UserAccessController::class, 'update'])->name('users.access.update');
+        Route::post('/pengguna/{user}/akses/salin', [\App\Http\Controllers\Pengaturan\UserAccessController::class, 'copyFrom'])->name('users.access.copy');
+        Route::post('/pengguna/{user}/akses/reset', [\App\Http\Controllers\Pengaturan\UserAccessController::class, 'reset'])->name('users.access.reset');
+        Route::post('/peran/{role}/duplikat', [\App\Http\Controllers\Pengaturan\RoleAccessController::class, 'duplicate'])->name('roles.duplicate');
+        Route::resource('peran', \App\Http\Controllers\Pengaturan\RoleAccessController::class)
+            ->except(['show'])
+            ->names('roles')
+            ->parameters(['peran' => 'role']);
         Route::resource('pengguna', \App\Http\Controllers\Pengaturan\UserController::class)
             ->names('users')
             ->parameters(['pengguna' => 'user']);

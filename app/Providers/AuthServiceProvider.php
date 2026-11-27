@@ -56,7 +56,22 @@ class AuthServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         Gate::before(function ($user, string $ability) {
-            return $user->hasRole('Super Admin') ? true : null;
+            if ($user->hasRole('Super Admin')) {
+                return true;
+            }
+
+            // Checklist Peran & Hak Akses (27 Nov 2026): izin lama yang mewakili kunci yang DICENTANG ikut lolos, sehingga peran
+            // baru / hasil duplikat bekerja sesuai centangnya (Policy & @can lama). Yang tidak dicentang tetap ikut aturan lama.
+            if (\App\Support\Access::gateAllows($user, $ability)) {
+                return true;
+            }
+
+            return null;
         });
+
+        // @access('penjualan.so.approve') … @endaccess — tombol/tautan tampil hanya bila dicentang
+        \Illuminate\Support\Facades\Blade::if('access', fn (string $key) => \App\Support\Access::allows($key));
+        \Illuminate\Support\Facades\Blade::if('accessRoute', fn (string $routeName) => \App\Support\Access::allowsRoute($routeName));
+        \Illuminate\Support\Facades\Blade::if('canExport', fn () => \App\Support\Access::canExportImport());
     }
 }
