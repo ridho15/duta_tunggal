@@ -29,6 +29,7 @@
 
         {{-- Action Buttons --}}
         <div class="flex flex-wrap items-center gap-2">
+            @accessRoute('manufaktur.material-issue.pdf')
             <a
                 href="{{ route('manufaktur.material-issue.pdf', $materialIssue) }}"
                 target="_blank"
@@ -39,9 +40,11 @@
                 </svg>
                 Cetak PDF
             </a>
+            @endaccessRoute
 
             {{-- Draft Actions --}}
             @if ($materialIssue->status === 'draft')
+                @accessRoute('manufaktur.material-issue.edit')
                 <a
                     href="{{ route('manufaktur.material-issue.edit', $materialIssue) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-gray-50 text-amber-700 border border-gray-200 text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -51,7 +54,9 @@
                     </svg>
                     Edit Draft
                 </a>
+                @endaccessRoute
 
+                @accessRoute('manufaktur.material-issue.submit-approval')
                 <form action="{{ route('manufaktur.material-issue.submit-approval', $materialIssue) }}" method="POST" class="inline">
                     @csrf
                     <button
@@ -64,10 +69,12 @@
                         Ajukan ke Gudang
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             {{-- Pending Approval Actions --}}
             @if (in_array($materialIssue->status, ['draft', 'pending_approval']))
+                @accessRoute('manufaktur.material-issue.confirm-warehouse')
                 <button
                     type="button"
                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -78,7 +85,9 @@
                     </svg>
                     Konfirmasi & Setujui Gudang
                 </button>
+                @endaccessRoute
 
+                @accessRoute('manufaktur.material-issue.reject')
                 <button
                     type="button"
                     onclick="document.getElementById('rejectModal').classList.remove('hidden')"
@@ -89,10 +98,12 @@
                     </svg>
                     Tolak
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Approved Actions --}}
             @if ($materialIssue->status === 'approved')
+                @accessRoute('manufaktur.material-issue.complete')
                 <button
                     type="button"
                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -103,10 +114,12 @@
                     </svg>
                     Selesaikan Serah Terima
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Cancel action for Pending Approval or Approved --}}
             @if (in_array($materialIssue->status, ['pending_approval', 'approved']))
+                @accessRoute('manufaktur.material-issue.cancel')
                 <button
                     type="button"
                     class="inline-flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition"
@@ -114,10 +127,12 @@
                 >
                     Batalkan Pengajuan
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Super Admin Void action for Completed --}}
             @if ($materialIssue->status === 'completed' && auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+                @accessRoute('manufaktur.material-issue.void')
                 <button
                     type="button"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -128,10 +143,12 @@
                     </svg>
                     Void Pengeluaran (Super Admin)
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Delete action for Draft --}}
             @if ($materialIssue->status === 'draft')
+                @accessRoute('manufaktur.material-issue.destroy')
                 <button
                     type="button"
                     class="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent rounded-xl transition"
@@ -142,6 +159,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -479,6 +497,7 @@
 </div>
 
 {{-- Modal Penolakan (Reject Modal) --}}
+@accessRoute('manufaktur.material-issue.reject')
 <div id="rejectModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -528,8 +547,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Setujui Gudang --}}
+@accessRoute('manufaktur.material-issue.confirm-warehouse')
 <x-confirmation-modal
     name="confirm-warehouse"
     title="Konfirmasi & Setujui Pengeluaran Gudang"
@@ -546,8 +567,10 @@
         Dokumen akan ditandai disetujui oleh gudang dan siap dieksekusi pemotongan stok fisik.
     </p>
 </x-confirmation-modal>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Selesaikan Pengeluaran Bahan --}}
+@accessRoute('manufaktur.material-issue.complete')
 <x-confirmation-modal
     name="complete-issue"
     title="Selesaikan Serah Terima Bahan Baku"
@@ -564,8 +587,10 @@
         Stok fisik bahan baku di gudang akan langsung dipotong dan jurnal akuntansi Barang Dalam Proses (BDP) otomatis dibukukan.
     </p>
 </x-confirmation-modal>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Hapus Draft --}}
+@accessRoute('manufaktur.material-issue.destroy')
 <x-confirmation-modal
     name="delete-issue"
     title="Hapus Draft Pengeluaran Bahan"
@@ -579,7 +604,9 @@
         Apakah Anda yakin ingin menghapus draft pengeluaran bahan <strong>{{ $materialIssue->issue_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
     </p>
 </x-confirmation-modal>
+@endaccessRoute
 {{-- Modal Konfirmasi Batalkan Pengajuan --}}
+@accessRoute('manufaktur.material-issue.cancel')
 <x-confirmation-modal
     name="cancel-issue"
     title="Batalkan Pengajuan Bahan Baku"
@@ -600,8 +627,10 @@
         <input type="text" name="cancel_reason" required placeholder="Contoh: Salah kuantitas / salah gudang asal" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
     </div>
 </x-confirmation-modal>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Void (Super Admin) --}}
+@accessRoute('manufaktur.material-issue.void')
 <x-confirmation-modal
     name="void-issue"
     title="Void Pengeluaran Bahan Baku (Super Admin)"
@@ -627,4 +656,5 @@
         <input type="text" name="cancel_reason" required placeholder="Contoh: Kesalahan konfirmasi gudang / barang tidak jadi keluar" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
     </div>
 </x-confirmation-modal>
+@endaccessRoute
 @endsection

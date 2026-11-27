@@ -21,6 +21,7 @@
 
             {{-- Action Buttons (PDF & Excel) --}}
             <div class="flex items-center gap-2">
+                @accessRoute('penjualan.laporan.pdf')
                 <a href="{{ route('penjualan.laporan.pdf', request()->query()) }}" target="_blank"
                     class="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl border border-gray-200 shadow-sm transition active:scale-[0.98]"
                     title="Cetak Laporan PDF (A4 Landscape)">
@@ -30,7 +31,9 @@
                     </svg>
                     <span>Cetak PDF</span>
                 </a>
+                @endaccessRoute
 
+                @accessRoute('penjualan.laporan.excel')
                 <a href="{{ route('penjualan.laporan.excel', request()->query()) }}"
                     class="inline-flex items-center gap-2 px-3.5 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
                     title="Unduh Data ke Spreadsheet Excel (.xlsx)">
@@ -40,6 +43,7 @@
                     </svg>
                     <span>Ekspor Excel</span>
                 </a>
+                @endaccessRoute
             </div>
         </div>
 

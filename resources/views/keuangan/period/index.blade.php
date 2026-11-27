@@ -11,7 +11,9 @@
             <p class="text-sm text-gray-500 mt-0.5">Periode yang ditutup mengunci semua jurnal bertanggal di dalam rentangnya, untuk cabang yang dipilih.</p>
         </div>
         @can('create', \App\Models\AccountingPeriod::class)
+            @accessRoute('keuangan.period.create')
             <a href="{{ route('keuangan.period.create') }}" class="px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition whitespace-nowrap">Buat Periode</a>
+            @endaccessRoute
         @endcan
     </div>
 
@@ -60,20 +62,26 @@
                                 <td class="px-4 py-3 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center gap-3">
                                         @can('close', $period)
+                                            @accessRoute('keuangan.period.close.form')
                                             <a href="{{ route('keuangan.period.close.form', $period) }}" class="text-xs font-semibold text-rose-600 hover:underline">Tutup buku<span class="sr-only"> {{ $label }}</span></a>
+                                            @endaccessRoute
                                         @endcan
                                         @can('reopen', $period)
+                                            @accessRoute('keuangan.period.reopen')
                                             <form method="POST" action="{{ route('keuangan.period.reopen', $period) }}" class="inline" onsubmit="return confirm('Buka kembali periode {{ $label }}? Jurnal di rentang ini akan bisa dibuat dan diubah lagi. Jurnal penutup yang sudah dibuat TIDAK dibatalkan otomatis. Lakukan hanya untuk koreksi resmi.')">
                                                 @csrf
                                                 <button type="submit" class="text-xs font-semibold text-amber-700 hover:underline">Buka kembali<span class="sr-only"> {{ $label }}</span></button>
                                             </form>
+                                            @endaccessRoute
                                         @endcan
                                         @can('delete', $period)
+                                            @accessRoute('keuangan.period.destroy')
                                             <form method="POST" action="{{ route('keuangan.period.destroy', $period) }}" class="inline" onsubmit="return confirm('Hapus periode {{ $label }}?')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-xs font-semibold text-gray-500 hover:text-rose-600 hover:underline">Hapus<span class="sr-only"> {{ $label }}</span></button>
                                             </form>
+                                            @endaccessRoute
                                         @endcan
                                     </div>
                                 </td>

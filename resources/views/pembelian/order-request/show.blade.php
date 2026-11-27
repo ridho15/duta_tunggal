@@ -39,6 +39,7 @@
         <div class="flex flex-wrap items-center gap-2">
             {{-- Tombol Terbitkan PO (Primary Action jika Approved / Partial) --}}
             @if (in_array($orderRequest->status, ['approved', 'partial'], true))
+                @accessRoute('pembelian.po.create')
                 <a
                     href="{{ route('pembelian.po.create', ['order_request_id' => $orderRequest->id]) }}"
                     class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
@@ -48,10 +49,12 @@
                     </svg>
                     Terbitkan Purchase Order (PO)
                 </a>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Ajukan Approval --}}
             @if (in_array($orderRequest->status, ['draft', 'rejected'], true))
+                @accessRoute('pembelian.or.request-approve')
                 <form action="{{ route('pembelian.or.request-approve', $orderRequest) }}" method="POST" class="inline">
                     @csrf
                     <button
@@ -64,10 +67,12 @@
                         Ajukan Persetujuan
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Otorisasi Persetujuan / Penolakan --}}
             @if (in_array($orderRequest->status, ['draft', 'request_approve'], true))
+                @accessRoute('pembelian.or.approve')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-approve-or', { action: '{{ route('pembelian.or.approve', $orderRequest) }}' })"
@@ -78,7 +83,9 @@
                     </svg>
                     Setujui Permintaan
                 </button>
+                @endaccessRoute
 
+                @accessRoute('pembelian.or.reject')
                 <button
                     type="button"
                     @click="showRejectModal = true"
@@ -89,10 +96,12 @@
                     </svg>
                     Tolak
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Ubah --}}
             @if (in_array($orderRequest->status, ['draft', 'rejected'], true))
+                @accessRoute('pembelian.or.edit')
                 <a
                     href="{{ route('pembelian.or.edit', $orderRequest) }}"
                     class="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg shadow-sm transition"
@@ -102,9 +111,11 @@
                     </svg>
                     Ubah
                 </a>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Cetak PDF --}}
+            @accessRoute('pembelian.or.pdf')
             <a
                 href="{{ route('pembelian.or.pdf', $orderRequest) }}"
                 target="_blank"
@@ -115,9 +126,11 @@
                 </svg>
                 Cetak PDF
             </a>
+            @endaccessRoute
 
             {{-- Tombol Hapus (Draf) --}}
             @if ($orderRequest->status === 'draft')
+                @accessRoute('pembelian.or.destroy')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-delete-or', { action: '{{ route('pembelian.or.destroy', $orderRequest) }}' })"
@@ -128,6 +141,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -442,6 +456,7 @@
     @endif
 
     {{-- Rejection Modal --}}
+    @accessRoute('pembelian.or.reject')
     <div
         x-show="showRejectModal"
         x-cloak
@@ -496,8 +511,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Setujui Permintaan Pembelian --}}
+    @accessRoute('pembelian.or.approve')
     <x-confirmation-modal
         name="approve-or"
         title="Setujui Permintaan Pembelian"
@@ -513,8 +530,10 @@
             Permintaan yang disetujui dapat segera diproses lebih lanjut menjadi Purchase Order (PO).
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Draf Permintaan Pembelian --}}
+    @accessRoute('pembelian.or.destroy')
     <x-confirmation-modal
         name="delete-or"
         title="Hapus Draf Permintaan Pembelian"
@@ -530,5 +549,6 @@
             Tindakan ini permanen dan tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

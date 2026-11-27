@@ -33,6 +33,7 @@
         </div>
 
         <div class="flex items-center gap-2">
+            @accessRoute('master.customers.edit')
             <a
                 href="{{ route('master.customers.edit', $customer) }}"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-[0.98]"
@@ -42,6 +43,7 @@
                 </svg>
                 Edit Customer
             </a>
+            @endaccessRoute
             <a
                 href="{{ route('master.customers.index') }}"
                 class="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"

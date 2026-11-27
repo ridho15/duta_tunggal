@@ -25,6 +25,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Kelola pelunasan tagihan faktur pembelian kepada pemasok melalui akun Kas &amp; Bank, otomatisasi saldo hutang (AP), dan jurnal Buku Besar.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('pembelian.payments.create')
             <a
                 href="{{ route('pembelian.payments.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
@@ -34,6 +35,7 @@
                 </svg>
                 Catat Pembayaran Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -335,6 +337,7 @@
                                     </a>
 
                                     {{-- Cetak PDF --}}
+                                    @accessRoute('pembelian.payments.pdf')
                                     <a
                                         href="{{ route('pembelian.payments.pdf', $payment->id) }}"
                                         target="_blank"
@@ -345,9 +348,11 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     {{-- Edit (Khusus Draft) --}}
                                     @if ($st === 'draft')
+                                        @accessRoute('pembelian.payments.edit')
                                         <a
                                             href="{{ route('pembelian.payments.edit', $payment->id) }}"
                                             class="p-1.5 text-gray-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition"
@@ -357,8 +362,10 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
                                         {{-- Hapus (Khusus Draft) --}}
+                                        @accessRoute('pembelian.payments.destroy')
                                         <button
                                             type="button"
                                             @click="confirmDelete('{{ route('pembelian.payments.destroy', $payment->id) }}', '{{ $payment->payment_number }}')"
@@ -369,6 +376,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -385,12 +393,14 @@
                                     </div>
                                     <p class="font-bold text-gray-700 text-sm">Tidak ada data pembayaran hutang yang ditemukan</p>
                                     <p class="text-xs text-gray-400 max-w-sm">Gunakan tombol di atas untuk mencatat pembayaran hutang vendor baru atau sesuaikan filter pencarian Anda.</p>
+                                    @accessRoute('pembelian.payments.create')
                                     <a
                                         href="{{ route('pembelian.payments.create') }}"
                                         class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
                                     >
                                         Catat Pembayaran Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -408,6 +418,7 @@
     </div>
 
     {{-- Modal Konfirmasi Hapus Draft --}}
+    @accessRoute('pembelian.payments.destroy')
     <div
         x-show="deleteModalOpen"
         x-cloak
@@ -481,5 +492,6 @@
             </div>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

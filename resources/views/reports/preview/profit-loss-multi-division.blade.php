@@ -22,7 +22,9 @@
 <body>
     <div class="print-toolbar">
         <h1>Profit Loss Multi Division</h1>
+        @accessRoute('reports.profit-loss-multi-division.excel')
         <a class="pt-btn pt-btn-print" href="{{ route('reports.profit-loss-multi-division.excel', array_filter(['startDate' => $report['period']['start'] ?? null, 'endDate' => $report['period']['end'] ?? null, 'cabangIds' => array_column($report['divisions'] ?? [], 'id')], fn ($value) => $value !== null && $value !== '' && $value !== [])) }}">Download Excel</a>
+        @endaccessRoute
         <button class="pt-btn pt-btn-print" onclick="window.print()">Cetak / PDF</button>
         <button class="pt-btn pt-btn-close" onclick="window.close()">Tutup</button>
     </div>

@@ -48,6 +48,7 @@
         {{-- Action Buttons --}}
         <div class="flex items-center gap-2">
             {{-- Cetak PDF --}}
+            @accessRoute('gudang.penerimaan.pdf')
             <a
                 href="{{ route('gudang.penerimaan.pdf', $receipt) }}"
                 target="_blank"
@@ -58,9 +59,11 @@
                 </svg>
                 Cetak Surat Jalan Masuk
             </a>
+            @endaccessRoute
 
             {{-- Shortcut Buat Retur Pembelian (Jika Selesai/Parsial) --}}
             @if (in_array($receipt->status, ['completed', 'partial']))
+                @accessRoute('pembelian.returns.create')
                 <a
                     href="{{ route('pembelian.returns.create', ['supplier_id' => $receipt->supplier_id ?? $receipt->purchaseOrder?->supplier_id, 'receipt_id' => $receipt->id]) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm font-semibold rounded-xl border border-amber-300 transition"
@@ -72,6 +75,7 @@
                     </svg>
                     Buat Retur
                 </a>
+                @endaccessRoute
                 @php
                     $canVoidReceipt = in_array(strtolower((string)$receipt->status), ['completed', 'partial'])
                         && ! \App\Models\Invoice::where(function ($q) use ($receipt) {
@@ -81,6 +85,7 @@
                         && ! \App\Models\PurchaseReturn::where('purchase_receipt_id', $receipt->id)->where('status', '!=', 'rejected')->exists();
                 @endphp
                 @if ($canVoidReceipt)
+                    @accessRoute('gudang.penerimaan.void')
                     <button
                         type="button"
                         @click="voidModalOpen = true"
@@ -92,20 +97,24 @@
                         </svg>
                         Batalkan GRN (Void)
                     </button>
+                    @endaccessRoute
                 @endif
             @endif
 
             {{-- Jika Masih Draf --}}
             @if ($receipt->status === 'draft')
                 {{-- Edit --}}
+                @accessRoute('gudang.penerimaan.edit')
                 <a
                     href="{{ route('gudang.penerimaan.edit', $receipt) }}"
                     class="px-3.5 py-2 text-sm font-semibold text-gray-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl transition"
                 >
                     Edit Draf
                 </a>
+                @endaccessRoute
 
                 {{-- Hapus --}}
+                @accessRoute('gudang.penerimaan.destroy')
                 <button
                     type="button"
                     @click="deleteModalOpen = true"
@@ -116,8 +125,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </button>
+                @endaccessRoute
 
                 {{-- Konfirmasi Masuk Stok --}}
+                @accessRoute('gudang.penerimaan.confirm')
                 <button
                     type="button"
                     @click="confirmModalOpen = true"
@@ -128,6 +139,7 @@
                     </svg>
                     Konfirmasi & Masuk Stok
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -278,10 +290,12 @@
                             <div class="sm:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
                                 Bila barang sebenarnya berada di gudang lain (mis. supplier salah kirim lokasi), buat mutasi ke gudang tersebut.
                                 @if ($receipt->status === 'completed')
+                                    @accessRoute('gudang.transfer.create')
                                     <a href="{{ route('gudang.transfer.create', ['from_purchase_receipt' => $receipt->id]) }}"
                                        class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#15803d] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#166534]">
                                         Buat Mutasi Stok ke Gudang Lain
                                     </a>
+                                    @endaccessRoute
                                 @else
                                     <span class="mt-1 block text-gray-500">Tombol "Buat Mutasi Stok" tersedia setelah penerimaan dikonfirmasi (stok sudah masuk).</span>
                                 @endif
@@ -557,6 +571,7 @@
                 </p>
                 <div class="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     @if (in_array(strtolower((string)$receipt->status), ['partial', 'completed']))
+                        @accessRoute('pembelian.invoices.create')
                         <a
                             href="{{ route('pembelian.invoices.create', ['receipt_id' => $receipt->id, 'supplier_id' => $receipt->purchaseOrder?->supplier_id]) }}"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -566,6 +581,7 @@
                             </svg>
                             Buat Faktur Pembelian
                         </a>
+                        @endaccessRoute
                     @endif
                     @if (\App\Support\MenuAccess::canSeePurchasePrices(auth()->user()))
                     <a
@@ -605,6 +621,7 @@
     </div>
 
     {{-- Modal Konfirmasi Masuk Stok --}}
+    @accessRoute('gudang.penerimaan.confirm')
     <div
         x-show="confirmModalOpen"
         x-cloak
@@ -657,8 +674,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Hapus Draf --}}
+    @accessRoute('gudang.penerimaan.destroy')
     <div
         x-show="deleteModalOpen"
         x-cloak
@@ -703,6 +722,7 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Preview Foto --}}
     <div
@@ -734,6 +754,7 @@
     </div>
 
     {{-- Modal Batalkan Penerimaan (Void GRN) --}}
+    @accessRoute('gudang.penerimaan.void')
     <div
         x-show="voidModalOpen"
         x-cloak
@@ -774,5 +795,6 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

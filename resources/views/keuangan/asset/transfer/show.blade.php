@@ -39,6 +39,7 @@
         </div>
 
         <div class="flex items-center gap-2">
+            @accessRoute('keuangan.asset.transfer.pdf')
             <a
                 href="{{ route('keuangan.asset.transfer.pdf', $transfer) }}"
                 target="_blank"
@@ -49,6 +50,7 @@
                 </svg>
                 Cetak Surat Mutasi (PDF)
             </a>
+            @endaccessRoute
             <a
                 href="{{ route('keuangan.asset.transfer.index') }}"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition"
@@ -119,6 +121,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                     @if ($transfer->status === 'pending')
+                        @accessRoute('keuangan.asset.transfer.approve')
                         <button
                             type="button"
                             @click="$dispatch('open-modal-approve-transfer', { action: '{{ route('keuangan.asset.transfer.approve', $transfer) }}' })"
@@ -129,7 +132,9 @@
                             </svg>
                             Setujui Mutasi (Approve)
                         </button>
+                        @endaccessRoute
                     @elseif ($transfer->status === 'approved')
+                        @accessRoute('keuangan.asset.transfer.complete')
                         <button
                             type="button"
                             @click="$dispatch('open-modal-complete-transfer', { action: '{{ route('keuangan.asset.transfer.complete', $transfer) }}' })"
@@ -140,9 +145,11 @@
                             </svg>
                             Konfirmasi Selesai Serah Terima (Complete)
                         </button>
+                        @endaccessRoute
                     @endif
 
                     {{-- Tombol Batal --}}
+                    @accessRoute('keuangan.asset.transfer.cancel')
                     <button
                         type="button"
                         onclick="document.getElementById('cancelModal').classList.remove('hidden')"
@@ -153,6 +160,7 @@
                         </svg>
                         Batalkan Mutasi
                     </button>
+                    @endaccessRoute
                 </div>
             </div>
         @elseif ($transfer->status === 'completed' && auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || auth()->user()->hasRole(['Super Admin', 'Finance Manager', 'Director'])))
@@ -161,6 +169,7 @@
                     Aksi Khusus Super Admin / Finance Manager:
                 </div>
                 <div class="flex items-center gap-2">
+                    @accessRoute('keuangan.asset.transfer.void')
                     <button
                         type="button"
                         onclick="document.getElementById('voidTransferModal').classList.remove('hidden')"
@@ -169,6 +178,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         Void Transfer Aset
                     </button>
+                    @endaccessRoute
                 </div>
             </div>
         @endif
@@ -270,6 +280,7 @@
 </div>
 
 {{-- Modal Pembatalan Mutasi --}}
+@accessRoute('keuangan.asset.transfer.cancel')
 <div id="cancelModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm hidden p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -314,8 +325,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Void Transfer Aset --}}
+@accessRoute('keuangan.asset.transfer.void')
 <div id="voidTransferModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm hidden p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -366,8 +379,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
     {{-- Modal Konfirmasi Setujui Mutasi --}}
+    @accessRoute('keuangan.asset.transfer.approve')
     <x-confirmation-modal
         name="approve-transfer"
         title="Setujui Mutasi Aset"
@@ -383,8 +398,10 @@
             Status mutasi akan menjadi <strong>Disetujui</strong> dan proses pengiriman/serah terima fisik aset dapat dilakukan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Selesai Serah Terima --}}
+    @accessRoute('keuangan.asset.transfer.complete')
     <x-confirmation-modal
         name="complete-transfer"
         title="Selesaikan Mutasi & Serah Terima Aset"
@@ -400,4 +417,5 @@
             Lokasi cabang operasional aset akan resmi diperbarui ke cabang tujuan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

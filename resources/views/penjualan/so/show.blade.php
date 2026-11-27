@@ -50,30 +50,38 @@
             </a>
 
             @if(in_array($saleOrder->status, ['reject', 'canceled'], true))
+                @accessRoute('penjualan.so.create')
                 <a href="{{ route('penjualan.so.create', ['copy_from' => $saleOrder->id]) }}" class="px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-xl transition-colors">
                     Salin ke SO Baru
                 </a>
+                @endaccessRoute
             @endif
 
             @if(\App\Http\Controllers\Penjualan\SaleOrderController::completionBlockReason(auth()->user(), $saleOrder) === null)
+                @accessRoute('penjualan.so.complete')
                 <button type="button"
                         @click="$dispatch('open-modal-complete-so', { action: '{{ route('penjualan.so.complete', $saleOrder->id) }}', number: '{{ $saleOrder->so_number }}' })"
                         class="px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-sm font-semibold rounded-xl transition-colors">
                     Selesai
                 </button>
+                @endaccessRoute
             @endif
 
             @if($saleOrder->status === 'draft' && \App\Http\Controllers\Penjualan\SaleOrderController::canEditDraftSaleOrder(auth()->user(), $saleOrder))
+                @accessRoute('penjualan.so.edit')
                 <a href="{{ route('penjualan.so.edit', $saleOrder->id) }}" class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl transition-colors">
                     Ubah
                 </a>
+                @endaccessRoute
             @endif
 
             @if(in_array($saleOrder->status, ['draft', 'request_approve']))
                 @can('reject', $saleOrder)
+                @accessRoute('penjualan.so.reject')
                 <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden')" class="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer">
                     Tolak SO
                 </button>
+                @endaccessRoute
                 @endcan
             @endif
 
@@ -87,9 +95,11 @@
                 @if($soHasActiveDo)
                     <span class="px-4 py-2 border border-gray-200 text-gray-400 text-sm font-semibold rounded-xl" title="Batalkan Perintah Kirim aktif lebih dulu">Batalkan SO (ada DO aktif)</span>
                 @else
+                    @accessRoute('penjualan.so.cancel')
                     <button type="button" onclick="document.getElementById('cancelSoModal').classList.remove('hidden')" class="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer">
                         Batalkan SO
                     </button>
+                    @endaccessRoute
                 @endif
             @endif
         </div>
@@ -125,9 +135,11 @@
 
                 @if(!empty($nextStep['is_approve']))
                     @if($canApprove)
+                        @accessRoute('penjualan.so.approve')
                         <button type="button" onclick="document.getElementById('approveModal').classList.remove('hidden')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm px-5 py-2.5 rounded-xl min-h-[44px] shadow-sm transition-colors cursor-pointer">
                             Setujui SO
                         </button>
+                        @endaccessRoute
                     @else
                         <div class="text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-300 rounded-lg px-3 py-2">
                             {{ $approveDenyReason ?? 'Menunggu persetujuan atasan' }}
@@ -292,6 +304,7 @@
 </div>
 
 <!-- Modal Approve SO -->
+@accessRoute('penjualan.so.approve')
 <div id="approveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl flex flex-col gap-4">
         <h3 class="text-lg font-bold text-gray-900 m-0">Setujui Sales Order {{ $saleOrder->so_number }}</h3>
@@ -322,8 +335,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <!-- Modal Batalkan SO -->
+@accessRoute('penjualan.so.cancel')
 <div id="cancelSoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl flex flex-col gap-4">
         <h3 class="text-lg font-bold text-red-900 m-0">Batalkan Sales Order {{ $saleOrder->so_number }}</h3>
@@ -343,8 +358,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <!-- Modal Reject SO -->
+@accessRoute('penjualan.so.reject')
 <div id="rejectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl flex flex-col gap-4">
         <h3 class="text-lg font-bold text-red-900 m-0">Tolak Sales Order {{ $saleOrder->so_number }}</h3>
@@ -370,10 +387,13 @@
         </form>
     </div>
 </div>
+@endaccessRoute
+@accessRoute('penjualan.so.complete')
 <x-confirmation-modal name="complete-so" title="Tandai Transaksi Selesai" variant="success" confirm-text="Ya, Selesai" cancel-text="Batal" method="POST">
     <p class="text-sm text-gray-600">
         Tandai transaksi <span class="font-bold font-mono text-gray-900" x-text="data.number"></span> <strong>SELESAI</strong>?
         Barang yang belum dikirim (bila ada) dianggap tidak dilanjutkan. Aksi ini tidak dapat dibatalkan.
     </p>
 </x-confirmation-modal>
+@endaccessRoute
 @endsection

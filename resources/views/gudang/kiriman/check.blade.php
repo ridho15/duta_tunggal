@@ -102,17 +102,20 @@
                 Centang semua barang dulu untuk mengirim
             </p>
 
+            @accessRoute('gudang.kiriman.retur')
             <a
                 href="{{ route('gudang.kiriman.retur', $deliveryOrder->id) }}"
                 class="w-full min-h-[48px] rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-center transition shadow-sm"
             >
                 Ada kurang / rusak
             </a>
+            @endaccessRoute
         </div>
     </form>
 
     {{-- Checker Edit Qty: form terpisah dari checklist (form tidak boleh bersarang) --}}
     @if($canEditQty)
+        @accessRoute('gudang.kiriman.editQty')
         <details class="bg-white border border-gray-200 rounded-2xl" @if($errors->any()) open @endif>
             <summary class="min-h-[48px] flex items-center px-4 py-3 text-xs font-bold text-gray-800 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#15803d]">
                 Barang kurang di rak? Ubah qty
@@ -162,6 +165,7 @@
                 </button>
             </form>
         </details>
+        @endaccessRoute
     @endif
 
 </div>

@@ -29,6 +29,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+            @accessRoute('manufaktur.production.pdf')
             <a
                 href="{{ route('manufaktur.production.pdf', $production) }}"
                 target="_blank"
@@ -39,8 +40,10 @@
                 </svg>
                 Cetak LHP
             </a>
+            @endaccessRoute
 
             @if ($production->status === 'draft')
+                @accessRoute('manufaktur.production.edit')
                 <a
                     href="{{ route('manufaktur.production.edit', $production) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-amber-200 hover:bg-amber-50 text-amber-800 text-xs font-semibold rounded-xl transition"
@@ -50,7 +53,9 @@
                     </svg>
                     Ubah
                 </a>
+                @endaccessRoute
 
+                @accessRoute('manufaktur.production.finish')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-finish-production', { action: '{{ route('manufaktur.production.finish', $production) }}' })"
@@ -61,6 +66,7 @@
                     </svg>
                     Selesaikan Produksi
                 </button>
+                @endaccessRoute
             @endif
 
             @php
@@ -68,6 +74,7 @@
             @endphp
 
             @if ($production->status === 'finished' && (!$qc || (int)$qc->status === 0))
+                @accessRoute('manufaktur.production.revert-draft')
                 <form action="{{ route('manufaktur.production.revert-draft', $production) }}" method="POST" class="inline">
                     @csrf
                     <button
@@ -81,10 +88,12 @@
                         Kembalikan ke Draft
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             @if ($qc && $qc->exists)
                 @if ($qc->status == 0)
+                    @accessRoute('manufaktur.qc.process-form')
                     <a
                         href="{{ route('manufaktur.qc.process-form', $qc) }}"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -94,6 +103,7 @@
                         </svg>
                         Proses Inspeksi QC
                     </a>
+                    @endaccessRoute
                 @else
                     <a
                         href="{{ route('manufaktur.qc.show', $qc) }}"
@@ -391,12 +401,14 @@
 
                         <div class="pt-3 border-t border-gray-100 flex flex-col gap-2">
                             @if ($qc->status == 0)
+                                @accessRoute('manufaktur.qc.process-form')
                                 <a
                                     href="{{ route('manufaktur.qc.process-form', $qc) }}"
                                     class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-center text-xs shadow-xs transition"
                                 >
                                     Proses Hasil QC Sekarang
                                 </a>
+                                @endaccessRoute
                             @else
                                 <a
                                     href="{{ route('manufaktur.qc.show', $qc) }}"
@@ -434,6 +446,7 @@
             </div>
         </div>
     {{-- Modal Konfirmasi Selesai Produksi --}}
+    @accessRoute('manufaktur.production.finish')
     <x-confirmation-modal
         name="finish-production"
         title="Selesaikan Produksi & Terbitkan QC"
@@ -449,5 +462,6 @@
             Status produksi akan menjadi <strong>Finished</strong> dan dokumen Quality Control (QC) akan diterbitkan secara otomatis.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

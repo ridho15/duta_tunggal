@@ -44,6 +44,7 @@
                 Kembali
             </a>
 
+            @accessRoute('manufaktur.spk.pdf')
             <a
                 href="{{ route('manufaktur.spk.pdf', $manufacturingOrder) }}"
                 target="_blank"
@@ -54,15 +55,19 @@
                 </svg>
                 Cetak Lembar SPK (PDF)
             </a>
+            @endaccessRoute
 
             @if ($manufacturingOrder->status === 'draft')
+                @accessRoute('manufaktur.spk.edit')
                 <a
                     href="{{ route('manufaktur.spk.edit', $manufacturingOrder) }}"
                     class="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-xl shadow-sm transition"
                 >
                     Ubah SPK
                 </a>
+                @endaccessRoute
 
+                @accessRoute('manufaktur.spk.start')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-start-spk')"
@@ -74,9 +79,11 @@
                     </svg>
                     Mulai Produksi
                 </button>
+                @endaccessRoute
             @endif
 
             @if (in_array($manufacturingOrder->status, ['draft', 'in_progress']))
+                @accessRoute('manufaktur.spk.cancel')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-cancel-spk')"
@@ -84,6 +91,7 @@
                 >
                     Batalkan SPK
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -285,6 +293,7 @@
                         SPK saat ini berstatus <strong>Draft</strong>. Silakan cetak lembar kerja untuk mandor pabrik, pastikan stok bahan baku di gudang sudah siap, lalu klik tombol di bawah untuk memulai pengerjaan.
                     </p>
                     <div class="pt-2">
+                        @accessRoute('manufaktur.spk.start')
                         <button
                             type="button"
                             @click="$dispatch('open-modal-start-spk')"
@@ -292,12 +301,14 @@
                         >
                             Mulai Produksi (In Progress)
                         </button>
+                        @endaccessRoute
                     </div>
                 @elseif ($manufacturingOrder->status === 'in_progress')
                     <p class="text-xs text-gray-600 leading-relaxed">
                         Produksi sedang berjalan. Lakukan <strong>Pengeluaran Bahan Baku (Material Issue)</strong> dari gudang ke pos sementara produksi untuk membukukan mutasi stok dan jurnal BDP.
                     </p>
                     <div class="pt-2 space-y-2">
+                        @accessRoute('manufaktur.spk.pdf')
                         <a
                             href="{{ route('manufaktur.spk.pdf', $manufacturingOrder) }}"
                             target="_blank"
@@ -305,6 +316,7 @@
                         >
                             Cetak Surat Perintah Kerja
                         </a>
+                        @endaccessRoute
                     </div>
                 @elseif ($manufacturingOrder->status === 'completed')
                     <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-800 font-semibold">
@@ -338,6 +350,7 @@
     </div>
 
     {{-- Modal Konfirmasi Mulai Produksi SPK --}}
+    @accessRoute('manufaktur.spk.start')
     <x-confirmation-modal
         name="start-spk"
         title="Mulai Proses Produksi"
@@ -354,8 +367,10 @@
             Status SPK akan berpindah ke In Progress dan alur pengeluaran bahan serta pencatatan hasil produksi dapat dilakukan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Batalkan SPK --}}
+    @accessRoute('manufaktur.spk.cancel')
     <x-confirmation-modal
         name="cancel-spk"
         title="Batalkan SPK Manufaktur"
@@ -387,5 +402,6 @@
             </div>
         @endif
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

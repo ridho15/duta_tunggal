@@ -220,7 +220,9 @@
     <div class="print-actions">
         <button class="btn btn-print" onclick="window.print()">&#128424; Cetak</button>
         <a class="btn btn-pdf" href="{{ route('inventory-card.pdf', request()->query()) }}" target="_blank">&#128196; Download PDF</a>
+        @accessRoute('inventory-card.excel')
         <a class="btn btn-excel" href="{{ route('inventory-card.excel', request()->query()) }}" target="_blank">&#128202; Download Excel</a>
+        @endaccessRoute
         <button class="btn btn-close" onclick="window.close()">&#10005; Tutup</button>
     </div>
     @endif

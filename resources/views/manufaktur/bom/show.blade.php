@@ -36,6 +36,7 @@
                 Kembali
             </a>
 
+            @accessRoute('manufaktur.bom.pdf')
             <a
                 href="{{ route('manufaktur.bom.pdf', $billOfMaterial) }}"
                 target="_blank"
@@ -46,7 +47,9 @@
                 </svg>
                 Cetak PDF
             </a>
+            @endaccessRoute
 
+            @accessRoute('manufaktur.bom.edit')
             <a
                 href="{{ route('manufaktur.bom.edit', $billOfMaterial) }}"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -56,7 +59,9 @@
                 </svg>
                 Ubah Resep
             </a>
+            @endaccessRoute
 
+            @accessRoute('manufaktur.spk.create')
             <a
                 href="{{ route('manufaktur.spk.create', ['bom_id' => $billOfMaterial->id]) }}"
                 class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -66,8 +71,10 @@
                 </svg>
                 Terbitkan SPK
             </a>
+            @endaccessRoute
 
             @if (!$isInUse)
+                @accessRoute('manufaktur.bom.destroy')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-delete-bom')"
@@ -78,6 +85,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -232,6 +240,7 @@
                     </div>
                 </div>
 
+                @accessRoute('manufaktur.spk.create')
                 <div class="pt-2">
                     <a
                         href="{{ route('manufaktur.spk.create', ['bom_id' => $billOfMaterial->id]) }}"
@@ -240,6 +249,7 @@
                         Buat Surat Perintah Kerja (SPK)
                     </a>
                 </div>
+                @endaccessRoute
             </div>
 
             {{-- Kartu Riwayat Penggunaan di Rencana Produksi / SPK --}}
@@ -272,6 +282,7 @@
     </div>
 
     {{-- Modal Konfirmasi Hapus Resep BOM --}}
+    @accessRoute('manufaktur.bom.destroy')
     <x-confirmation-modal
         name="delete-bom"
         title="Hapus Resep BOM"
@@ -288,5 +299,6 @@
             Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

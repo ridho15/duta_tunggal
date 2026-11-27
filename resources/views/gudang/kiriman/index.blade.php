@@ -125,6 +125,7 @@
                             Lihat detail DO
                         </a>
 
+                        @accessRoute('penjualan.do.confirmStock')
                         <form method="POST" action="{{ route('penjualan.do.confirmStock', $do->id) }}">
                             @csrf
                             <button
@@ -134,6 +135,7 @@
                                 Konfirmasi stok
                             </button>
                         </form>
+                        @endaccessRoute
                     </div>
                 </div>
             @elseif($isWaitingSJ)
@@ -173,12 +175,14 @@
                             Rak: A-01, B-02
                         </span>
 
+                        @accessRoute('gudang.kiriman.check')
                         <a
                             href="{{ route('gudang.kiriman.check', $do->id) }}"
                             class="bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2 rounded-xl font-semibold text-xs shadow-sm transition active:scale-[0.98]"
                         >
                             Mulai cek
                         </a>
+                        @endaccessRoute
                     </div>
                 </div>
             @endif

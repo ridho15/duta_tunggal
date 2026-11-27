@@ -51,10 +51,13 @@
             </a>
 
             @if ($opname->status === 'draft')
+                @accessRoute('gudang.opname.destroy')
                 <button type="button" @click="$dispatch('open-modal-delete-opname')" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
                     Hapus Sesi
                 </button>
+                @endaccessRoute
 
+                @accessRoute('gudang.opname.start')
                 <form action="{{ route('gudang.opname.start', $opname) }}" method="POST">
                     @csrf
                     <button type="submit"
@@ -66,27 +69,35 @@
                         <span>Mulai Hitung Fisik</span>
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             @if (in_array($opname->status, ['in_progress', 'completed']))
+                @accessRoute('gudang.opname.cancel')
                 <button type="button"
                         @click="$dispatch('open-modal-cancel-opname')"
                         class="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm">
                     Batalkan Sesi Opname
                 </button>
+                @endaccessRoute
             @endif
 
             @if ($opname->status === 'cancelled')
+                @accessRoute('gudang.opname.destroy')
                 <button type="button" @click="$dispatch('open-modal-delete-opname')" class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
                     Hapus Sesi
                 </button>
+                @endaccessRoute
             @endif
 
             @if ($opname->status === 'completed')
+                @accessRoute('gudang.opname.recount')
                 <button type="button" @click="$dispatch('open-modal-recount-opname')" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Hitung Ulang
                 </button>
+                @endaccessRoute
 
+                @accessRoute('gudang.opname.approve')
                 <button type="button"
                         @click="$dispatch('open-modal-approve-opname')"
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl transition shadow-sm active:scale-[0.98]">
@@ -95,9 +106,11 @@
                     </svg>
                     <span>Setujui &amp; Sesuaikan Stok</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Cetak PDF & Excel --}}
+            @accessRoute('gudang.opname.pdf')
             <a href="{{ route('gudang.opname.pdf', $opname) }}"
                target="_blank"
                class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"
@@ -107,8 +120,10 @@
                 </svg>
                 <span>PDF</span>
             </a>
+            @endaccessRoute
 
             @if (in_array($opname->status, ['in_progress', 'completed', 'approved']))
+                @accessRoute('gudang.opname.excel')
                 <a href="{{ route('gudang.opname.excel', $opname) }}"
                    class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm"
                    title="Ekspor CSV / Excel">
@@ -117,6 +132,7 @@
                     </svg>
                     <span>Excel</span>
                 </a>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -200,6 +216,7 @@
                 </p>
             </div>
             <div class="pt-2 flex items-center justify-center gap-3">
+                @accessRoute('gudang.opname.pdf')
                 <a href="{{ route('gudang.opname.pdf', $opname) }}"
                    target="_blank"
                    class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
@@ -208,6 +225,8 @@
                     </svg>
                     <span>Cetak Formulir Hitung Fisik (PDF)</span>
                 </a>
+                @endaccessRoute
+                @accessRoute('gudang.opname.start')
                 <form action="{{ route('gudang.opname.start', $opname) }}" method="POST">
                     @csrf
                     <button type="submit"
@@ -219,6 +238,7 @@
                         <span>Mulai Hitung Fisik Sekarang</span>
                     </button>
                 </form>
+                @endaccessRoute
             </div>
         </div>
     @else
@@ -433,6 +453,7 @@
 
                 {{-- Action Bar saat Status IN_PROGRESS --}}
                 @if ($opname->status === 'in_progress')
+                    @accessRoute('gudang.opname.save-progress')
                     <div class="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
                         <span class="text-xs text-gray-500">
                             Simpan hasil hitung secara berkala agar tidak hilang saat input belum selesai.
@@ -455,6 +476,7 @@
                             </button>
                         </div>
                     </div>
+                    @endaccessRoute
                 @endif
             </div>
         </form>
@@ -509,6 +531,7 @@
 </script>
     @if (in_array($opname->status, ['draft', 'cancelled']))
     {{-- Modal Konfirmasi Hapus Sesi Opname (Draft atau Cancelled) --}}
+    @accessRoute('gudang.opname.destroy')
     <x-confirmation-modal
         name="delete-opname"
         title="Hapus Sesi Stock Opname"
@@ -525,9 +548,11 @@
             Tindakan ini tidak dapat dibatalkan dan seluruh draf perhitungan fisik akan dihapus.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
     @endif
 
     {{-- Modal Konfirmasi Batalkan Sesi Opname --}}
+    @accessRoute('gudang.opname.cancel')
     <x-confirmation-modal
         name="cancel-opname"
         title="Batalkan Sesi Stock Opname"
@@ -548,8 +573,10 @@
             <input type="text" name="cancel_reason" required placeholder="Contoh: Jadwal audit fisik diundur / salah pilih gudang" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
         </div>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hitung Ulang --}}
+    @accessRoute('gudang.opname.recount')
     <x-confirmation-modal
         name="recount-opname"
         title="Hitung Ulang Stock Opname"
@@ -566,8 +593,10 @@
             Status akan kembali ke proses perhitungan sehingga petugas gudang dapat merevisi kuantitas fisik.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Setujui Opname --}}
+    @accessRoute('gudang.opname.approve')
     <x-confirmation-modal
         name="approve-opname"
         title="Setujui Hasil Stock Opname"
@@ -584,4 +613,5 @@
             Stok sistem akan disesuaikan otomatis mengikuti hasil fisik riil, dan jurnal penyesuaian persediaan akan langsung dibukukan ke Buku Besar.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

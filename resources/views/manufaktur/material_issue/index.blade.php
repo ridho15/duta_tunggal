@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Pencatatan serah terima bahan baku dari gudang ke lantai produksi dan pengembalian sisa bahan beserta mutasi jurnal BDP.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('manufaktur.material-issue.create')
             <a
                 href="{{ route('manufaktur.material-issue.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Catat Pengeluaran / Retur
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -290,6 +292,7 @@
                                         </svg>
                                     </a>
 
+                                    @accessRoute('manufaktur.material-issue.pdf')
                                     <a
                                         href="{{ route('manufaktur.material-issue.pdf', $issue) }}"
                                         target="_blank"
@@ -300,8 +303,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     @if ($issue->status === 'draft')
+                                        @accessRoute('manufaktur.material-issue.edit')
                                         <a
                                             href="{{ route('manufaktur.material-issue.edit', $issue) }}"
                                             class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-gray-100 rounded-lg transition"
@@ -311,7 +316,9 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
+                                        @accessRoute('manufaktur.material-issue.destroy')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-delete-material-issue', { action: '{{ route('manufaktur.material-issue.destroy', $issue) }}', number: '{{ $issue->issue_number }}' })"
@@ -322,6 +329,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -350,6 +358,7 @@
     </div>
 
     {{-- Modal Konfirmasi Hapus Draft Dokumen --}}
+    @accessRoute('manufaktur.material-issue.destroy')
     <x-confirmation-modal
         name="delete-material-issue"
         title="Hapus Draft Dokumen Pengeluaran Bahan"
@@ -365,5 +374,6 @@
             Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

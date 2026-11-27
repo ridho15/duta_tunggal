@@ -12,10 +12,12 @@
                 Semua SO cabang <span class="font-semibold text-gray-700">{{ $cabangNama }}</span>. Klik baris untuk melihat detail dan langkah berikutnya.
             </div>
         </div>
+        @accessRoute('penjualan.so.create')
         <a href="{{ route('penjualan.so.create') }}" class="bg-[#15803d] hover:bg-[#166534] text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl min-h-[44px] inline-flex items-center gap-2 shadow-sm transition active:scale-[0.98]">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             Buat SO
         </a>
+        @endaccessRoute
     </div>
 
     <!-- Tab Filter Cepat -->
@@ -175,9 +177,11 @@
                                             Lanjutkan
                                         </a>
                                     @elseif(in_array($so->status, ['approved', 'confirmed', 'partially_delivered']) && $available > 0)
+                                        @accessRoute('penjualan.do.create')
                                         <a href="{{ route('penjualan.do.create', ['so_id' => $so->id]) }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Buat DO
                                         </a>
+                                        @endaccessRoute
                                     @elseif($so->status === 'received')
                                         <a href="{{ route('penjualan.invoices.index') }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Buat Invoice
@@ -194,11 +198,13 @@
 
                                     {{-- Tombol Selesai (Ko Handy 21 Nov): transaksi selesai saat sales menekannya --}}
                                     @if(\App\Http\Controllers\Penjualan\SaleOrderController::completionBlockReason(auth()->user(), $so) === null)
+                                        @accessRoute('penjualan.so.complete')
                                         <button type="button"
                                                 @click="$dispatch('open-modal-complete-so', { action: '{{ route('penjualan.so.complete', $so->id) }}', number: '{{ $so->so_number }}' })"
                                                 class="text-xs font-bold px-3 py-1.5 bg-white border border-[#15803d] text-[#15803d] hover:bg-emerald-50 rounded-xl shadow-sm transition-colors">
                                             Selesai
                                         </button>
+                                        @endaccessRoute
                                     @endif
 
                                     <!-- Dropdown Menu / PDF Link -->
@@ -295,10 +301,12 @@
         </div>
     </div>
 </div>
+@accessRoute('penjualan.so.complete')
 <x-confirmation-modal name="complete-so" title="Tandai Transaksi Selesai" variant="success" confirm-text="Ya, Selesai" cancel-text="Batal" method="POST">
     <p class="text-sm text-gray-600">
         Tandai transaksi <span class="font-bold font-mono text-gray-900" x-text="data.number"></span> <strong>SELESAI</strong>?
         Barang yang belum dikirim (bila ada) dianggap tidak dilanjutkan. Aksi ini tidak dapat dibatalkan.
     </p>
 </x-confirmation-modal>
+@endaccessRoute
 @endsection

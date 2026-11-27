@@ -40,6 +40,7 @@
         </div>
 
         <div class="flex items-center gap-2">
+            @accessRoute('penjualan.receipts.pdf')
             <a
                 href="{{ route('penjualan.receipts.pdf', $customerReceipt->id) }}"
                 target="_blank"
@@ -51,8 +52,10 @@
                 </svg>
                 <span>Cetak Kwitansi (PDF)</span>
             </a>
+            @endaccessRoute
 
             @if($canCancel)
+                @accessRoute('penjualan.receipts.cancel')
                 <button
                     type="button"
                     @click="showCancelModal = true"
@@ -63,6 +66,7 @@
                     </svg>
                     <span>Batalkan Penerimaan</span>
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -339,6 +343,7 @@
 
     {{-- Modal Pembatalan Penerimaan --}}
     @if($canCancel)
+        @accessRoute('penjualan.receipts.cancel')
         <div
             x-show="showCancelModal"
             x-cloak
@@ -407,6 +412,7 @@
                 </form>
             </div>
         </div>
+        @endaccessRoute
     @endif
 
 </div>

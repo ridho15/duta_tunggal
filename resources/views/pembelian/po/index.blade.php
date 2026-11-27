@@ -33,6 +33,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Kelola komitmen pesanan barang/jasa ke supplier, otorisasi approval, dan pantau status pemenuhan gudang.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('pembelian.po.create')
             <a
                 href="{{ route('pembelian.po.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -42,6 +43,7 @@
                 </svg>
                 Buat PO Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -348,6 +350,7 @@
                                     </a>
 
                                     @if ($po->status === 'draft')
+                                        @accessRoute('pembelian.po.edit')
                                         <a
                                             href="{{ route('pembelian.po.edit', $po) }}"
                                             class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
@@ -357,6 +360,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
                                         @php
                                             $canApproveThisPo = isset($approvalControlService)
@@ -364,6 +368,7 @@
                                                 : false;
                                         @endphp
                                         @if ($canApproveThisPo)
+                                            @accessRoute('pembelian.po.approve')
                                             <button
                                                 type="button"
                                                 @click="confirmApprove('{{ route('pembelian.po.approve', $po) }}', '{{ $po->po_number }}')"
@@ -374,8 +379,10 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                                 </svg>
                                             </button>
+                                            @endaccessRoute
                                         @endif
 
+                                        @accessRoute('pembelian.po.destroy')
                                         <button
                                             type="button"
                                             @click="confirmDelete('{{ route('pembelian.po.destroy', $po) }}', '{{ $po->po_number }}')"
@@ -386,8 +393,10 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
 
+                                    @accessRoute('pembelian.po.pdf')
                                     <a
                                         href="{{ route('pembelian.po.pdf', $po) }}"
                                         target="_blank"
@@ -398,6 +407,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -414,6 +424,7 @@
                                     <span class="text-xs text-gray-400 mt-1 max-w-sm text-center">
                                         Tidak ditemukan transaksi yang cocok dengan filter. Silakan sesuaikan kriteria atau buat PO baru.
                                     </span>
+                                    @accessRoute('pembelian.po.create')
                                     <a
                                         href="{{ route('pembelian.po.create') }}"
                                         class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-lg shadow-sm transition"
@@ -423,6 +434,7 @@
                                         </svg>
                                         Buat PO Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -440,6 +452,7 @@
     </div>
 
     {{-- Modal Konfirmasi Approve Cepat --}}
+    @accessRoute('pembelian.po.approve')
     <div
         x-show="approveModalOpen"
         x-cloak
@@ -484,8 +497,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Draf PO --}}
+    @accessRoute('pembelian.po.destroy')
     <div
         x-show="deleteModalOpen"
         x-cloak
@@ -531,5 +546,6 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

@@ -5,9 +5,11 @@
 
     {{-- Top Bar --}}
     <div class="flex items-center justify-between pb-2 border-b border-gray-200">
+        @accessRoute('gudang.kiriman.check')
         <a href="{{ route('gudang.kiriman.check', $deliveryOrder->id) }}" class="text-xs font-bold text-gray-700 hover:text-gray-900 flex items-center gap-1">
             <span>‹</span> <span>{{ $deliveryOrder->do_number }}</span>
         </a>
+        @endaccessRoute
         <span class="text-[9px] font-bold text-[#15803d] border border-[#86efac] bg-[#f0fdf4] rounded px-1.5 py-0.5">
             CHECKER
         </span>
@@ -133,12 +135,14 @@
             </p>
         </div>
 
+        @accessRoute('gudang.kiriman.submitRetur')
         <button
             type="submit"
             class="w-full min-h-[52px] bg-[#15803d] hover:bg-[#14532d] text-white font-bold text-base rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
         >
             <span>Simpan & ajukan retur</span>
         </button>
+        @endaccessRoute
     </form>
 
 </div>

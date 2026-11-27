@@ -61,6 +61,7 @@
             </a>
 
             @if ($purchaseOrder->status === 'draft')
+                @accessRoute('pembelian.po.edit')
                 <a
                     href="{{ route('pembelian.po.edit', $purchaseOrder) }}"
                     class="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5"
@@ -70,8 +71,10 @@
                     </svg>
                     Ubah Draf
                 </a>
+                @endaccessRoute
 
                 @if (!empty($canApprove))
+                    @accessRoute('pembelian.po.approve')
                     <button
                         type="button"
                         @click="approveModalOpen = true"
@@ -82,8 +85,10 @@
                         </svg>
                         Setujui PO
                     </button>
+                    @endaccessRoute
                 @endif
 
+                @accessRoute('pembelian.po.destroy')
                 <button
                     type="button"
                     @click="deleteModalOpen = true"
@@ -91,10 +96,12 @@
                 >
                     Hapus
                 </button>
+                @endaccessRoute
             @endif
 
             @if ($purchaseOrder->status === 'request_approve')
                 @if (!empty($canApprove))
+                    @accessRoute('pembelian.po.approve')
                     <button
                         type="button"
                         @click="approveModalOpen = true"
@@ -105,6 +112,7 @@
                         </svg>
                         Setujui PO
                     </button>
+                    @endaccessRoute
                 @else
                     <div class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-medium" title="{{ $approveDenyReason ?? 'Menunggu persetujuan atasan' }}">
                         <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,6 +124,7 @@
             @endif
 
             @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
+                @accessRoute('gudang.penerimaan.create')
                 <a
                     href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
                     class="px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5"
@@ -125,6 +134,8 @@
                     </svg>
                     Terima Barang (GRN)
                 </a>
+                @endaccessRoute
+                @accessRoute('pembelian.po.request-close')
                 <button
                     type="button"
                     @click="requestCloseModalOpen = true"
@@ -132,6 +143,8 @@
                 >
                     Ajukan Tutup
                 </button>
+                @endaccessRoute
+                @accessRoute('pembelian.po.close')
                 <button
                     type="button"
                     @click="closeModalOpen = true"
@@ -139,11 +152,13 @@
                 >
                     Tutup PO
                 </button>
+                @endaccessRoute
                 @php
                     $canCancelPo = in_array($purchaseOrder->status, ['draft', 'request_approve', 'approved'])
                         && ($purchaseOrder->purchaseReceipt->whereNull('deleted_at')->where('status', '!=', 'cancelled')->count() === 0);
                 @endphp
                 @if ($canCancelPo && $purchaseOrder->status === 'approved')
+                    @accessRoute('pembelian.po.cancel')
                     <button
                         type="button"
                         @click="cancelModalOpen = true"
@@ -155,9 +170,11 @@
                         </svg>
                         Batalkan PO
                     </button>
+                    @endaccessRoute
                 @endif
             @endif
 
+            @accessRoute('pembelian.po.pdf')
             <a
                 href="{{ route('pembelian.po.pdf', $purchaseOrder) }}"
                 target="_blank"
@@ -168,6 +185,7 @@
                 </svg>
                 Cetak PDF
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -549,6 +567,7 @@
             <div class="flex items-center justify-between pb-2 border-b border-gray-100">
                 <div class="text-xs text-gray-500 font-semibold">Riwayat Surat Jalan Masuk & Penerimaan Fisik Gudang</div>
                 @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
+                    @accessRoute('gudang.penerimaan.create')
                     <a
                         href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#15803d] text-xs font-bold rounded-xl transition"
@@ -558,6 +577,7 @@
                         </svg>
                         <span>Catat Penerimaan Baru</span>
                     </a>
+                    @endaccessRoute
                 @endif
             </div>
 
@@ -619,6 +639,7 @@
                     <div class="text-xs text-gray-400 mt-0.5">Barang pesanan belum diterima di gudang atau belum dibuatkan dokumen Goods Receipt.</div>
                     @if (in_array($purchaseOrder->status, ['approved', 'partially_received']))
                         <div class="mt-3">
+                            @accessRoute('gudang.penerimaan.create')
                             <a
                                 href="{{ route('gudang.penerimaan.create', ['purchase_order_id' => $purchaseOrder->id]) }}"
                                 class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl shadow-xs transition"
@@ -628,6 +649,7 @@
                                 </svg>
                                 <span>Catat Penerimaan Barang Sekarang</span>
                             </a>
+                            @endaccessRoute
                         </div>
                     @endif
                 </div>
@@ -739,6 +761,7 @@
 
     @if (!empty($canApprove))
     {{-- Modal Konfirmasi Setujui PO --}}
+    @accessRoute('pembelian.po.approve')
     <div
         x-show="approveModalOpen"
         x-cloak
@@ -771,9 +794,11 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
     @endif
 
     {{-- Modal Ajukan Penutupan (Request Close) --}}
+    @accessRoute('pembelian.po.request-close')
     <div
         x-show="requestCloseModalOpen"
         x-cloak
@@ -800,8 +825,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Tutup PO Langsung (Close) --}}
+    @accessRoute('pembelian.po.close')
     <div
         x-show="closeModalOpen"
         x-cloak
@@ -828,8 +855,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Hapus Draf --}}
+    @accessRoute('pembelian.po.destroy')
     <div
         x-show="deleteModalOpen"
         x-cloak
@@ -863,8 +892,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Batalkan PO Resmi --}}
+    @accessRoute('pembelian.po.cancel')
     <div
         x-show="cancelModalOpen"
         x-cloak
@@ -900,5 +931,6 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

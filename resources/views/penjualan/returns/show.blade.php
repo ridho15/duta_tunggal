@@ -48,6 +48,7 @@
         {{-- Action Buttons --}}
         <div class="flex items-center gap-2 flex-wrap">
             {{-- Cetak PDF --}}
+            @accessRoute('penjualan.returns.pdf')
             <a
                 href="{{ route('penjualan.returns.pdf', $customerReturn->id) }}"
                 target="_blank"
@@ -59,9 +60,11 @@
                 </svg>
                 <span>Cetak PDF</span>
             </a>
+            @endaccessRoute
 
             {{-- 1. Pending -> Mark Received --}}
             @if($st === \App\Models\CustomerReturn::STATUS_PENDING)
+                @accessRoute('penjualan.returns.markReceived')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-mark-received', { action: '{{ route('penjualan.returns.markReceived', $customerReturn->id) }}' })"
@@ -72,10 +75,12 @@
                     </svg>
                     <span>Tandai Diterima Gudang</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- 2. Received -> Start QC --}}
             @if($st === \App\Models\CustomerReturn::STATUS_RECEIVED)
+                @accessRoute('penjualan.returns.startQc')
                 <form method="POST" action="{{ route('penjualan.returns.startQc', $customerReturn->id) }}">
                     @csrf
                     <button
@@ -88,10 +93,12 @@
                         <span>Mulai Inspeksi QC</span>
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             {{-- 3. QC Inspection -> Approve --}}
             @if($st === \App\Models\CustomerReturn::STATUS_QC_INSPECTION)
+                @accessRoute('penjualan.returns.approve')
                 <button
                     type="button"
                     {{ !$allQcDone ? 'disabled' : '' }}
@@ -104,10 +111,12 @@
                     </svg>
                     <span>Setujui Retur</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- 4. Approved -> Complete --}}
             @if($st === \App\Models\CustomerReturn::STATUS_APPROVED && !$customerReturn->stock_restored_at)
+                @accessRoute('penjualan.returns.complete')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-complete-return', { action: '{{ route('penjualan.returns.complete', $customerReturn->id) }}' })"
@@ -118,10 +127,12 @@
                     </svg>
                     <span>Selesaikan (Restorasi Stok & Jurnal)</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Tolak (Jika belum selesai & belum ditolak) --}}
             @if(!in_array($st, [\App\Models\CustomerReturn::STATUS_COMPLETED, \App\Models\CustomerReturn::STATUS_REJECTED]))
+                @accessRoute('penjualan.returns.reject')
                 <button
                     type="button"
                     @click="showRejectModal = true"
@@ -132,6 +143,7 @@
                     </svg>
                     <span>Tolak</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Buat / Buka Nota Kredit --}}
@@ -147,6 +159,7 @@
                         <span>Nota Kredit: {{ $existingCreditNote->credit_note_number }}</span>
                     </a>
                 @else
+                    @accessRoute('penjualan.credit-notes.fromReturn')
                     <form method="POST" action="{{ route('penjualan.credit-notes.fromReturn', $customerReturn->id) }}">
                         @csrf
                         <button
@@ -160,6 +173,7 @@
                             <span>Buat Nota Kredit</span>
                         </button>
                     </form>
+                    @endaccessRoute
                 @endif
             @endif
         </div>
@@ -447,6 +461,7 @@
                             <span class="text-xs text-gray-500">
                                 Pastikan seluruh item telah diinspeksi sebelum menyimpan hasil.
                             </span>
+                            @accessRoute('penjualan.returns.saveQc')
                             <button
                                 type="submit"
                                 class="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5"
@@ -456,6 +471,7 @@
                                 </svg>
                                 <span>Simpan Hasil QC & Keputusan</span>
                             </button>
+                            @endaccessRoute
                         </div>
                     </div>
                 </form>
@@ -657,6 +673,7 @@
     </div>
 
     {{-- MODAL TOLAK PENGANJUAN RETUR --}}
+    @accessRoute('penjualan.returns.reject')
     <div
         x-show="showRejectModal"
         x-cloak
@@ -712,8 +729,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Barang Sampai --}}
+    @accessRoute('penjualan.returns.markReceived')
     <x-confirmation-modal
         name="mark-received"
         title="Konfirmasi Penerimaan Fisik Retur"
@@ -729,8 +748,10 @@
             Status pengajuan akan beralih ke <strong>Diterima</strong> dan siap untuk proses inspeksi QC.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Setujui Retur --}}
+    @accessRoute('penjualan.returns.approve')
     <x-confirmation-modal
         name="approve-return"
         title="Setujui Pengajuan Retur"
@@ -746,8 +767,10 @@
             Seluruh keputusan penanganan (restorasi stok, servis/perbaikan, atau pembuatan nota kredit) akan difinalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Selesaikan Retur --}}
+    @accessRoute('penjualan.returns.complete')
     <x-confirmation-modal
         name="complete-return"
         title="Selesaikan Retur Penjualan"
@@ -763,5 +786,6 @@
             Stok barang yang diperbaiki/diganti akan dipulihkan ke gudang dan jurnal akuntansi akan otomatis diposting. Aksi ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

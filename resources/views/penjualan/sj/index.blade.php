@@ -18,6 +18,7 @@
         </div>
 
         <div>
+            @accessRoute('penjualan.sj.create')
             <a
                 href="{{ route('penjualan.sj.create') }}"
                 class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
@@ -27,6 +28,7 @@
                 </svg>
                 <span>Buat Surat Jalan</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -190,6 +192,7 @@
                             {{-- Aksi --}}
                             <td class="px-5 py-4 text-right">
                                 <div class="inline-flex items-center gap-2">
+                                    @accessRoute('penjualan.sj.pdf')
                                     <a
                                         href="{{ route('penjualan.sj.pdf', $sj->id) }}"
                                         target="_blank"
@@ -201,6 +204,7 @@
                                             <rect x="6" y="14" width="12" height="8" rx="1" stroke-width="1.8"></rect>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     <a
                                         href="{{ route('penjualan.sj.show', $sj->id) }}"
@@ -283,6 +287,7 @@
                 </div>
 
                 <div class="flex items-center justify-between pt-1">
+                    @accessRoute('penjualan.sj.pdf')
                     <a
                         href="{{ route('penjualan.sj.pdf', $sj->id) }}"
                         target="_blank"
@@ -294,6 +299,7 @@
                         </svg>
                         <span>Cetak PDF</span>
                     </a>
+                    @endaccessRoute
 
                     <a
                         href="{{ route('penjualan.sj.show', $sj->id) }}"

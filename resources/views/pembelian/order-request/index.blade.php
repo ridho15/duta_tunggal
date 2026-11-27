@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Daftar pengajuan pengadaan barang dari cabang dan gudang sebelum diterbitkan Purchase Order.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('pembelian.or.create')
             <a
                 href="{{ route('pembelian.or.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Buat Permintaan Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -316,6 +318,7 @@
                                     </a>
 
                                     @if (in_array($or->status, ['draft', 'rejected'], true))
+                                        @accessRoute('pembelian.or.edit')
                                         <a
                                             href="{{ route('pembelian.or.edit', $or) }}"
                                             class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition shadow-2xs"
@@ -325,8 +328,10 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
                                     @endif
 
+                                    @accessRoute('pembelian.or.pdf')
                                     <a
                                         href="{{ route('pembelian.or.pdf', $or) }}"
                                         target="_blank"
@@ -337,6 +342,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>

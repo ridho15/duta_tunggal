@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Kelola tagihan dari pemasok, verifikasi 3-Way Matching (PO &amp; GRN), dan pantau hutang dagang (Accounts Payable).</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('pembelian.invoices.create')
             <a
                 href="{{ route('pembelian.invoices.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
@@ -25,6 +26,7 @@
                 </svg>
                 Buat Faktur Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -275,6 +277,7 @@
                                     </a>
 
                                     {{-- Cetak PDF --}}
+                                    @accessRoute('pembelian.invoices.pdf')
                                     <a
                                         href="{{ route('pembelian.invoices.pdf', $inv) }}"
                                         target="_blank"
@@ -285,9 +288,11 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     {{-- Edit (Khusus Draft) --}}
                                     @if ($status === 'draft')
+                                        @accessRoute('pembelian.invoices.edit')
                                         <a
                                             href="{{ route('pembelian.invoices.edit', $inv) }}"
                                             class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded transition"
@@ -297,8 +302,10 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
                                         {{-- Hapus (Khusus Draft) --}}
+                                        @accessRoute('pembelian.invoices.destroy')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-delete-invoice', { action: '{{ route('pembelian.invoices.destroy', $inv) }}', invoiceNumber: '{{ $inv->invoice_number }}' })"
@@ -309,6 +316,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -322,9 +330,11 @@
                                     </svg>
                                     <div class="text-sm font-semibold text-gray-500">Tidak ada Faktur Pembelian yang ditemukan</div>
                                     <p class="text-xs text-gray-400 max-w-sm">Coba sesuaikan kata kunci pencarian atau ubah tab filter di atas.</p>
+                                    @accessRoute('pembelian.invoices.create')
                                     <a href="{{ route('pembelian.invoices.create') }}" class="mt-2 inline-flex items-center gap-1.5 text-xs text-white bg-[#15803d] hover:bg-[#14532d] px-3.5 py-1.5 rounded-lg font-semibold transition">
                                         Buat Faktur Pembelian Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -342,6 +352,7 @@
     </div>
 
     {{-- Modal Konfirmasi Hapus Draft --}}
+    @accessRoute('pembelian.invoices.destroy')
     <x-confirmation-modal
         name="delete-invoice"
         title="Hapus Faktur Pembelian Draft"
@@ -357,5 +368,6 @@
             Penerimaan barang (GRN) yang tertagih pada faktur ini akan kembali dapat ditagihkan. Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

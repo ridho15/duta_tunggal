@@ -28,6 +28,7 @@
                 </svg>
                 <span>Cek Saldo Stok</span>
             </a>
+            @accessRoute('gudang.transfer.create')
             <a href="{{ route('gudang.transfer.create') }}"
                class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,6 +36,7 @@
                 </svg>
                 <span>Transfer Stok Baru</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -258,14 +260,17 @@
                                     </a>
 
                                     @if ($tf->status === 'Draft')
+                                        @accessRoute('gudang.transfer.edit')
                                         <a href="{{ route('gudang.transfer.edit', $tf) }}"
                                            class="px-2.5 py-1 text-xs font-semibold text-[#15803d] bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition"
                                            title="Ubah Draft">
                                             Edit
                                         </a>
+                                        @endaccessRoute
                                     @endif
 
                                     @if (in_array($tf->status, ['Approved', 'Shipped', 'Completed', 'completed']))
+                                        @accessRoute('gudang.transfer.pdf')
                                         <a href="{{ route('gudang.transfer.pdf', $tf) }}"
                                            target="_blank"
                                            class="p-1 text-gray-500 hover:text-[#15803d] transition"
@@ -274,6 +279,7 @@
                                                 <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2zm8-12V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4h10z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                                             </svg>
                                         </a>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>

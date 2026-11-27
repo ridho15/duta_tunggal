@@ -63,7 +63,9 @@
 <body>
     <div class="print-toolbar">
         <h1>Financial Statement</h1>
+        @accessRoute('reports.financial-statement.excel')
         <a class="pt-btn pt-btn-print" href="{{ route('reports.financial-statement.excel', array_filter(['start_date' => $report['start_date'], 'end_date' => $report['end_date'], 'cabang_id' => request('cabang_id'), 'statement_type' => $report['statement_type']], fn ($value) => $value !== null && $value !== '' && $value !== [])) }}">Download Excel</a>
+        @endaccessRoute
         <a class="pt-btn pt-btn-print" href="{{ route('reports.financial-statement.pdf', array_filter(['start_date' => $report['start_date'], 'end_date' => $report['end_date'], 'cabang_id' => request('cabang_id'), 'statement_type' => $report['statement_type']], fn ($value) => $value !== null && $value !== '' && $value !== [])) }}">Download PDF</a>
         <button class="pt-btn pt-btn-print" onclick="window.print()">Cetak / PDF</button>
         <button class="pt-btn pt-btn-close" onclick="window.close()">Tutup</button>

@@ -215,7 +215,9 @@
     <div class="toolbar no-print">
         <div class="toolbar-title">Drill Down Financial Report</div>
         <div class="toolbar-actions">
+            @accessRoute('reports.drill-down-financial-report.excel')
             <a class="btn btn-excel" href="{{ route('reports.drill-down-financial-report.excel', array_filter($report['filters'] ?? [], fn ($value) => $value !== null && $value !== '' && $value !== [])) }}">Download Excel</a>
+            @endaccessRoute
             <a class="btn btn-pdf" href="{{ route('reports.drill-down-financial-report.pdf', array_filter($report['filters'] ?? [], fn ($value) => $value !== null && $value !== '' && $value !== [])) }}">Download PDF</a>
             <button class="btn btn-print" onclick="window.print()">Cetak / PDF</button>
             <button class="btn btn-close" onclick="window.close()">Tutup</button>

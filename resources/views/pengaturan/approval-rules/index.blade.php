@@ -13,8 +13,10 @@
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Aturan Persetujuan</h1>
             <p class="text-sm text-gray-500 mt-0.5">Batas nilai dan peran yang boleh menyetujui Quotation, Sales Order, dan Nota Kredit. Bila beberapa aturan cocok, yang batas bawahnya paling tinggi dipakai.</p>
         </div>
+        @accessRoute('settings.approval-rules.create')
         <a href="{{ route('settings.approval-rules.create') }}"
            class="px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition whitespace-nowrap">Tambah Aturan</a>
+        @endaccessRoute
     </div>
 
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -52,7 +54,9 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    @accessRoute('settings.approval-rules.edit')
                                     <a href="{{ route('settings.approval-rules.edit', $rule) }}" class="text-xs font-semibold text-[#15803d] hover:text-[#166534] underline-offset-2 hover:underline">Ubah<span class="sr-only"> {{ $rule->label }}</span></a>
+                                    @endaccessRoute
                                 </td>
                             </tr>
                         @endforeach

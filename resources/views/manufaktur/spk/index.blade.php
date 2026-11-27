@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Dokumen instruksi kerja pabrik untuk memulai proses konversi bahan baku menjadi barang jadi.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('manufaktur.spk.create')
             <a
                 href="{{ route('manufaktur.spk.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Terbitkan SPK Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -264,6 +266,7 @@
                                         </svg>
                                     </a>
 
+                                    @accessRoute('manufaktur.spk.pdf')
                                     <a
                                         href="{{ route('manufaktur.spk.pdf', $order) }}"
                                         target="_blank"
@@ -274,8 +277,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     @if ($order->status === 'draft')
+                                        @accessRoute('manufaktur.spk.edit')
                                         <a
                                             href="{{ route('manufaktur.spk.edit', $order) }}"
                                             class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
@@ -285,7 +290,9 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
+                                        @accessRoute('manufaktur.spk.start')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-start-spk', { action: '{{ route('manufaktur.spk.start', $order) }}', number: '{{ $order->mo_number }}' })"
@@ -297,6 +304,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -312,12 +320,14 @@
                                 <p class="text-sm font-semibold text-gray-700">Belum ada Surat Perintah Kerja (SPK)</p>
                                 <p class="text-xs text-gray-400 mt-0.5">Terbitkan SPK baru berdasarkan resep BOM atau rencana produksi terjadwal.</p>
                                 <div class="mt-4">
+                                    @accessRoute('manufaktur.spk.create')
                                     <a
                                         href="{{ route('manufaktur.spk.create') }}"
                                         class="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold bg-[#15803d] text-white rounded-xl shadow-sm hover:bg-[#166534] transition"
                                     >
                                         Terbitkan SPK Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -335,6 +345,7 @@
     </div>
 
     {{-- Modal Konfirmasi Mulai Produksi --}}
+    @accessRoute('manufaktur.spk.start')
     <x-confirmation-modal
         name="start-spk"
         title="Mulai Proses Produksi"
@@ -350,5 +361,6 @@
             Status SPK akan berubah menjadi In Progress dan siap untuk pencatatan output/inspeksi.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

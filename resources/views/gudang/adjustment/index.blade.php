@@ -10,7 +10,9 @@
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Penyesuaian Stok</h1>
             <p class="text-sm text-gray-500 mt-0.5">Koreksi qty stok per produk. Stok dan jurnal baru berubah setelah penyesuaian disetujui.</p>
         </div>
+        @accessRoute('gudang.adjustment.create')
         <a href="{{ route('gudang.adjustment.create') }}" class="px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition whitespace-nowrap">Buat Penyesuaian</a>
+        @endaccessRoute
     </div>
 
     <form method="GET" class="flex flex-wrap items-end gap-3">

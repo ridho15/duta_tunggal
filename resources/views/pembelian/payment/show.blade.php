@@ -51,6 +51,7 @@
         {{-- Action Buttons Toolbar --}}
         <div class="flex flex-wrap items-center gap-2">
             {{-- Tombol Cetak PDF Voucher --}}
+            @accessRoute('pembelian.payments.pdf')
             <a
                 href="{{ route('pembelian.payments.pdf', $payment->id) }}"
                 target="_blank"
@@ -61,9 +62,11 @@
                 </svg>
                 Cetak Voucher (PDF)
             </a>
+            @endaccessRoute
 
             {{-- Aksi Khusus Draft --}}
             @if ($isDraft)
+                @accessRoute('pembelian.payments.edit')
                 <a
                     href="{{ route('pembelian.payments.edit', $payment->id) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg shadow-xs transition"
@@ -73,7 +76,9 @@
                     </svg>
                     Edit Draft
                 </a>
+                @endaccessRoute
 
+                @accessRoute('pembelian.payments.post')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-post-payment', { action: '{{ route('pembelian.payments.post', $payment->id) }}' })"
@@ -84,7 +89,9 @@
                     </svg>
                     Posting ke Buku Besar
                 </button>
+                @endaccessRoute
 
+                @accessRoute('pembelian.payments.destroy')
                 <button
                     type="button"
                     @click="deleteModalOpen = true"
@@ -95,10 +102,12 @@
                     </svg>
                     Hapus Draft
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Aksi Khusus Posted (Paid / Partial) --}}
             @if ($isPaid || $isPartial)
+                @accessRoute('pembelian.payments.cancel')
                 <button
                     type="button"
                     @click="cancelModalOpen = true"
@@ -109,6 +118,7 @@
                     </svg>
                     Batalkan Pembayaran
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -434,6 +444,7 @@
     </div>
 
     {{-- Modal Konfirmasi Batalkan Pembayaran (Posted) --}}
+    @accessRoute('pembelian.payments.cancel')
     <div
         x-show="cancelModalOpen"
         x-cloak
@@ -518,9 +529,11 @@
             </div>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Draft --}}
     @if ($isDraft)
+        @accessRoute('pembelian.payments.destroy')
         <div
             x-show="deleteModalOpen"
             x-cloak
@@ -594,9 +607,11 @@
                 </div>
             </div>
         </div>
+        @endaccessRoute
     @endif
 
     {{-- Modal Konfirmasi Posting Pembayaran --}}
+    @accessRoute('pembelian.payments.post')
     <x-confirmation-modal
         name="post-payment"
         title="Posting Pembayaran ke Buku Besar"
@@ -612,5 +627,6 @@
             Jurnal pengeluaran kas/bank akan dibukukan dan saldo hutang vendor terkait akan langsung dipotong.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

@@ -51,76 +51,92 @@
             </a>
 
             {{-- Cetak PDF --}}
+            @accessRoute('penjualan.quotations.pdf')
             <a href="{{ route('penjualan.quotations.pdf', $quotation) }}" target="_blank"
                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-xl hover:bg-[#dcfce7] transition shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 <span>Cetak PDF</span>
             </a>
+            @endaccessRoute
 
             {{-- Aksi Edit untuk Draft / Reject --}}
             @if($canEdit)
+                @accessRoute('penjualan.quotations.edit')
                 <a href="{{ route('penjualan.quotations.edit', $quotation) }}"
                    class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     <span>Edit Penawaran</span>
                 </a>
+                @endaccessRoute
             @endif
 
             {{-- Ajukan Persetujuan (dari Draft) --}}
             @if($canRequestApprove)
+                @accessRoute('penjualan.quotations.requestApprove')
                 <button type="button"
                         @click="$dispatch('open-modal-request-approve-quotation', { action: '{{ route('penjualan.quotations.requestApprove', $quotation) }}' })"
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Ajukan Persetujuan</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Setujui / Tolak (untuk yang menunggu persetujuan) --}}
             @if($quotation->status === 'request_approve')
                 @if($canReject)
+                    @accessRoute('penjualan.quotations.reject')
                     <button type="button" onclick="openRejectModal()"
                             class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         <span>Tolak</span>
                     </button>
+                    @endaccessRoute
                 @endif
                 @if($canApprove)
+                    @accessRoute('penjualan.quotations.approve')
                     <button type="button"
                             @click="$dispatch('open-modal-approve-quotation', { action: '{{ route('penjualan.quotations.approve', $quotation) }}' })"
                             class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         <span>Setujui (Approve)</span>
                     </button>
+                    @endaccessRoute
                 @endif
             @endif
 
             {{-- Buat Revisi (untuk Disetujui / Kedaluwarsa) --}}
             @if($canRevise)
+                @accessRoute('penjualan.quotations.revision')
                 <button type="button"
                         @click="$dispatch('open-modal-revision-quotation', { action: '{{ route('penjualan.quotations.revision', $quotation) }}' })"
                         class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     <span>Buat Revisi</span>
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Konversi ke Sales Order (jika approved & usable) --}}
             @if($canConvertToSo)
+                @accessRoute('penjualan.quotations.convertToSaleOrder')
                 <a href="{{ route('penjualan.quotations.convertToSaleOrder', $quotation) }}"
                    class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
                     <span>Buat Sales Order (SO)</span>
                 </a>
+                @endaccessRoute
             @endif
 
             {{-- Hapus (Draft / Reject) --}}
             @if($canDelete)
+                @accessRoute('penjualan.quotations.destroy')
                 <button type="button"
                         @click="$dispatch('open-modal-delete-quotation', { action: '{{ route('penjualan.quotations.destroy', $quotation) }}' })"
                         class="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition" title="Hapus Draft">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -393,6 +409,7 @@
 </div>
 
 {{-- Reject Reason Modal --}}
+@accessRoute('penjualan.quotations.reject')
 <div id="rejectModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white border border-gray-100 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between pb-3 border-b border-gray-100">
@@ -426,6 +443,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <script>
     function openRejectModal() {
@@ -437,6 +455,7 @@
 </script>
 
     {{-- Modal Ajukan Persetujuan --}}
+    @accessRoute('penjualan.quotations.requestApprove')
     <x-confirmation-modal
         name="request-approve-quotation"
         title="Ajukan Persetujuan Penawaran"
@@ -449,8 +468,10 @@
             Ajukan dokumen penawaran harga <span class="font-bold text-gray-900 font-mono">{{ $quotation->quotation_number }}</span> untuk diverifikasi dan disetujui oleh manajer?
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Setujui Penawaran --}}
+    @accessRoute('penjualan.quotations.approve')
     <x-confirmation-modal
         name="approve-quotation"
         title="Setujui Penawaran Harga"
@@ -471,8 +492,10 @@
             </label>
         @endif
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Buat Revisi --}}
+    @accessRoute('penjualan.quotations.revision')
     <x-confirmation-modal
         name="revision-quotation"
         title="Terbitkan Revisi Penawaran"
@@ -488,8 +511,10 @@
             Versi revisi baru akan bernomor otomatis <strong>-R{{ $quotation->revision_no + 1 }}</strong> dan dokumen ini akan ditandai superseded.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Hapus Draft --}}
+    @accessRoute('penjualan.quotations.destroy')
     <x-confirmation-modal
         name="delete-quotation"
         title="Hapus Penawaran Harga"
@@ -505,4 +530,5 @@
             Tindakan ini tidak dapat dipulihkan kembali.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

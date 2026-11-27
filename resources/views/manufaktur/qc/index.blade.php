@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Inspeksi mutu hasil produksi barang jadi sebelum dimasukkan ke dalam persediaan gudang siap jual.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('manufaktur.qc.create')
             <a
                 href="{{ route('manufaktur.qc.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl shadow-xs transition"
@@ -25,6 +26,7 @@
                 </svg>
                 Terbitkan QC Manual
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -273,6 +275,7 @@
                                         </svg>
                                     </a>
 
+                                    @accessRoute('manufaktur.qc.pdf')
                                     <a
                                         href="{{ route('manufaktur.qc.pdf', $item) }}"
                                         target="_blank"
@@ -283,8 +286,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     @if ($item->status == 0)
+                                        @accessRoute('manufaktur.qc.process-form')
                                         <a
                                             href="{{ route('manufaktur.qc.process-form', $item) }}"
                                             class="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
@@ -295,6 +300,7 @@
                                             </svg>
                                             Proses QC
                                         </a>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>

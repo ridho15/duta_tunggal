@@ -28,6 +28,7 @@
                 </svg>
                 <span>Cek Stok Sistem</span>
             </a>
+            @accessRoute('gudang.opname.create')
             <a href="{{ route('gudang.opname.create') }}"
                class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,6 +36,7 @@
                 </svg>
                 <span>Sesi Opname Baru</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -290,6 +292,7 @@
                                         Workspace
                                     </a>
 
+                                    @accessRoute('gudang.opname.pdf')
                                     <a href="{{ route('gudang.opname.pdf', $op) }}"
                                        target="_blank"
                                        class="p-1 text-gray-500 hover:text-[#15803d] transition"
@@ -298,6 +301,7 @@
                                             <path d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2zm8-12V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v4h10z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
