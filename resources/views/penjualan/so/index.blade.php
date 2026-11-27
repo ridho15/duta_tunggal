@@ -47,7 +47,7 @@
 
     @if (! empty($searchAllTabs))
         <div class="text-xs text-gray-600 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
-            Hasil pencarian "<strong>{{ $search }}</strong>" ditampilkan dari <strong>semua status</strong>.
+            @if ($search !== '') Hasil pencarian "<strong>{{ $search }}</strong>" @else Hasil filter status @endif ditampilkan dari <strong>semua tab</strong>.
         </div>
     @endif
 
@@ -67,6 +67,14 @@
                 <option value="">Semua Periode</option>
                 <option value="{{ now()->format('Y-m') }}" {{ request('date') === now()->format('Y-m') ? 'selected' : '' }}>Bulan Ini ({{ now()->translatedFormat('M Y') }})</option>
                 <option value="{{ now()->subMonth()->format('Y-m') }}" {{ request('date') === now()->subMonth()->format('Y-m') ? 'selected' : '' }}>Bulan Lalu ({{ now()->subMonth()->translatedFormat('M Y') }})</option>
+            </select>
+
+            <!-- Filter Status (semua status, termasuk Ditolak & Dibatalkan) -->
+            <select name="status" onchange="this.form.submit()" aria-label="Filter status SO" class="text-xs sm:text-[13px] font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] cursor-pointer">
+                <option value="">Semua Status</option>
+                @foreach (\App\Models\SaleOrder::STATUS_LABELS as $statusKey => $statusText)
+                    <option value="{{ $statusKey }}" {{ ($statusFilter ?? null) === $statusKey ? 'selected' : '' }}>{{ $statusText }}</option>
+                @endforeach
             </select>
 
             <!-- Filter Sales -->

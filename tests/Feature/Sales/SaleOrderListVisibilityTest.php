@@ -30,5 +30,18 @@ it('mencari nomor SO dari tab Perlu tindakan tetap menemukan SO yang sudah dibua
     $this->actingAs($this->ctx['user'])->get(route('penjualan.so.index', ['tab' => 'perlu_tindakan', 'search' => $this->so->so_number]))
         ->assertOk()
         ->assertSee($this->so->so_number)
-        ->assertSee('semua status');
+        ->assertSee('semua tab', false);
+});
+
+it('filter status menampilkan SO Dibatalkan / Ditolak yang tidak punya tab sendiri', function () {
+    [$canceled] = stkSaleOrder($this->ctx, 1, ['created_by' => $this->ctx['user']->id]);
+    $canceled->forceFill(['status' => 'canceled'])->saveQuietly();
+
+    $this->actingAs($this->ctx['user'])->get(route('penjualan.so.index', ['tab' => 'perlu_tindakan', 'status' => 'canceled']))
+        ->assertOk()
+        ->assertSee($canceled->so_number)
+        ->assertDontSee($this->so->so_number);   // SO lain (status berbeda) tidak ikut
+
+    // Status tak dikenal diabaikan (tidak error, tidak memfilter)
+    $this->get(route('penjualan.so.index', ['status' => 'xyz']))->assertOk()->assertSee($this->so->so_number);
 });
