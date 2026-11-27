@@ -23,7 +23,11 @@ class Deposit extends Model
         'note',
         'status', //active,closed
         'created_by',
-        'deposit_number'
+        'deposit_number',
+        'payment_date',
+        'payment_method',
+        'payment_reference',
+        'cabang_id',
     ];
 
     public function coa()
@@ -39,6 +43,36 @@ class Deposit extends Model
     public function fromModel()
     {
         return $this->morphTo(__FUNCTION__, 'from_model_type', 'from_model_id')->withDefault();
+    }
+
+    public function cabang()
+    {
+        return $this->belongsTo(Cabang::class, 'cabang_id');
+    }
+
+    /** Penerimaan asal bila deposit ini kelebihan bayar (uangnya sudah tercantum di voucher penerimaan tsb). */
+    public function sourceReceipt()
+    {
+        return $this->hasOne(CustomerReceipt::class, 'deposit_id');
+    }
+
+    /**
+     * Titip dana customer: voucher penerimaan dicetak pencatatnya / Finance Manager / Owner / Super Admin.
+     * Kelebihan bayar tidak punya voucher sendiri (sudah masuk voucher penerimaannya, agar kas tidak tercatat dobel).
+     */
+    public function canPrintVoucher(?User $user): bool
+    {
+        return $this->from_model_type === Customer::class
+            && ! $this->sourceReceipt()->exists()
+            && \App\Support\Access::canPrintReceiptVoucher($user, $this->created_by);
+    }
+
+    /** Tanggal uang diterima: kolom payment_date, atau tanggal jurnalnya untuk data lama. */
+    public function receivedDate(): ?string
+    {
+        return $this->payment_date
+            ?? JournalEntry::query()->where('source_type', self::class)->where('source_id', $this->id)->value('date')
+            ?? $this->created_at?->toDateString();
     }
 
     public function createdBy()

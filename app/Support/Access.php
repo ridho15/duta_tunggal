@@ -85,6 +85,9 @@ class Access
             || str_starts_with($lastSegment, 'export') || str_starts_with($lastSegment, 'import')) {
             return 'export';
         }
+        if (isset(config('access.route_overrides', [])[$routeName])) {
+            return config('access.route_overrides')[$routeName];
+        }
         foreach (config('access.shared_prefixes', []) as $shared) {
             if (str_starts_with($routeName, $shared . '.')) {
                 return null;
@@ -139,12 +142,6 @@ class Access
 
     // ------------------------------------------------------------------ cek akses
 
-    /** Request ini sudah lolos checklist (EnforceAccess) → cek peran lama di controller tidak perlu menolak lagi. */
-    public static function grantedByChecklist(): bool
-    {
-        return app()->bound('request') && request()->attributes->has('access_granted');
-    }
-
     public static function isSuper(?User $user): bool
     {
         return $user !== null && $user->hasAnyRole(config('access.super_roles', ['Owner', 'Super Admin']));
@@ -154,6 +151,22 @@ class Access
     public static function canExportImport(?User $user = null): bool
     {
         return self::isSuper($user ?? Auth::user());
+    }
+
+    /**
+     * Voucher Penerimaan Kas/Bank (penerimaan & titip dana customer): wajib centang "Cetak Voucher Penerimaan";
+     * pencatat (mis. kasir) mencetak miliknya, Finance Manager / Owner / Super Admin semua (keputusan Ko Handy 27 Nov 2026).
+     */
+    public static function canPrintReceiptVoucher(?User $user, $createdBy): bool
+    {
+        if (! $user || ! self::allows('penjualan.receipts.voucher', $user)) {
+            return false;
+        }
+        if (self::isSuper($user) || $user->hasRole(config('access.receipt_voucher_all_roles', []))) {
+            return true;
+        }
+
+        return $createdBy !== null && (int) $createdBy === (int) $user->getKey();
     }
 
     /** Boleh mengatur peran & hak akses: hanya Owner / Super Admin. */
@@ -171,8 +184,8 @@ class Access
         if ($key === 'export') {
             return self::canExportImport($user);
         }
-        if (self::isSuper($user)) {
-            return true;
+        if (self::isSuper($user) || self::unmanaged($user)) {
+            return true;   // user tanpa peran: tombol tidak disembunyikan checklist, aturan lama di halaman yang menentukan
         }
 
         return self::grantedKeys($user)[$key] ?? false;
@@ -184,6 +197,47 @@ class Access
         $key = self::keyForRoute($routeName);
 
         return $key === null || self::allows($key, $user);
+    }
+
+    /** @return array<int, string> kunci akses yang diwakili izin teknis lama ini (+ Lihat halamannya) */
+    public static function keysForLegacyPermissions(array $permissions): array
+    {
+        if ($permissions === []) {
+            return [];
+        }
+        $have = array_flip($permissions);
+        $keys = [];
+        foreach (self::pages() as $pageKey => $page) {
+            foreach ($page['actions'] as $action => $def) {
+                foreach ($def[2] ?? [] as $perm) {
+                    if (isset($have[$perm])) {
+                        $keys[] = "{$pageKey}.{$action}";
+                        $keys[] = "{$pageKey}.view";
+                        break;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /** User tanpa peran dan tanpa akses khusus: tidak diatur checklist (aturan lama per halaman berlaku). */
+    public static function unmanaged(User $user): bool
+    {
+        return $user->roles->isEmpty() && self::overrides($user) === [];
+    }
+
+    /** Punya salah satu centang (Lihat atau aksi apa pun) pada halaman ini. */
+    public static function allowsAnyOnPage(string $pageKey, ?User $user = null): bool
+    {
+        foreach (array_keys(self::pages()[$pageKey]['actions'] ?? []) as $action) {
+            if (self::allows("{$pageKey}.{$action}", $user)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Boleh salah satu halaman (untuk judul kelompok menu). */
@@ -206,6 +260,10 @@ class Access
         }
 
         $keys = array_fill_keys(self::roleKeysForUser($user), true);
+        // Izin teknis yang diberikan langsung ke user (bukan lewat peran) ikut menjadi akses
+        foreach (self::keysForLegacyPermissions($user->getDirectPermissions()->pluck('name')->all()) as $key) {
+            $keys[$key] = true;
+        }
         foreach (self::overrides($user) as $key => $allowed) {
             if ($allowed) {
                 $keys[$key] = true;
@@ -252,52 +310,6 @@ class Access
 
         return DB::table('user_access_overrides')->where('user_id', $user->getKey())
             ->pluck('allowed', 'access_key')->map(fn ($v) => (bool) $v)->all();
-    }
-
-    /** @var array<string, array<int, string>>|null izin teknis lama => kunci akses */
-    private static ?array $legacyIndex = null;
-
-    private const POLICY_ACTIONS = [
-        'viewAny' => 'view', 'view' => 'view', 'create' => 'create', 'update' => 'update',
-        'delete' => 'delete', 'deleteAny' => 'delete', 'forceDelete' => 'delete', 'restore' => 'delete',
-    ];
-
-    /**
-     * Dipanggil Gate::before. True bila:
-     *  - kemampuan = izin teknis lama yang dipetakan ke kunci akses yang dimiliki user; atau
-     *  - kemampuan Policy (viewAny/view/create/update/delete/approve/…) pada halaman route yang sedang dibuka dan aksinya dicentang.
-     */
-    public static function gateAllows(?User $user, string $ability): bool
-    {
-        if (! $user || self::isSuper($user)) {
-            return false;   // super ditangani aturan lama (Super Admin) / role Owner sendiri
-        }
-        if (self::$legacyIndex === null) {
-            self::$legacyIndex = [];
-            foreach (self::pages() as $pageKey => $page) {
-                foreach ($page['actions'] as $action => $def) {
-                    foreach ($def[2] ?? [] as $perm) {
-                        self::$legacyIndex[$perm][] = "{$pageKey}.{$action}";
-                    }
-                }
-            }
-        }
-        foreach (self::$legacyIndex[$ability] ?? [] as $key) {
-            if (self::allows($key, $user)) {
-                return true;
-            }
-        }
-
-        $granted = self::grantedByChecklist() ? request()->attributes->get('access_granted') : null;
-        if (is_string($granted) && $granted !== 'export') {
-            [$pageKey] = self::split($granted);
-            $action = self::POLICY_ACTIONS[$ability] ?? $ability;
-            if (isset(self::pages()[$pageKey]['actions'][$action])) {
-                return self::allows("{$pageKey}.{$action}", $user);
-            }
-        }
-
-        return false;
     }
 
     public static function flush(): void

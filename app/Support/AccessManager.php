@@ -35,7 +35,14 @@ class AccessManager
         AccessDefaults::ensurePermissions();
         DB::transaction(function () use ($role, $keys) {
             $legacy = $role->permissions()->where('name', 'not like', Access::PREFIX . '%')->pluck('name')->all();
-            $role->syncPermissions([...$legacy, Access::CONFIGURED, ...array_map(fn ($k) => Access::PREFIX . $k, $keys)]);
+            // Izin teknis lama milik centang yang aktif ikut diberikan, agar peran baru / duplikat lolos Policy lama.
+            // Tidak pernah dicabut di sini: pembatasan dilakukan checklist (middleware EnforceAccess).
+            $mapped = collect($keys)->flatMap(fn ($k) => Access::legacyPermissionsFor($k))->unique()->values();
+            $existing = \Spatie\Permission\Models\Permission::query()->where('guard_name', 'web')
+                ->whereIn('name', $mapped)->pluck('name')->all();
+            $role->syncPermissions(array_values(array_unique([
+                ...$legacy, ...$existing, Access::CONFIGURED, ...array_map(fn ($k) => Access::PREFIX . $k, $keys),
+            ])));
         });
         Access::flush();
 
@@ -71,6 +78,10 @@ class AccessManager
             if ($rows) {
                 DB::table('user_access_overrides')->insert($rows);
             }
+            // Izin teknis lama untuk akses yang DITAMBAH khusus user ini (izin langsung user hanya dikelola dari sini)
+            $mapped = collect($add)->flatMap(fn ($k) => Access::legacyPermissionsFor($k))->unique()->values();
+            $user->syncPermissions(\Spatie\Permission\Models\Permission::query()->where('guard_name', 'web')
+                ->whereIn('name', $mapped)->pluck('name')->all());
         });
         Access::flush();
 

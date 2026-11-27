@@ -26,9 +26,6 @@ class CabangController extends Controller
         if (! $user) {
             abort(401);
         }
-        if (\App\Support\Access::grantedByChecklist()) {
-            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
-        }
 
         if (MenuAccess::isSuper($user) || in_array('OWN', MenuAccess::codesFor($user)) || in_array('IT', MenuAccess::codesFor($user))) {
             return;

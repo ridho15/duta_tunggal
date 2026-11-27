@@ -130,10 +130,31 @@ class CustomerReceiptController extends Controller
         }
 
         $receipts = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
+
+        // Tab Titip Dana: deposit customer (uang titipan sebelum ada invoice / kelebihan bayar), bisa dicetak vouchernya
+        $depositQuery = Deposit::query()->with(['fromModel', 'paymentCoa', 'createdBy', 'sourceReceipt'])
+            ->where('from_model_type', Customer::class);
+        $counts['titip'] = (clone $depositQuery)->count();
+        $deposits = null;
+        if ($tab === 'titip') {
+            if (! empty($search)) {
+                $depositQuery->where(function ($q) use ($search) {
+                    $q->where('deposit_number', 'like', "%{$search}%")
+                        ->orWhere('payment_reference', 'like', "%{$search}%")
+                        ->orWhere('note', 'like', "%{$search}%")
+                        ->orWhereIn('from_model_id', Customer::query()->where('name', 'like', "%{$search}%")->select('id'));
+                });
+            }
+            if ($cabangId) {
+                $depositQuery->where('cabang_id', $cabangId);
+            }
+            $deposits = $depositQuery->orderByDesc('id')->paginate(15)->withQueryString();
+        }
         $cabangs = Cabang::where('status', true)->get();
 
         return view('penjualan.receipts.index', compact(
             'receipts',
+            'deposits',
             'counts',
             'tab',
             'search',
@@ -503,6 +524,10 @@ class CustomerReceiptController extends Controller
                     'note' => 'Kelebihan bayar dari Penerimaan Customer #' . $receipt->id,
                     'status' => 'active',
                     'created_by' => Auth::id(),
+                    'payment_date' => $validated['payment_date'],
+                    'payment_method' => $receipt->payment_method,
+                    'payment_reference' => $receipt->payment_reference,
+                    'cabang_id' => $receipt->cabang_id,
                 ]);
 
                 $this->ledgerService->postDeposit($deposit, $receipt->cabang_id ? (int) $receipt->cabang_id : null, (string) $validated['payment_date']);
@@ -565,6 +590,10 @@ class CustomerReceiptController extends Controller
                 'note' => mb_substr($note, 0, 255),
                 'status' => 'active',
                 'created_by' => Auth::id(),
+                'payment_date' => $validated['payment_date'],
+                'payment_method' => $validated['payment_method'],
+                'payment_reference' => $validated['payment_reference'] ?? null,
+                'cabang_id' => Auth::user()?->cabang_id,
             ]);
 
             $this->ledgerService->postDeposit($deposit, Auth::user()?->cabang_id ? (int) Auth::user()->cabang_id : null, (string) $validated['payment_date']);
@@ -574,9 +603,9 @@ class CustomerReceiptController extends Controller
 
         $balance = Deposit::availableForCustomer($customer->id);
 
-        return redirect()->route('penjualan.receipts.index')->with('success',
+        return redirect()->route('penjualan.receipts.index', ['tab' => 'titip'])->with('success',
             "Titip dana {$customer->name} sebesar " . MoneyHelper::rupiah($amount) . " tercatat ({$deposit->deposit_number}). "
-            . 'Saldo titip sekarang ' . MoneyHelper::rupiah($balance) . '.');
+            . 'Saldo titip sekarang ' . MoneyHelper::rupiah($balance) . '. Voucher penerimaan bisa dicetak di tab Titip Dana.');
     }
 
     /**
@@ -630,6 +659,69 @@ class CustomerReceiptController extends Controller
         $filename = 'Kwitansi_KW-' . str_pad((string) $customerReceipt->id, 6, '0', STR_PAD_LEFT) . '.pdf';
 
         return $pdf->stream($filename);
+    }
+
+    /**
+     * Voucher Penerimaan Kas/Bank (bukti internal), identik dengan Voucher Pengeluaran di Pembayaran Hutang.
+     * Kwitansi tetap untuk customer; voucher ini untuk arsip & tanda tangan internal (permintaan akunting 27 Nov 2026).
+     */
+    public function voucher(CustomerReceipt $customerReceipt): Response
+    {
+        abort_unless($customerReceipt->canPrintVoucher(Auth::user()), 403,
+            'Anda tidak memiliki akses: Cetak Voucher Penerimaan untuk penerimaan ini. Solusi: voucher dicetak oleh pencatatnya, '
+            . 'atau oleh Finance Manager / Owner / Super Admin.');
+        $customerReceipt->loadMissing(['customer', 'cabang', 'coa', 'customerReceiptItem.invoice', 'createdBy']);
+        $number = str_pad((string) $customerReceipt->id, 6, '0', STR_PAD_LEFT);
+
+        $pdf = Pdf::loadView('penjualan.receipts.voucher', [
+            'receipt' => $customerReceipt,
+            'voucherNumber' => 'BKM-' . $number,
+            'kwitansiNumber' => 'KW-' . $number,
+            'company' => $this->docBuilder->company($customerReceipt->cabang, false),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Voucher_Penerimaan_BKM-' . $number . '.pdf');
+    }
+
+    /** Voucher Penerimaan Kas/Bank untuk titip dana customer (deposit), format sama dengan voucher penerimaan biasa. */
+    public function depositVoucher(Deposit $deposit): Response
+    {
+        if ($deposit->sourceReceipt()->exists()) {
+            abort(422, 'Titip dana ini berasal dari kelebihan bayar; uangnya sudah tercantum di voucher penerimaan KW-'
+                . str_pad((string) $deposit->sourceReceipt->id, 6, '0', STR_PAD_LEFT) . '. Solusi: cetak voucher dari penerimaan tersebut.');
+        }
+        abort_unless($deposit->canPrintVoucher(Auth::user()), 403,
+            'Anda tidak memiliki akses: Cetak Voucher Penerimaan untuk titip dana ini. Solusi: voucher dicetak oleh pencatatnya, '
+            . 'atau oleh Finance Manager / Owner / Super Admin.');
+        $deposit->loadMissing(['fromModel', 'paymentCoa', 'coa', 'createdBy', 'cabang']);
+        $cabang = $deposit->cabang ?? $deposit->createdBy?->cabang;
+
+        // Bentuk data sama dengan penerimaan agar memakai template voucher yang sama
+        $view = (object) [
+            'status' => $deposit->status === 'active' || $deposit->status === 'closed' ? 'paid' : $deposit->status,
+            'customer' => $deposit->fromModel,
+            'bank_name' => null,
+            'payment_reference' => $deposit->payment_reference,
+            'payment_date' => $deposit->receivedDate(),
+            'payment_method' => $deposit->payment_method ?: 'Titip Dana',
+            'coa' => $deposit->paymentCoa?->getKey() ? $deposit->paymentCoa : null,
+            'cabang' => $cabang,
+            'customerReceiptItem' => collect(),
+            'overpayment_amount' => 0,
+            'total_payment' => $deposit->amount,
+            'notes' => $deposit->note,
+            'createdBy' => $deposit->createdBy,
+        ];
+
+        $pdf = Pdf::loadView('penjualan.receipts.voucher', [
+            'receipt' => $view,
+            'voucherNumber' => 'BKM-' . $deposit->deposit_number,
+            'kwitansiNumber' => $deposit->deposit_number,
+            'company' => $this->docBuilder->company($cabang, false),
+            'deposit' => $deposit,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Voucher_Penerimaan_BKM-' . $deposit->deposit_number . '.pdf');
     }
 
     /**

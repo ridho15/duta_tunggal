@@ -60,12 +60,6 @@ class AuthServiceProvider extends ServiceProvider
                 return true;
             }
 
-            // Checklist Peran & Hak Akses (27 Nov 2026): izin lama yang mewakili kunci yang DICENTANG ikut lolos, sehingga peran
-            // baru / hasil duplikat bekerja sesuai centangnya (Policy & @can lama). Yang tidak dicentang tetap ikut aturan lama.
-            if (\App\Support\Access::gateAllows($user, $ability)) {
-                return true;
-            }
-
             return null;
         });
 

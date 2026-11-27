@@ -4,7 +4,9 @@
     $isSuper = \App\Support\MenuAccess::isSuper($user);
 
     // Menu tampil sesuai checklist "Lihat (menu)" di Pengaturan → Peran & Hak Akses (Owner / Super Admin selalu tampil)
-    $can = fn (string $routeName) => \Illuminate\Support\Facades\Route::has($routeName) && \App\Support\Access::allowsRoute($routeName, $user);
+    // User tanpa peran tidak melihat menu (sama seperti sebelum checklist)
+    $managed = $user && ! \App\Support\Access::unmanaged($user);
+    $can = fn (string $routeName) => $managed && \Illuminate\Support\Facades\Route::has($routeName) && \App\Support\Access::allowsRoute($routeName, $user);
     $canAny = function (array $routeNames) use ($can) {
         foreach ($routeNames as $routeName) {
             if ($can($routeName)) return true;

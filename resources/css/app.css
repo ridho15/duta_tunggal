@@ -31,6 +31,18 @@
         display: none !important;
     }
 
+    /* Tabel lebar digeser di wadahnya sendiri (HP & layar sempit); tanpa ini kolom kanan terpotong kartu ber-overflow-hidden.
+       !important karena utilitas overflow-hidden di kartu berada di lapisan utilities. */
+    main :where(div, section, form):has(> table) {
+        overflow-x: auto !important;
+        overscroll-behavior-x: contain;
+    }
+
+    /* Teks khusus pembaca layar di ujung tabel lebar tidak boleh ikut melebarkan halaman */
+    .sr-only {
+        left: 0;
+    }
+
     .font-mono,
     [data-tabular-num],
     input[type="number"] {

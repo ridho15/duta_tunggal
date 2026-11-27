@@ -9,9 +9,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Kunci server untuk checklist Peran & Hak Akses: route yang termasuk halaman/aksi yang TIDAK dicentang ditolak (403),
- * walaupun alamatnya diketik langsung. Route yang dicentang ditandai `access_granted` sehingga pemeriksaan lama
- * (Policy / peran per controller) ikut lolos; checklist menjadi penentu (AuthServiceProvider Gate::before).
- * Route di luar katalog tidak diubah perilakunya.
+ * walaupun alamatnya diketik langsung. Yang dicentang tetap melewati aturan bisnis lama (Policy / peran per controller),
+ * jadi checklist hanya mempersempit, tidak membuka hak yang dulu ditolak. Route di luar katalog tidak diubah perilakunya.
  */
 class EnforceAccess
 {
@@ -28,7 +27,17 @@ class EnforceAccess
             return $next($request);
         }
 
-        if (! Access::allows($key, $user)) {
+        // User tanpa peran & tanpa akses khusus: aturan lama per halaman yang berlaku (perilaku sebelum checklist); export tetap dicek
+        if ($key !== 'export' && Access::unmanaged($user)) {
+            return $next($request);
+        }
+
+        // Halaman detail / bantu (bukan daftar menu) sering dibuka dari modul lain: cukup punya salah satu centang halaman itu
+        $allowed = str_ends_with($key, '.view') && ! str_ends_with($routeName, '.index')
+            ? Access::allowsAnyOnPage(Access::split($key)[0], $user)
+            : Access::allows($key, $user);
+
+        if (! $allowed) {
             $what = $key === 'export' ? 'Export/Import Excel (khusus Owner / Super Admin)' : Access::label($key);
             $message = "Anda tidak memiliki akses: {$what}. Solusi: minta Owner / Super Admin mencentang akses ini di Pengaturan → Peran & Hak Akses.";
             if ($request->expectsJson()) {
@@ -36,8 +45,6 @@ class EnforceAccess
             }
             abort(403, $message);
         }
-
-        $request->attributes->set('access_granted', $key);
 
         return $next($request);
     }

@@ -95,7 +95,7 @@ it('B4: titip dana tanpa invoice tercatat sebagai deposit aktif dan jurnalnya se
     $this->actingAs($ctx['user'])->post(route('penjualan.receipts.store'), [
         'customer_id' => $ctx['customer']->id, 'payment_date' => now()->toDateString(), 'payment_method' => 'Cash',
         'coa_id' => $kas->id, 'deposit_amount' => 750000, 'notes' => 'COD bayar di muka',
-    ])->assertSessionHasNoErrors()->assertRedirect(route('penjualan.receipts.index'));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('penjualan.receipts.index', ['tab' => 'titip']));   // langsung ke tab Titip Dana untuk cetak voucher
 
     $deposit = Deposit::where('from_model_type', Customer::class)->where('from_model_id', $ctx['customer']->id)->sole();
     expect((float) $deposit->remaining_amount)->toBe(750000.0)->and($deposit->status)->toBe('active')

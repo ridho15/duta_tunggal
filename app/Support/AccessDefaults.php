@@ -6,11 +6,10 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 /**
- * Akses bawaan checklist per peran = akses SEBELUM checklist dipasang (27 Nov 2026):
+ * Akses bawaan checklist per peran = akses SEBELUM checklist dipasang (27 Nov 2026). Checklist hanya mempersempit:
  *  - Lihat (menu)  : menu samping yang tampil untuk peran itu (database/data/access_default_views.php).
- *  - Aksi lain     : hanya pada halaman yang terlihat, bila peran punya salah satu izin teknis lama aksi itu,
- *                    atau halaman tsb dulu meloloskan peran tanpa izin teknis (bypass) / aksi tanpa izin teknis.
- * Peran yang tidak ada di data bawaan: Lihat dari izin teknis "view" saja.
+ *  - Aksi lain     : semua (kecuali Data Master untuk non-manajer); aturan lama di controller/Policy tetap menentukan.
+ * Peran yang tidak ada di data bawaan & belum punya checklist: semua halaman (kecuali Data Master), aturan lama menentukan.
  */
 class AccessDefaults
 {
@@ -37,28 +36,29 @@ class AccessDefaults
             if ($page['section'] === 'master' && ! $masterAllowed) {
                 continue;
             }
-            $viewPerms = $page['actions']['view'][2] ?? [];
-            $canView = $views !== null
-                ? in_array($pageKey, $views, true)
-                : ($viewPerms !== [] && collect($viewPerms)->contains(fn ($p) => isset($legacy[$p])));
-            if (! $canView) {
-                continue;
-            }
-
+            // Peran di luar daftar bawaan yang belum punya checklist (mis. dibuat langsung di database): tidak dipersempit,
+            // aturan lama yang menentukan. Peran baru dari halaman Peran selalu menyimpan checklist sendiri.
+            $canView = $views === null || in_array($pageKey, $views, true);
             foreach ($page['actions'] as $action => $def) {
-                $perms = $def[2] ?? [];
-                $granted = $action === 'view'
-                    || ! empty($page['bypass'])
-                    || $perms === []
-                    || collect($perms)->contains(fn ($p) => isset($legacy[$p]));
+                // Checklist hanya mempersempit (aturan lama tetap berlaku): Lihat = menu lama; aksi = semua (aksi lintas modul,
+                // mis. Checker mengirim DO / membuat SJ, dulu diizinkan aturan lama berdasarkan nama peran).
+                $granted = $action !== 'view' || $canView;
                 if ($granted) {
                     $keys[] = "{$pageKey}.{$action}";
                 }
             }
         }
 
+        // Peran yang boleh mencetak semua Voucher Penerimaan perlu melihat & mencetak di Terima Pembayaran
+        if (in_array($role->name, config('access.receipt_voucher_all_roles', []), true)
+            || in_array($role->base_role, config('access.receipt_voucher_all_roles', []), true)) {
+            $keys = array_values(array_unique([...$keys, ...self::RECEIPT_VOUCHER_KEYS]));
+        }
+
         return $keys;
     }
+
+    public const RECEIPT_VOUCHER_KEYS = ['penjualan.receipts.view', 'penjualan.receipts.print', 'penjualan.receipts.voucher'];
 
     /** Data Master hanya untuk peran tingkat manajer (config access.master_data_roles); peran duplikat dinilai dari peran asalnya. */
     public static function mayHoldMasterData(Role $role): bool

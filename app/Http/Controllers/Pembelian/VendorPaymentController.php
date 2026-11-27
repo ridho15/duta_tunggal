@@ -627,7 +627,9 @@ class VendorPaymentController extends Controller
             'vendorPaymentDetail.invoice',
         ]);
 
-        $pdf = Pdf::loadView('pembelian.payment.pdf', compact('payment'))
+        // Kop dari data cabang (dulu alamat/NPWP contoh tertulis tetap di template)
+        $company = app(\App\Services\DocumentPrintBuilder::class)->company($payment->cabang, false);
+        $pdf = Pdf::loadView('pembelian.payment.pdf', compact('payment', 'company'))
             ->setPaper('a4', 'portrait');
 
         $filename = "Voucher_Pembayaran_{$payment->payment_number}.pdf";

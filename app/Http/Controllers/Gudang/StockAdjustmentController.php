@@ -31,9 +31,6 @@ class StockAdjustmentController extends Controller
     private function authorizeAccess(): void
     {
         $user = Auth::user();
-        if (\App\Support\Access::grantedByChecklist()) {
-            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
-        }
         abort_unless($user && (MenuAccess::isSuper($user) || array_intersect(['GDG', 'FIN'], MenuAccess::codesFor($user))),
             403, 'Anda tidak memiliki hak akses untuk Penyesuaian Stok.');
     }

@@ -249,6 +249,8 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         Route::post('/terima-pembayaran', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'store'])->name('receipts.store');
         Route::get('/terima-pembayaran/{customerReceipt}', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'show'])->name('receipts.show');
         Route::get('/terima-pembayaran/{customerReceipt}/pdf', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'pdf'])->name('receipts.pdf');
+        Route::get('/terima-pembayaran/titip-dana/{deposit}/voucher', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'depositVoucher'])->name('receipts.deposit-voucher');
+        Route::get('/terima-pembayaran/{customerReceipt}/voucher', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'voucher'])->name('receipts.voucher');
         Route::post('/terima-pembayaran/{customerReceipt}/cancel', [\App\Http\Controllers\Penjualan\CustomerReceiptController::class, 'cancel'])->name('receipts.cancel');
 
         // Aliases for plural URL compatibility
