@@ -160,7 +160,7 @@
             </div>
 
             {{-- Kolom Kanan: Rentang Tanggal & Tombol Aksi --}}
-            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-shrink-0">
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-shrink-0 max-w-full">
                 {{-- Tanggal Permintaan Dari - Sampai --}}
                 <div class="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
                     <span class="text-[11px] font-semibold text-gray-400 select-none">Tgl:</span>
