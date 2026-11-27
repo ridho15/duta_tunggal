@@ -13,7 +13,7 @@
                         'reset' => 'Mengembalikan ke akses peran',
                     ][$log->action] ?? $log->action;
                     $fmt = function (string $k) {
-                        $sign = in_array($k[0], ['+', '−'], true) ? mb_substr($k, 0, 1) : '';
+                        $sign = in_array(mb_substr($k, 0, 1), ['+', '−'], true) ? mb_substr($k, 0, 1) : '';
                         $key = $sign !== '' ? mb_substr($k, 1) : $k;
                         return ($sign === '+' ? 'Tambah ' : ($sign === '−' ? 'Cabut ' : '')) . \App\Support\Access::label($key);
                     };

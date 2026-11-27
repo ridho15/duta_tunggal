@@ -716,6 +716,15 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
             ->parameters(['pajak' => 'pajak']);
     });
 
+    // Export / Import Excel-CSV semua halaman data, khusus Owner / Super Admin (akhiran route = "export"/"import*")
+    Route::prefix('data/{page}')->name('data-transfer.')->where(['page' => '[a-z0-9.-]+'])->group(function () {
+        Route::get('/export', [\App\Http\Controllers\DataTransferController::class, 'export'])->name('export');
+        Route::get('/import', [\App\Http\Controllers\DataTransferController::class, 'importForm'])->name('import');
+        Route::get('/import/template', [\App\Http\Controllers\DataTransferController::class, 'importTemplate'])->name('import-template');
+        Route::post('/import/periksa', [\App\Http\Controllers\DataTransferController::class, 'importCheck'])->name('import-check');
+        Route::post('/import/proses', [\App\Http\Controllers\DataTransferController::class, 'importStore'])->name('import-store');
+    });
+
     // Pengaturan
     Route::prefix('pengaturan')->name('settings.')->group(function () {
         Route::post('/pengguna/{user}/toggle-active', [\App\Http\Controllers\Pengaturan\UserController::class, 'toggleActive'])->name('users.toggle-active');

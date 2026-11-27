@@ -39,7 +39,8 @@
                 @endif
             </div>
         @else
-            <div class="overflow-x-auto">
+            {{-- Batas lebar di HP: kolom konten layout utama tidak min-w-0, tabel lebar akan mendorong halaman. --}}
+            <div class="overflow-x-auto max-w-[calc(100vw-2rem)] md:max-w-none">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs font-semibold text-gray-700">
                         <tr>
