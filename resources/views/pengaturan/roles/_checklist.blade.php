@@ -75,6 +75,7 @@
                 <h2 :id="'sec-' + section.key" class="text-sm font-bold text-gray-900">
                     <span x-text="section.label"></span>
                     <span class="ml-2 text-xs font-semibold text-gray-600" x-text="sectionAllowed(section) + '/' + sectionTotal(section)"></span>
+                    <span x-show="section.note" class="block text-xs font-semibold text-amber-800 mt-0.5" x-text="section.note"></span>
                 </h2>
                 <div class="flex gap-2" x-show="!readonly">
                     <button type="button" @click="setSection(section, true)" class="cursor-pointer min-h-9 px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#15803d] hover:bg-[#dcfce7] active:bg-[#bbf7d0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15803d]/40" :aria-label="'Centang semua di ' + section.label">Centang semua</button>

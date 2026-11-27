@@ -106,3 +106,24 @@ it('pencarian bersama customer tidak diatur checklist (dipakai banyak form)', fu
         ->and(Access::keyForRoute('pembelian.products.search'))->toBeNull()
         ->and(Access::keyForRoute('penjualan.so.products.search'))->toBe('penjualan.so.view');
 });
+
+it('Data Master hanya untuk tingkat manajer: Sales & Purchasing ditolak, Manager & Finance Manager boleh', function () {
+    foreach (['Sales', 'Purchasing', 'Accounting', 'Admin Keuangan', 'IT Support', 'Warehouse Staff'] as $roleName) {
+        $this->user->syncRoles([Role::findByName($roleName)]);
+        Access::flush();
+        $this->actingAs($this->user)->get(route('master.customers.index'))->assertForbidden();
+        $this->get(route('master.products.index'))->assertForbidden();
+    }
+
+    foreach (['Sales Manager' => 'master.customers.index', 'Purchasing Manager' => 'master.products.index', 'Finance Manager' => 'master.suppliers.index'] as $roleName => $route) {
+        $this->user->syncRoles([Role::findByName($roleName)]);
+        Access::flush();
+        $this->actingAs($this->user)->get(route($route))->assertOk();
+    }
+
+    // Pencarian customer di form SO tetap jalan untuk Sales (bukan halaman Data Master)
+    $this->user->syncRoles([Role::findByName('Sales')]);
+    Access::flush();
+    expect(Access::keyForRoute('penjualan.customers.search'))->toBeNull();
+    $this->get(route('penjualan.so.create'))->assertOk();
+});

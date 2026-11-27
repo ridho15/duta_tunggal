@@ -128,7 +128,7 @@ class AccessManager
                 }
                 $pages[] = ['key' => $pageKey, 'label' => $page['label'], 'actions' => $actions];
             }
-            $out[] = ['key' => $sectionKey, 'label' => $section['label'], 'pages' => $pages];
+            $out[] = ['key' => $sectionKey, 'label' => $section['label'], 'note' => $section['note'] ?? null, 'pages' => $pages];
         }
 
         return $out;

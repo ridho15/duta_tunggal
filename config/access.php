@@ -32,6 +32,10 @@ return [
 
     // Pencarian bersama yang dipakai banyak halaman (combobox customer / produk / supplier): tidak diatur checklist,
     // tetap dijaga aturan izin lama di controller-nya.
+    // Data Master (Produk, Customer, Supplier, Cabang, Gudang, Kategori, Satuan, Armada, Mata Uang, Pajak) hanya untuk
+    // tingkat manajer (keputusan Ko Handy 27 Nov 2026). Peran lain tidak mendapat centang bawaan; peran duplikat ikut peran asalnya.
+    'master_data_roles' => ['Admin', 'Sales Manager', 'Purchasing Manager', 'Inventory Manager', 'Finance Manager'],
+
     'shared_prefixes' => ['penjualan.customers', 'pembelian.products', 'pembelian.suppliers', 'pembelian.product-details', 'pembelian.supplier-details'],
 
     // Akhiran route export / import Excel-CSV di SEMUA halaman: khusus Owner / Super Admin (keputusan Ko Handy 27 Nov 2026).
@@ -397,6 +401,7 @@ return [
 
         'master' => [
             'label' => 'Data Master',
+            'note' => 'Disarankan hanya untuk Owner, Super Admin, Admin, Manager, dan Finance Manager.',
             'pages' => [
                 'master.products' => [
                     'label' => 'Produk', 'prefix' => 'master.products', 'subject' => 'product', 'bypass' => true,

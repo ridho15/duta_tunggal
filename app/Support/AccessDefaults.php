@@ -31,8 +31,12 @@ class AccessDefaults
         $views = (require database_path('data/access_default_views.php'))[$role->name] ?? null;
         $legacy = $role->permissions()->pluck('name')->flip();
         $keys = [];
+        $masterAllowed = self::mayHoldMasterData($role);
 
         foreach (Access::pages() as $pageKey => $page) {
+            if ($page['section'] === 'master' && ! $masterAllowed) {
+                continue;
+            }
             $viewPerms = $page['actions']['view'][2] ?? [];
             $canView = $views !== null
                 ? in_array($pageKey, $views, true)
@@ -54,6 +58,14 @@ class AccessDefaults
         }
 
         return $keys;
+    }
+
+    /** Data Master hanya untuk peran tingkat manajer (config access.master_data_roles); peran duplikat dinilai dari peran asalnya. */
+    public static function mayHoldMasterData(Role $role): bool
+    {
+        $allowed = [...config('access.super_roles', []), ...config('access.master_data_roles', [])];
+
+        return in_array($role->name, $allowed, true) || in_array($role->base_role, $allowed, true);
     }
 
     /** Simpan akses bawaan sebagai checklist peran (hanya peran yang belum diatur). */
