@@ -36,6 +36,10 @@ return [
     // tingkat manajer (keputusan Ko Handy 27 Nov 2026). Peran lain tidak mendapat centang bawaan; peran duplikat ikut peran asalnya.
     'master_data_roles' => ['Admin', 'Sales Manager', 'Purchasing Manager', 'Inventory Manager', 'Finance Manager'],
 
+    // Voucher Penerimaan Kas/Bank: pencatat penerimaan (mis. kasir) mencetak voucher miliknya; peran ini + Owner/Super Admin
+    // boleh mencetak semua (keputusan Ko Handy 27 Nov 2026).
+    'receipt_voucher_all_roles' => ['Finance Manager'],
+
     'shared_prefixes' => ['penjualan.customers', 'pembelian.products', 'pembelian.suppliers', 'pembelian.product-details', 'pembelian.supplier-details'],
 
     // Akhiran route export / import Excel-CSV di SEMUA halaman: khusus Owner / Super Admin (keputusan Ko Handy 27 Nov 2026).
@@ -111,6 +115,7 @@ return [
                         'create' => ['Catat Penerimaan', ['create', 'store'], ['create customer receipt']],
                         'cancel' => ['Batalkan', ['cancel'], ['update customer receipt']],
                         'print' => ['Cetak Kwitansi', ['pdf'], ['view customer receipt']],
+                        'voucher' => ['Cetak Voucher Penerimaan', ['voucher'], ['view customer receipt']],
                     ],
                 ],
                 'penjualan.returns' => [

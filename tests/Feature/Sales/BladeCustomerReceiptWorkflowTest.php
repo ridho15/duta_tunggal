@@ -358,6 +358,34 @@ class BladeCustomerReceiptWorkflowTest extends TestCase
         $response->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_can_print_receipt_voucher_identical_to_vendor_payment_voucher()
+    {
+        // Permintaan akunting 27 Nov 2026: Voucher Penerimaan Kas/Bank seperti Voucher Pengeluaran di Pembayaran Hutang
+        $invoice = $this->createInvoiceWithAR(1000000);
+        $this->actingAs($this->user)->post(route('penjualan.receipts.store'), [
+            'customer_id' => $this->customer->id,
+            'payment_date' => now()->toDateString(),
+            'payment_method' => 'Cash',
+            'coa_id' => $this->cashCoa->id,
+            'selected_invoices' => [$invoice->id],
+            'invoice_receipts' => [$invoice->id => 1000000],
+        ]);
+        $receipt = CustomerReceipt::withoutGlobalScopes()->latest('id')->first();
+
+        $this->get(route('penjualan.receipts.voucher', $receipt->id))->assertOk()->assertHeader('content-type', 'application/pdf');
+        $this->get(route('penjualan.receipts.show', $receipt->id))->assertOk()->assertSee('Cetak Voucher Penerimaan');
+
+        $receipt->load(['customer', 'cabang', 'coa', 'customerReceiptItem.invoice', 'createdBy']);
+        $html = view('penjualan.receipts.voucher', [
+            'receipt' => $receipt, 'voucherNumber' => 'BKM-000001', 'kwitansiNumber' => 'KW-000001',
+            'company' => app(\App\Services\DocumentPrintBuilder::class)->company($receipt->cabang, false),
+        ])->render();
+        $this->assertStringContainsString('BUKTI PENERIMAAN KAS / BANK', $html);
+        $this->assertStringContainsString($invoice->invoice_number, $html);
+        $this->assertStringContainsString('TOTAL PENERIMAAN KAS / BANK', $html);
+        $this->assertStringNotContainsString('Jl. Industri Raya No. 88', $html);
+    }
+
     public function test_can_cancel_customer_receipt_reverses_journals_and_restores_ar()
     {
         $invoice = $this->createInvoiceWithAR(1000000);

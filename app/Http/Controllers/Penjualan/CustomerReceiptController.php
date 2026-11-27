@@ -633,6 +633,28 @@ class CustomerReceiptController extends Controller
     }
 
     /**
+     * Voucher Penerimaan Kas/Bank (bukti internal), identik dengan Voucher Pengeluaran di Pembayaran Hutang.
+     * Kwitansi tetap untuk customer; voucher ini untuk arsip & tanda tangan internal (permintaan akunting 27 Nov 2026).
+     */
+    public function voucher(CustomerReceipt $customerReceipt): Response
+    {
+        abort_unless($customerReceipt->canPrintVoucher(Auth::user()), 403,
+            'Anda tidak memiliki akses: Cetak Voucher Penerimaan untuk penerimaan ini. Solusi: voucher dicetak oleh pencatatnya, '
+            . 'atau oleh Finance Manager / Owner / Super Admin.');
+        $customerReceipt->loadMissing(['customer', 'cabang', 'coa', 'customerReceiptItem.invoice', 'createdBy']);
+        $number = str_pad((string) $customerReceipt->id, 6, '0', STR_PAD_LEFT);
+
+        $pdf = Pdf::loadView('penjualan.receipts.voucher', [
+            'receipt' => $customerReceipt,
+            'voucherNumber' => 'BKM-' . $number,
+            'kwitansiNumber' => 'KW-' . $number,
+            'company' => $this->docBuilder->company($customerReceipt->cabang, false),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Voucher_Penerimaan_BKM-' . $number . '.pdf');
+    }
+
+    /**
      * Membatalkan Penerimaan Customer secara resmi (Reversal Jurnal & Pengembalian Piutang).
      */
     public function cancel(Request $request, CustomerReceipt $customerReceipt): RedirectResponse

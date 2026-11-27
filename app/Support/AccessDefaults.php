@@ -57,8 +57,16 @@ class AccessDefaults
             }
         }
 
+        // Peran yang boleh mencetak semua Voucher Penerimaan perlu melihat & mencetak di Terima Pembayaran
+        if (in_array($role->name, config('access.receipt_voucher_all_roles', []), true)
+            || in_array($role->base_role, config('access.receipt_voucher_all_roles', []), true)) {
+            $keys = array_values(array_unique([...$keys, ...self::RECEIPT_VOUCHER_KEYS]));
+        }
+
         return $keys;
     }
+
+    public const RECEIPT_VOUCHER_KEYS = ['penjualan.receipts.view', 'penjualan.receipts.print', 'penjualan.receipts.voucher'];
 
     /** Data Master hanya untuk peran tingkat manajer (config access.master_data_roles); peran duplikat dinilai dari peran asalnya. */
     public static function mayHoldMasterData(Role $role): bool

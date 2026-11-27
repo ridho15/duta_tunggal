@@ -253,11 +253,9 @@
     <table class="header-table">
         <tr>
             <td style="width: 55%;">
-                <div class="company-name">PT DUTA TUNGGAL</div>
+                <div class="company-name">{{ $company['name'] }}</div>
                 <div class="company-address">
-                    Jl. Industri Raya No. 88, Kawasan Industri<br>
-                    Telp: (021) 8989-1234 | Email: finance@dutatunggal.co.id<br>
-                    NPWP: 01.234.567.8-012.000
+                    {!! collect([$company['address'], $company['phone'] ? 'Telp: '.$company['phone'] : null, $company['email'] ? 'Email: '.$company['email'] : null, $company['npwp'] ? 'NPWP: '.$company['npwp'] : null])->filter()->map(fn ($l) => e($l))->implode('<br>') !!}
                 </div>
             </td>
             <td style="width: 45%;" class="doc-title">

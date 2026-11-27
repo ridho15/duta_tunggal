@@ -289,6 +289,19 @@
                                         </svg>
                                     </a>
                                     @endaccessRoute
+                                    @if ($receipt->canPrintVoucher(auth()->user()))
+                                    <a
+                                        href="{{ route('penjualan.receipts.voucher', $receipt->id) }}"
+                                        target="_blank"
+                                        class="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition shadow-xs"
+                                        title="Cetak Voucher Penerimaan Kas/Bank (PDF)"
+                                        aria-label="Cetak Voucher Penerimaan Kas/Bank"
+                                    >
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </a>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

@@ -84,6 +84,22 @@ class CustomerReceipt extends Model
         return $this->morphMany(JournalEntry::class, 'source');
     }
     
+    /**
+     * Voucher Penerimaan Kas/Bank: wajib centang "Cetak Voucher Penerimaan"; pencatat mencetak voucher miliknya,
+     * Finance Manager / Owner / Super Admin boleh semua (keputusan Ko Handy 27 Nov 2026).
+     */
+    public function canPrintVoucher(?User $user): bool
+    {
+        if (! $user || ! \App\Support\Access::allows('penjualan.receipts.voucher', $user)) {
+            return false;
+        }
+        if (\App\Support\Access::isSuper($user) || $user->hasRole(config('access.receipt_voucher_all_roles', []))) {
+            return true;
+        }
+
+        return (int) $this->created_by === (int) $user->getKey();
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by')->withDefault();
