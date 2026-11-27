@@ -8,11 +8,8 @@
 use App\Models\User;
 use App\Support\Access;
 use App\Support\AccessDefaults;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->ctx = stkContext();
@@ -94,7 +91,7 @@ it('tambah peran dari template mengisi centang template', function () {
 });
 
 it('akses khusus user: tambah & cabut tersimpan, kunci sama dengan peran dibuang, bisa dikembalikan', function () {
-    $this->actingAs($this->owner)->get(route('settings.users.access.edit', $this->staff))->assertOk()->assertSee('Akses ' . $this->staff->name);
+    $this->actingAs($this->owner)->get(route('settings.users.access.edit', $this->staff))->assertOk()->assertSee('Akses '.$this->staff->name);
 
     $this->put(route('settings.users.access.update', $this->staff), [
         'add' => ['keuangan.journal.view', 'penjualan.so.view'],   // so.view sudah dari peran → dibuang

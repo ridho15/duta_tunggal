@@ -13,8 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
     $this->ctx = stkContext();
     $this->user = $this->ctx['user'];

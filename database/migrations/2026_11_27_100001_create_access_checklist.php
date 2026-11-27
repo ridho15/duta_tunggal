@@ -15,14 +15,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('roles', function (Blueprint $table) {
-            if (! Schema::hasColumn('roles', 'base_role')) {
-                $table->string('base_role')->nullable();
-            }
-            if (! Schema::hasColumn('roles', 'description')) {
-                $table->string('description', 500)->nullable();
-            }
-        });
+        $needBaseRole = ! Schema::hasColumn('roles', 'base_role');
+        $needDescription = ! Schema::hasColumn('roles', 'description');
+        if ($needBaseRole || $needDescription) {
+            Schema::table('roles', function (Blueprint $table) use ($needBaseRole, $needDescription) {
+                if ($needBaseRole) {
+                    $table->string('base_role')->nullable();
+                }
+                if ($needDescription) {
+                    $table->string('description', 500)->nullable();
+                }
+            });
+        }
 
         if (! Schema::hasTable('user_access_overrides')) {
             Schema::create('user_access_overrides', function (Blueprint $table) {

@@ -87,7 +87,9 @@ if (app()->environment('local')) {
     });
 
     Route::get('/dev-login', function () {
-        $user = \App\Models\User::first();
+        $user = request('role')
+            ? \App\Models\User::role(request('role'))->first()
+            : \App\Models\User::first();
         if ($user) {
             \Illuminate\Support\Facades\Auth::login($user);
         }
