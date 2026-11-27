@@ -269,6 +269,11 @@
                                         {{ $u->status ? 'Aktif' : 'Nonaktif' }}
                                     </button>
                                 </form>
+                                @else
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold {{ $u->status ? 'bg-emerald-50 text-[#15803d] border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-200' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $u->status ? 'bg-[#15803d]' : 'bg-gray-400' }}" aria-hidden="true"></span>
+                                    {{ $u->status ? 'Aktif' : 'Nonaktif' }}
+                                </span>
                                 @endaccessRoute
                             </td>
 

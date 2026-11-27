@@ -220,6 +220,11 @@
                                         {{ $p->is_active ? 'Aktif' : 'Non-Aktif' }}
                                     </button>
                                 </form>
+                                @else
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $p->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $p->is_active ? 'bg-emerald-500' : 'bg-gray-400' }}" aria-hidden="true"></span>
+                                    {{ $p->is_active ? 'Aktif' : 'Non-Aktif' }}
+                                </span>
                                 @endaccessRoute
                             </td>
                             <td class="py-3 px-4 text-center">
