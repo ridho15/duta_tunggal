@@ -36,6 +36,7 @@
             <main x-data class="flex-1 w-full max-w-[1180px] mx-auto px-4 sm:px-6 md:px-7 py-6 md:py-8 flex flex-col gap-5">
                 {{-- Flash Notifications --}}
                 @include('layouts.partials.flash')
+                @include('layouts.partials.data-transfer-bar')
 
                 {{-- Page Content --}}
                 @yield('content')

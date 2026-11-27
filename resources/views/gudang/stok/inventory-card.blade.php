@@ -20,6 +20,7 @@
             </p>
         </div>
         <div class="flex items-center gap-2.5">
+            @accessRoute('gudang.stok.inventory-card.pdf')
             <a href="{{ route('gudang.stok.inventory-card.pdf', request()->query()) }}"
                target="_blank"
                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition shadow-sm">
@@ -29,6 +30,8 @@
                 </svg>
                 <span>Cetak PDF (Landscape)</span>
             </a>
+            @endaccessRoute
+            @accessRoute('inventory-card.excel')
             <a href="{{ route('inventory-card.excel', request()->query()) }}"
                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#15803d] bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition shadow-sm">
                 <svg class="w-4 h-4 text-[#15803d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,6 +39,7 @@
                 </svg>
                 <span>Ekspor Excel</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 

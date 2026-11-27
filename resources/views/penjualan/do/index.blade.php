@@ -313,6 +313,7 @@
                                         </svg>
                                     </a>
 
+                                    @accessRoute('penjualan.do.pdf')
                                     <a
                                         href="{{ route('penjualan.do.pdf', $do->id) }}"
                                         target="_blank"
@@ -324,8 +325,10 @@
                                             <rect x="6" y="14" width="12" height="8" rx="1" stroke-width="1.8"></rect>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     @if($do->status === 'confirmed' && empty($do->returned_at) && ! $hasIssuedSj)
+                                        @accessRoute('penjualan.sj.create')
                                         <a
                                             href="{{ route('penjualan.sj.create', ['so_id' => $primarySo?->id, 'do_id' => $do->id]) }}"
                                             class="inline-flex items-center gap-1 px-2.5 py-1 bg-[#15803d] hover:bg-[#14532d] text-white rounded-lg font-bold text-[11px] shadow-xs transition"
@@ -333,6 +336,7 @@
                                         >
                                             <span>Buat SJ</span>
                                         </a>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>

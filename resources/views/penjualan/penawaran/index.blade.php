@@ -28,6 +28,7 @@
                 <span>Pesanan Penjualan (SO)</span>
             </a>
             @can('create', App\Models\Quotation::class)
+            @accessRoute('penjualan.quotations.create')
             <a href="{{ route('penjualan.quotations.create') }}"
                class="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl transition shadow-sm active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,6 +36,7 @@
                 </svg>
                 <span>Buat Penawaran Baru</span>
             </a>
+            @endaccessRoute
             @endcan
         </div>
     </div>
@@ -247,27 +249,33 @@
                                        title="Lihat Detail">
                                         Detail
                                     </a>
+                                    @accessRoute('penjualan.quotations.pdf')
                                     <a href="{{ route('penjualan.quotations.pdf', $qo) }}" target="_blank"
                                        class="px-2.5 py-1 text-[11px] font-medium text-[#15803d] bg-[#f0fdf4] border border-[#86efac] rounded-xl hover:bg-[#dcfce7] shadow-sm transition"
                                        title="Cetak PDF">
                                         PDF
                                     </a>
+                                    @endaccessRoute
                                     @if($qo->isEditable())
                                         @can('update', $qo)
+                                        @accessRoute('penjualan.quotations.edit')
                                         <a href="{{ route('penjualan.quotations.edit', $qo) }}"
                                            class="px-2.5 py-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 shadow-sm transition"
                                            title="Edit Draft">
                                             Edit
                                         </a>
+                                        @endaccessRoute
                                         @endcan
                                     @endif
                                     @if(is_null($qo->unusableReasonForSaleOrder()))
                                         @can('create', App\Models\SaleOrder::class)
+                                        @accessRoute('penjualan.quotations.convertToSaleOrder')
                                         <a href="{{ route('penjualan.quotations.convertToSaleOrder', $qo) }}"
                                            class="px-2.5 py-1 text-[11px] font-bold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl shadow-sm transition"
                                            title="Buat Sales Order dari Penawaran Ini">
                                             Buat SO
                                         </a>
+                                        @endaccessRoute
                                         @endcan
                                     @endif
                                 </div>

@@ -38,6 +38,7 @@
 
         {{-- Top Action Buttons --}}
         <div class="flex items-center gap-2">
+            @accessRoute('penjualan.invoices.pdf')
             <a
                 href="{{ route('penjualan.invoices.pdf', $invoice->id) }}"
                 target="_blank"
@@ -49,8 +50,10 @@
                 </svg>
                 <span>Cetak Faktur (PDF)</span>
             </a>
+            @endaccessRoute
 
             @if($remainingAmount > 0)
+                @accessRoute('penjualan.receipts.create')
                 <a
                     href="{{ route('penjualan.receipts.create', ['invoice_id' => $invoice->id]) }}"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#14532d] text-white font-bold text-xs shadow-xs transition"
@@ -60,9 +63,11 @@
                     </svg>
                     <span>Terima Pembayaran</span>
                 </a>
+                @endaccessRoute
             @endif
 
             @if(!in_array(strtolower((string) $invoice->status), ['draft', 'cancelled', 'canceled']))
+                @accessRoute('penjualan.invoices.updateTaxNumber')
                 <button
                     type="button"
                     onclick="document.getElementById('taxNumberModal').classList.remove('hidden')"
@@ -73,7 +78,9 @@
                     </svg>
                     <span>{{ filled($invoice->tax_invoice_number) ? 'Ubah No. Faktur Pajak' : 'Isi No. Faktur Pajak' }}</span>
                 </button>
+                @endaccessRoute
 
+                @accessRoute('penjualan.credit-notes.create')
                 <a
                     href="{{ route('penjualan.credit-notes.create', ['invoice_id' => $invoice->id]) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold text-xs shadow-xs transition"
@@ -85,6 +92,7 @@
                     </svg>
                     <span>Buat Nota Kredit</span>
                 </a>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -320,6 +328,7 @@
     </div>
 
     {{-- Modal Isi No. Faktur Pajak --}}
+    @accessRoute('penjualan.invoices.updateTaxNumber')
     <div id="taxNumberModal" class="{{ $errors->has('tax_invoice_number') ? '' : 'hidden' }} fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 backdrop-blur-xs flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex items-center justify-between pb-3 border-b border-gray-100">
@@ -371,6 +380,7 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
 </div>
 @endsection

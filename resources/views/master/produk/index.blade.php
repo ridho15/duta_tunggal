@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Kelola katalog barang, SKU, harga beli, harga jual, batas diskon kasir, dan akun persediaan.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('master.products.create')
             <a
                 href="{{ route('master.products.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Tambah Produk Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -206,6 +208,7 @@
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-center">
+                                @accessRoute('master.products.toggle-active')
                                 <form method="POST" action="{{ route('master.products.toggle-active', $p) }}" class="inline">
                                     @csrf
                                     <button
@@ -217,6 +220,12 @@
                                         {{ $p->is_active ? 'Aktif' : 'Non-Aktif' }}
                                     </button>
                                 </form>
+                                @else
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border {{ $p->is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-600 border-gray-200' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $p->is_active ? 'bg-emerald-500' : 'bg-gray-400' }}" aria-hidden="true"></span>
+                                    {{ $p->is_active ? 'Aktif' : 'Non-Aktif' }}
+                                </span>
+                                @endaccessRoute
                             </td>
                             <td class="py-3 px-4 text-center">
                                 <div class="inline-flex items-center gap-1">
@@ -230,6 +239,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </a>
+                                    @accessRoute('master.products.edit')
                                     <a
                                         href="{{ route('master.products.edit', $p) }}"
                                         class="p-1.5 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition"
@@ -239,6 +249,8 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
+                                    @accessRoute('master.products.destroy')
                                     <button
                                         type="button"
                                         @click="$dispatch('open-modal-delete-product', { action: '{{ route('master.products.destroy', $p) }}', name: '{{ addslashes($p->name) }}' })"
@@ -249,6 +261,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                     </button>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -275,6 +288,7 @@
     </div>
 
     {{-- Modal Konfirmasi Hapus Produk --}}
+    @accessRoute('master.products.destroy')
     <x-confirmation-modal
         name="delete-product"
         title="Hapus Data Produk"
@@ -290,5 +304,6 @@
             Tindakan ini tidak dapat dibatalkan dan akan mempengaruhi riwayat inventori dan katalog harga.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

@@ -71,6 +71,8 @@ class SaleOrderController extends Controller
         $search = trim((string) $request->query('search', ''));
         $dateFilter = $request->query('date');
         $salesFilter = $request->query('sales');
+        // Filter status lengkap (Ko Handy 27 Nov 2026) — termasuk Ditolak & Dibatalkan yang tidak punya tab sendiri
+        $statusFilter = array_key_exists((string) $request->query('status'), SaleOrder::STATUS_LABELS) ? (string) $request->query('status') : null;
 
         // Base query with cabang scoping
         $baseQuery = SaleOrder::query();
@@ -98,7 +100,7 @@ class SaleOrderController extends Controller
 
         // Filter query menurut tab yang aktif. Saat MENCARI, semua status ikut dicari agar nomor SO selalu ketemu.
         $query = clone $baseQuery;
-        $searchAllTabs = $search !== '' && $activeTab !== 'semua';
+        $searchAllTabs = ($search !== '' || $statusFilter !== null) && $activeTab !== 'semua';
         match ($searchAllTabs ? 'semua' : $activeTab) {
             'draft' => $query->where('status', 'draft'),
             'menunggu_approve' => $query->where('status', 'request_approve'),
@@ -129,6 +131,10 @@ class SaleOrderController extends Controller
                             ->orWhere('sku', 'like', "%{$search}%");
                     });
             });
+        }
+
+        if ($statusFilter !== null) {
+            $query->where('status', $statusFilter);
         }
 
         // Filter Sales Creator
@@ -168,6 +174,7 @@ class SaleOrderController extends Controller
             'activeTab' => $activeTab,
             'search' => $search,
             'searchAllTabs' => $searchAllTabs,
+            'statusFilter' => $statusFilter,
             'dateFilter' => $dateFilter,
             'salesFilter' => $salesFilter,
             'salesUsers' => $salesUsers,

@@ -39,6 +39,7 @@
 
         {{-- Top Action Buttons --}}
         <div class="flex items-center gap-2">
+            @accessRoute('penjualan.sj.pdf')
             <a
                 href="{{ route('penjualan.sj.pdf', $suratJalan->id) }}"
                 target="_blank"
@@ -50,8 +51,10 @@
                 </svg>
                 <span>Cetak SJ (PDF)</span>
             </a>
+            @endaccessRoute
 
             @if($suratJalan->status === \App\Models\SuratJalan::STATUS_ISSUED && $primarySO)
+                @accessRoute('penjualan.invoices.create')
                 <a
                     href="{{ route('penjualan.invoices.create', ['so_id' => $primarySO->id, 'sj_id' => $suratJalan->id]) }}"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#14532d] text-white font-bold text-xs shadow-xs transition"
@@ -61,7 +64,9 @@
                     </svg>
                     <span>Buat Faktur Penjualan</span>
                 </a>
+                @endaccessRoute
 
+                @accessRoute('penjualan.sj.cancel')
                 <button
                     type="button"
                     onclick="openCancelModal()"
@@ -69,6 +74,7 @@
                 >
                     Batalkan SJ
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -262,6 +268,7 @@
 </div>
 
 {{-- Modal Pembatalan Surat Jalan --}}
+@accessRoute('penjualan.sj.cancel')
 <div id="cancelModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center gap-3 text-red-600">
@@ -310,6 +317,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 @push('scripts')
 <script>

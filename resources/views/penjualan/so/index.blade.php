@@ -12,10 +12,12 @@
                 Semua SO cabang <span class="font-semibold text-gray-700">{{ $cabangNama }}</span>. Klik baris untuk melihat detail dan langkah berikutnya.
             </div>
         </div>
+        @accessRoute('penjualan.so.create')
         <a href="{{ route('penjualan.so.create') }}" class="bg-[#15803d] hover:bg-[#166534] text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl min-h-[44px] inline-flex items-center gap-2 shadow-sm transition active:scale-[0.98]">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             Buat SO
         </a>
+        @endaccessRoute
     </div>
 
     <!-- Tab Filter Cepat -->
@@ -47,7 +49,7 @@
 
     @if (! empty($searchAllTabs))
         <div class="text-xs text-gray-600 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
-            Hasil pencarian "<strong>{{ $search }}</strong>" ditampilkan dari <strong>semua status</strong>.
+            @if ($search !== '') Hasil pencarian "<strong>{{ $search }}</strong>" @else Hasil filter status @endif ditampilkan dari <strong>semua tab</strong>.
         </div>
     @endif
 
@@ -67,6 +69,14 @@
                 <option value="">Semua Periode</option>
                 <option value="{{ now()->format('Y-m') }}" {{ request('date') === now()->format('Y-m') ? 'selected' : '' }}>Bulan Ini ({{ now()->translatedFormat('M Y') }})</option>
                 <option value="{{ now()->subMonth()->format('Y-m') }}" {{ request('date') === now()->subMonth()->format('Y-m') ? 'selected' : '' }}>Bulan Lalu ({{ now()->subMonth()->translatedFormat('M Y') }})</option>
+            </select>
+
+            <!-- Filter Status (semua status, termasuk Ditolak & Dibatalkan) -->
+            <select name="status" onchange="this.form.submit()" aria-label="Filter status SO" class="text-xs sm:text-[13px] font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d] cursor-pointer">
+                <option value="">Semua Status</option>
+                @foreach (\App\Models\SaleOrder::STATUS_LABELS as $statusKey => $statusText)
+                    <option value="{{ $statusKey }}" {{ ($statusFilter ?? null) === $statusKey ? 'selected' : '' }}>{{ $statusText }}</option>
+                @endforeach
             </select>
 
             <!-- Filter Sales -->
@@ -167,9 +177,11 @@
                                             Lanjutkan
                                         </a>
                                     @elseif(in_array($so->status, ['approved', 'confirmed', 'partially_delivered']) && $available > 0)
+                                        @accessRoute('penjualan.do.create')
                                         <a href="{{ route('penjualan.do.create', ['so_id' => $so->id]) }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Buat DO
                                         </a>
+                                        @endaccessRoute
                                     @elseif($so->status === 'received')
                                         <a href="{{ route('penjualan.invoices.index') }}" class="text-xs font-bold px-3 py-1.5 bg-[#15803d] hover:bg-[#166534] text-white rounded-xl shadow-sm transition-colors">
                                             Buat Invoice
@@ -186,11 +198,13 @@
 
                                     {{-- Tombol Selesai (Ko Handy 21 Nov): transaksi selesai saat sales menekannya --}}
                                     @if(\App\Http\Controllers\Penjualan\SaleOrderController::completionBlockReason(auth()->user(), $so) === null)
+                                        @accessRoute('penjualan.so.complete')
                                         <button type="button"
                                                 @click="$dispatch('open-modal-complete-so', { action: '{{ route('penjualan.so.complete', $so->id) }}', number: '{{ $so->so_number }}' })"
                                                 class="text-xs font-bold px-3 py-1.5 bg-white border border-[#15803d] text-[#15803d] hover:bg-emerald-50 rounded-xl shadow-sm transition-colors">
                                             Selesai
                                         </button>
+                                        @endaccessRoute
                                     @endif
 
                                     <!-- Dropdown Menu / PDF Link -->
@@ -287,10 +301,12 @@
         </div>
     </div>
 </div>
+@accessRoute('penjualan.so.complete')
 <x-confirmation-modal name="complete-so" title="Tandai Transaksi Selesai" variant="success" confirm-text="Ya, Selesai" cancel-text="Batal" method="POST">
     <p class="text-sm text-gray-600">
         Tandai transaksi <span class="font-bold font-mono text-gray-900" x-text="data.number"></span> <strong>SELESAI</strong>?
         Barang yang belum dikirim (bila ada) dianggap tidak dilanjutkan. Aksi ini tidak dapat dibatalkan.
     </p>
 </x-confirmation-modal>
+@endaccessRoute
 @endsection

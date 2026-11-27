@@ -18,6 +18,7 @@
         </div>
 
         <div>
+            @accessRoute('penjualan.receipts.create')
             <a
                 href="{{ route('penjualan.receipts.create') }}"
                 class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-[0.98]"
@@ -27,6 +28,7 @@
                 </svg>
                 <span>Catat Penerimaan Baru</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -274,6 +276,7 @@
                                         <span>Detail</span>
                                     </a>
 
+                                    @accessRoute('penjualan.receipts.pdf')
                                     <a
                                         href="{{ route('penjualan.receipts.pdf', $receipt->id) }}"
                                         target="_blank"
@@ -285,6 +288,7 @@
                                             <rect x="6" y="14" width="12" height="8" rx="1" stroke-width="1.8"></rect>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -301,12 +305,14 @@
                                     <p class="text-xs text-gray-500 max-w-sm mt-1">
                                         Belum ada data penerimaan kwitansi yang cocok dengan filter. Klik tombol di bawah untuk mencatat pelunasan invoice piutang.
                                     </p>
+                                    @accessRoute('penjualan.receipts.create')
                                     <a
                                         href="{{ route('penjualan.receipts.create') }}"
                                         class="mt-4 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-xl transition shadow-xs"
                                     >
                                         Buat Penerimaan Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>

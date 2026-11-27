@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Kelola akun staf, hierarki peran (RBAC), penugasan cabang/gudang, dan kredensial login.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('settings.users.create')
             <a
                 href="{{ route('settings.users.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-xl shadow-xs transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Tambah Pengguna Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -254,6 +256,7 @@
 
                             {{-- Status & Toggle --}}
                             <td class="px-4 py-4 text-center">
+                                @accessRoute('settings.users.toggle-active')
                                 <form method="POST" action="{{ route('settings.users.toggle-active', $u) }}" class="inline-block">
                                     @csrf
                                     <button
@@ -266,6 +269,12 @@
                                         {{ $u->status ? 'Aktif' : 'Nonaktif' }}
                                     </button>
                                 </form>
+                                @else
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold {{ $u->status ? 'bg-emerald-50 text-[#15803d] border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-200' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $u->status ? 'bg-[#15803d]' : 'bg-gray-400' }}" aria-hidden="true"></span>
+                                    {{ $u->status ? 'Aktif' : 'Nonaktif' }}
+                                </span>
+                                @endaccessRoute
                             </td>
 
                             {{-- Tombol Aksi --}}
@@ -284,6 +293,7 @@
                                     </a>
 
                                     {{-- Edit User --}}
+                                    @accessRoute('settings.users.edit')
                                     <a
                                         href="{{ route('settings.users.edit', $u) }}"
                                         class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition"
@@ -293,8 +303,23 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
+
+                                    @if (\App\Support\Access::canManageRoles())
+                                        <a
+                                            href="{{ route('settings.users.access.edit', $u) }}"
+                                            class="p-1.5 text-[#15803d] hover:text-[#14532d] hover:bg-[#dcfce7] rounded-lg transition"
+                                            title="Atur akses {{ $u->name }}"
+                                            aria-label="Atur akses {{ $u->name }}"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                                            </svg>
+                                        </a>
+                                    @endif
 
                                     {{-- Reset Password Trigger --}}
+                                    @accessRoute('settings.users.reset-password')
                                     <button
                                         type="button"
                                         onclick="openResetPasswordModal('{{ $u->id }}', '{{ addslashes($u->name) }}', '{{ $u->username }}')"
@@ -305,9 +330,11 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                         </svg>
                                     </button>
+                                    @endaccessRoute
 
                                     {{-- Hapus (Protected) --}}
                                     @if ($u->id !== auth()->id())
+                                        @accessRoute('settings.users.destroy')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-delete-user', { action: '{{ route('settings.users.destroy', $u) }}', name: '{{ addslashes($u->name) }}' })"
@@ -318,6 +345,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -346,6 +374,7 @@
 </div>
 
 {{-- Modal Reset Password --}}
+@accessRoute('settings.users.reset-password')
 <div id="resetPasswordModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-gray-200 max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in duration-150">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
@@ -407,6 +436,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <script>
     function openResetPasswordModal(userId, userName, username) {
@@ -426,6 +456,7 @@
 </script>
 
     {{-- Modal Konfirmasi Hapus User --}}
+    @accessRoute('settings.users.destroy')
     <x-confirmation-modal
         name="delete-user"
         title="Hapus Akun Pengguna"
@@ -441,4 +472,5 @@
             Tindakan ini tidak dapat dibatalkan. Seluruh akses login untuk akun ini akan langsung dinonaktifkan secara permanen.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

@@ -69,16 +69,20 @@
 
                     @if ($canApprove && $return->status === 'draft')
                         <div class="flex items-center gap-2 shrink-0">
+                            @accessRoute('gudang.retur-do.reject')
                             <button type="button"
                                     @click="$dispatch('open-modal-reject-do-return', { action: '{{ route('gudang.retur-do.reject', $return) }}', number: '{{ $return->return_number }}' })"
                                     class="px-3.5 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100">
                                 Tolak
                             </button>
+                            @endaccessRoute
+                            @accessRoute('gudang.retur-do.approve')
                             <button type="button"
                                     @click="$dispatch('open-modal-approve-do-return', { action: '{{ route('gudang.retur-do.approve', $return) }}', number: '{{ $return->return_number }}' })"
                                     class="px-4 py-2 text-xs font-bold text-white bg-[#15803d] hover:bg-[#166534] rounded-xl">
                                 Setujui
                             </button>
+                            @endaccessRoute
                         </div>
                     @endif
                 </div>
@@ -121,13 +125,16 @@
 
     {{ $returns->links() }}
 
+    @accessRoute('gudang.retur-do.approve')
     <x-confirmation-modal name="approve-do-return" title="Setujui Retur DO" variant="success" confirm-text="Ya, Setujui Retur" cancel-text="Batal" method="POST">
         <p class="text-sm text-gray-600">
             Setujui retur <span class="font-bold font-mono text-gray-900" x-text="data.number"></span>?
             Barang kurang dikembalikan ke stok gudang asal, barang rusak masuk karantina, dan DO pengganti dibuat untuk barang yang tetap dikirim.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
+    @accessRoute('gudang.retur-do.reject')
     <x-confirmation-modal name="reject-do-return" title="Tolak Retur DO" variant="danger" confirm-text="Ya, Tolak Retur" cancel-text="Batal" method="POST">
         <p class="text-sm text-gray-600">
             Tolak retur <span class="font-bold font-mono text-gray-900" x-text="data.number"></span>? Stok dan DO tidak berubah; DO bisa dicek dan diretur ulang.
@@ -138,5 +145,6 @@
                       class="mt-1 w-full py-2 px-3 text-xs font-normal bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#15803d] focus:border-[#15803d]"></textarea>
         </label>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

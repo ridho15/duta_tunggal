@@ -27,6 +27,7 @@
                 </svg>
                 Daftar Pengguna
             </a>
+            @accessRoute('settings.users.edit')
             <a
                 href="{{ route('settings.users.edit', $user) }}"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-xl transition shadow-xs active:scale-[0.98]"
@@ -36,6 +37,15 @@
                 </svg>
                 Edit Pengguna
             </a>
+            @endaccessRoute
+            @if (\App\Support\Access::canManageRoles())
+                <a
+                    href="{{ route('settings.users.access.edit', $user) }}"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 text-sm font-semibold rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
+                >
+                    Atur akses
+                </a>
+            @endif
         </div>
     </div>
 
@@ -68,6 +78,7 @@
                     {{ $user->status ? 'Akun Aktif' : 'Nonaktif' }}
                 </span>
 
+                @accessRoute('settings.users.reset-password')
                 <button
                     type="button"
                     onclick="openResetPasswordModal('{{ $user->id }}', '{{ addslashes($user->name) }}', '{{ $user->username }}')"
@@ -75,6 +86,7 @@
                 >
                     Reset Password
                 </button>
+                @endaccessRoute
             </div>
         </div>
 
@@ -210,6 +222,7 @@
 </div>
 
 {{-- Modal Reset Password --}}
+@accessRoute('settings.users.reset-password')
 <div id="resetPasswordModal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-gray-200 max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in duration-150">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
@@ -271,6 +284,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <script>
     function openResetPasswordModal(userId, userName, username) {

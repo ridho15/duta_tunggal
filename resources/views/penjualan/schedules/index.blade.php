@@ -18,6 +18,7 @@
         </div>
 
         <div class="flex items-center gap-2">
+            @accessRoute('penjualan.schedules.create')
             <a
                 href="{{ route('penjualan.schedules.create') }}"
                 class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition"
@@ -27,6 +28,7 @@
                 </svg>
                 <span>Buat Jadwal Baru</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -330,6 +332,7 @@
                                     </a>
 
                                     {{-- Cetak Surat Tugas Driver (PDF) --}}
+                                    @accessRoute('penjualan.schedules.pdf')
                                     <a
                                         href="{{ route('penjualan.schedules.pdf', $schedule->id) }}"
                                         target="_blank"
@@ -341,9 +344,11 @@
                                             <path d="M6 14h12v8H6z" stroke-width="2"></path>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     @if($schedule->status === 'pending')
                                         {{-- Mulai Kirim --}}
+                                        @accessRoute('penjualan.schedules.start')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-start-schedule', { action: '{{ route('penjualan.schedules.start', $schedule->id) }}', number: '{{ $schedule->schedule_number }}' })"
@@ -355,8 +360,10 @@
                                             </svg>
                                             <span>Berangkat</span>
                                         </button>
+                                        @endaccessRoute
 
                                         {{-- Edit --}}
+                                        @accessRoute('penjualan.schedules.edit')
                                         <a
                                             href="{{ route('penjualan.schedules.edit', $schedule->id) }}"
                                             class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -367,8 +374,10 @@
                                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-width="2"></path>
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
                                         {{-- Batal --}}
+                                        @accessRoute('penjualan.schedules.cancel')
                                         <button
                                             type="button"
                                             onclick="openCancelModal('{{ $schedule->id }}', '{{ $schedule->schedule_number }}')"
@@ -380,8 +389,10 @@
                                                 <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke-width="2"></line>
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @elseif($schedule->status === 'on_the_way')
                                         {{-- Selesaikan Kirim --}}
+                                        @accessRoute('penjualan.schedules.complete')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-complete-schedule', { action: '{{ route('penjualan.schedules.complete', $schedule->id) }}', number: '{{ $schedule->schedule_number }}' })"
@@ -393,8 +404,10 @@
                                             </svg>
                                             <span>Selesai</span>
                                         </button>
+                                        @endaccessRoute
 
                                         {{-- Tandai Gagal --}}
+                                        @accessRoute('penjualan.schedules.fail')
                                         <button
                                             type="button"
                                             onclick="openFailModal('{{ $schedule->id }}', '{{ $schedule->schedule_number }}')"
@@ -406,6 +419,7 @@
                                             </svg>
                                             <span>Gagal</span>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -420,9 +434,11 @@
                                     </svg>
                                     <p class="text-sm font-semibold text-gray-700">Tidak ada jadwal pengiriman ditemukan</p>
                                     <p class="text-xs text-gray-400 mt-0.5">Silakan buat jadwal keberangkatan armada baru atau ubah kriteria filter.</p>
+                                    @accessRoute('penjualan.schedules.create')
                                     <a href="{{ route('penjualan.schedules.create') }}" class="mt-4 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white rounded-xl text-xs font-bold transition">
                                         Buat Jadwal Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -440,6 +456,7 @@
 </div>
 
 {{-- Modal Pengiriman Gagal --}}
+@accessRoute('penjualan.schedules.fail')
 <div id="failModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -482,8 +499,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 {{-- Modal Pembatalan Jadwal --}}
+@accessRoute('penjualan.schedules.cancel')
 <div id="cancelModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -524,6 +543,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <script>
 function openFailModal(scheduleId, scheduleNum) {
@@ -548,6 +568,7 @@ function closeCancelModal() {
 </script>
 
     {{-- Modal Konfirmasi Mulai Pengiriman --}}
+    @accessRoute('penjualan.schedules.start')
     <x-confirmation-modal
         name="start-schedule"
         title="Mulai Pengiriman Armada"
@@ -563,8 +584,10 @@ function closeCancelModal() {
             Seluruh Surat Jalan dan Delivery Order terkait akan ditandai terkirim dan stok fisik resmi dikeluarkan dari gudang.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Selesai Pengiriman --}}
+    @accessRoute('penjualan.schedules.complete')
     <x-confirmation-modal
         name="complete-schedule"
         title="Tandai Jadwal Pengiriman Selesai"
@@ -580,4 +603,5 @@ function closeCancelModal() {
             Status seluruh DO terkait akan ditandai selesai dan jurnal akuntansi pengiriman barang akan dibukukan secara otomatis.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

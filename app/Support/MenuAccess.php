@@ -37,7 +37,12 @@ class MenuAccess
             return;
         }
 
-        if (! empty($allowedRoles) && method_exists($user, 'hasAnyRole') && $user->hasAnyRole($allowedRoles)) {
+        // Route sudah lolos checklist Peran & Hak Akses → aturan peran lama tidak menghalangi (checklist yang menentukan)
+        if (request()->attributes->get('access_granted')) {
+            return;
+        }
+
+        if (! empty($allowedRoles) && array_intersect(static::roleNamesFor($user), $allowedRoles)) {
             return;
         }
 
@@ -105,9 +110,7 @@ class MenuAccess
             return static::$codeCache[$user];
         }
 
-        $roleNames = method_exists($user, 'getRoleNames')
-            ? $user->getRoleNames()->all()
-            : [];
+        $roleNames = static::roleNamesFor($user);
 
         $codes = [];
         foreach ((array) config('menu_access.role_groups', []) as $code => $roles) {
@@ -133,6 +136,27 @@ class MenuAccess
         $isInventoryManager = method_exists($user, 'hasRole') && $user->hasRole('Inventory Manager');
 
         return static::isSuper($user) || $isInventoryManager || (bool) array_intersect(static::codesFor($user), ['PUR', 'FIN']);
+    }
+
+    /**
+     * Nama peran user + nama peran ASAL (roles.base_role) untuk peran hasil duplikat / peran baru dari template,
+     * sehingga aturan lama berbasis nama peran (mis. "Accounting") ikut berlaku untuk "Akuntan 2".
+     *
+     * @return array<int, string>
+     */
+    public static function roleNamesFor($user): array
+    {
+        if (! method_exists($user, 'getRoleNames')) {
+            return [];
+        }
+        $names = $user->getRoleNames()->all();
+        foreach ($user->roles ?? [] as $role) {
+            if (! empty($role->base_role) && ! in_array($role->base_role, config('access.super_roles', ['Owner', 'Super Admin']), true)) {
+                $names[] = $role->base_role;
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     /** Dipakai di test / setelah role user berubah. */

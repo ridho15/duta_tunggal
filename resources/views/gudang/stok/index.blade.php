@@ -198,7 +198,8 @@
                         <th class="py-3 px-4 text-center w-36">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 text-xs text-gray-700">
+                {{-- Satu scope Alpine untuk seluruh tabel: baris rincian gudang adalah <tr> saudara, bukan anak baris produk --}}
+                <tbody x-data="{ openId: null }" class="divide-y divide-gray-100 text-xs text-gray-700">
                     @forelse ($products as $index => $product)
                         @php
                             $stocks = $product->inventoryStock;
@@ -224,7 +225,7 @@
                                 $statusDot = 'bg-[#15803d]';
                             }
                         @endphp
-                        <tr x-data="{ open: false }" class="hover:bg-gray-50/60 transition-colors">
+                        <tr class="hover:bg-gray-50/60 transition-colors">
                             <td class="py-3.5 px-4 text-center text-gray-400">
                                 {{ $products->firstItem() + $index }}
                             </td>
@@ -283,10 +284,12 @@
 
                                     @if ($stocks->count() > 1)
                                         <button type="button"
-                                                @click="open = !open"
+                                                @click="openId = openId === {{ $product->id }} ? null : {{ $product->id }}"
+                                                :aria-expanded="openId === {{ $product->id }}"
+                                                aria-label="Rincian stok per gudang"
                                                 class="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition"
-                                                :title="open ? 'Tutup Rincian Gudang' : 'Lihat Rincian per Gudang'">
-                                            <svg class="w-4 h-4 transform transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                :title="openId === {{ $product->id }} ? 'Tutup Rincian Gudang' : 'Lihat Rincian per Gudang'">
+                                            <svg class="w-4 h-4 transform transition-transform" :class="openId === {{ $product->id }} ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path d="m19 9-7 7-7-7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
                                             </svg>
                                         </button>
@@ -297,7 +300,7 @@
 
                         {{-- Accordion Breakdown per Gudang --}}
                         @if ($stocks->count() > 1)
-                            <tr x-show="open" x-cloak class="bg-gray-50/80">
+                            <tr x-show="openId === {{ $product->id }}" x-cloak class="bg-gray-50/80">
                                 <td colspan="10" class="py-2.5 px-6 border-y border-gray-200/60">
                                     <div class="text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                                         Distribusi Stok di Setiap Gudang:

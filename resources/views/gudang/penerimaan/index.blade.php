@@ -25,6 +25,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Pencatatan surat jalan masuk dari supplier, verifikasi fisik barang gudang, dan pembaruan stok persediaan.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('gudang.penerimaan.create')
             <a
                 href="{{ route('gudang.penerimaan.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -34,6 +35,7 @@
                 </svg>
                 Terima Barang Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -348,6 +350,7 @@
                                     </a>
 
                                     {{-- Cetak PDF --}}
+                                    @accessRoute('gudang.penerimaan.pdf')
                                     <a
                                         href="{{ route('gudang.penerimaan.pdf', $receipt) }}"
                                         target="_blank"
@@ -358,9 +361,11 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     {{-- Edit (Hanya Draf) --}}
                                     @if ($receipt->status === 'draft')
+                                        @accessRoute('gudang.penerimaan.edit')
                                         <a
                                             href="{{ route('gudang.penerimaan.edit', $receipt) }}"
                                             class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition"
@@ -370,8 +375,10 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
                                         {{-- Hapus (Hanya Draf) --}}
+                                        @accessRoute('gudang.penerimaan.destroy')
                                         <button
                                             type="button"
                                             @click="confirmDelete('{{ route('gudang.penerimaan.destroy', $receipt) }}', '{{ $receipt->receipt_number }}')"
@@ -382,6 +389,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -395,12 +403,14 @@
                                 <div class="text-base font-semibold text-gray-700">Tidak Ada Data Penerimaan Barang</div>
                                 <p class="text-xs text-gray-500 mt-1">Belum ada dokumen penerimaan barang yang cocok dengan filter pencarian ini.</p>
                                 <div class="mt-4">
+                                    @accessRoute('gudang.penerimaan.create')
                                     <a
                                         href="{{ route('gudang.penerimaan.create') }}"
                                         class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-semibold rounded-xl shadow-sm transition"
                                     >
                                         Terima Barang Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -418,6 +428,7 @@
     </div>
 
     {{-- Modal Konfirmasi Hapus Draf --}}
+    @accessRoute('gudang.penerimaan.destroy')
     <div
         x-show="deleteModalOpen"
         x-cloak
@@ -462,5 +473,6 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

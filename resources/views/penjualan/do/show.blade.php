@@ -48,6 +48,7 @@
 
         {{-- Top Action Buttons --}}
         <div class="flex items-center gap-2">
+            @accessRoute('penjualan.do.pdf')
             <a
                 href="{{ route('penjualan.do.pdf', $deliveryOrder->id) }}"
                 target="_blank"
@@ -59,8 +60,10 @@
                 </svg>
                 <span>Cetak DO (PDF)</span>
             </a>
+            @endaccessRoute
 
             @if($canConfirmStock)
+                @accessRoute('penjualan.do.confirmStock')
                 <form method="POST" action="{{ route('penjualan.do.confirmStock', $deliveryOrder->id) }}">
                     @csrf
                     <button
@@ -70,9 +73,11 @@
                         Konfirmasi Stok
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             @if($canSend)
+                @accessRoute('penjualan.do.send')
                 <form method="POST" action="{{ route('penjualan.do.send', $deliveryOrder->id) }}" onsubmit="return confirm('Barang akan keluar dari gudang dan stok fisik berkurang. Kirim {{ $deliveryOrder->do_number }} sekarang?')">
                     @csrf
                     <button
@@ -82,12 +87,14 @@
                         Kirim
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             @if($canCreateSj)
                 @php
                     $primarySo = $deliveryOrder->salesOrders->first();
                 @endphp
+                @accessRoute('penjualan.sj.create')
                 <a
                     href="{{ route('penjualan.sj.create', ['so_id' => $primarySo?->id, 'do_id' => $deliveryOrder->id]) }}"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#14532d] text-white font-bold text-xs shadow-xs transition"
@@ -97,9 +104,11 @@
                     </svg>
                     <span>Terbitkan Surat Jalan</span>
                 </a>
+                @endaccessRoute
             @endif
 
             @if(!empty($canRequestCancel))
+                @accessRoute('penjualan.do.request-cancel')
                 <button
                     type="button"
                     onclick="document.getElementById('requestCancelModal').classList.remove('hidden')"
@@ -107,9 +116,11 @@
                 >
                     Ajukan Pembatalan
                 </button>
+                @endaccessRoute
             @endif
 
             @if($canCancel)
+                @accessRoute('penjualan.do.cancel')
                 <button
                     type="button"
                     onclick="openCancelModal()"
@@ -117,6 +128,7 @@
                 >
                     {{ $deliveryOrder->cancel_requested_at ? 'Setujui & Batalkan DO' : 'Batalkan DO' }}
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -155,13 +167,15 @@
             <div class="text-xs text-blue-900">
                 <div class="font-bold">Menunggu Pengecekan Fisik Gudang</div>
                 <div class="mt-0.5 text-blue-800">
-                    Perintah kirim ini siap dicek oleh Checker Gudang di modul <a href="{{ route('gudang.kiriman.check', $deliveryOrder->id) }}" class="underline font-bold">Siapkan & Kirim</a>. Setelah seluruh item dicentang dan dikonfirmasi, Surat Jalan dapat diterbitkan.
+                    Perintah kirim ini siap dicek oleh Checker Gudang di modul @accessRoute('gudang.kiriman.check')<a href="{{ route('gudang.kiriman.check', $deliveryOrder->id) }}" class="underline font-bold">Siapkan & Kirim</a>@endaccessRoute. Setelah seluruh item dicentang dan dikonfirmasi, Surat Jalan dapat diterbitkan.
                 </div>
+                @accessRoute('gudang.kiriman.retur')
                 <div class="mt-1.5 text-blue-800">
                     Ada barang kurang / rusak / ditolak saat pengecekan sebelum Surat Jalan?
                     <a href="{{ route('gudang.kiriman.retur', $deliveryOrder->id) }}" class="underline font-bold">Buat Retur by DO</a>
                     — barang kembali ke gudang (reject ke karantina) dan DO pengganti ({{ $deliveryOrder->do_number }}C) terbit otomatis.
                 </div>
+                @endaccessRoute
             </div>
         </div>
     @elseif($deliveryOrder->status === 'confirmed' && ! $deliveryOrder->hasIssuedSuratJalan())
@@ -482,6 +496,7 @@
 
 {{-- Modal Pengajuan Pembatalan DO (Sales) --}}
 @if(!empty($canRequestCancel))
+    @accessRoute('penjualan.do.request-cancel')
     <div id="requestCancelModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -502,10 +517,12 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 @endif
 
 {{-- Modal Pembatalan DO --}}
 @if($canCancel)
+    @accessRoute('penjualan.do.cancel')
     <div id="cancelModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -548,6 +565,7 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     <script>
         function openCancelModal() {

@@ -59,6 +59,7 @@
         {{-- Action Buttons --}}
         <div class="flex flex-wrap items-center gap-2">
             {{-- Cetak PDF --}}
+            @accessRoute('pembelian.invoices.pdf')
             <a
                 href="{{ route('pembelian.invoices.pdf', $invoice) }}"
                 target="_blank"
@@ -69,9 +70,11 @@
                 </svg>
                 Cetak PDF
             </a>
+            @endaccessRoute
 
             {{-- Tombol Khusus Draft --}}
             @if ($isDraft)
+                @accessRoute('pembelian.invoices.edit')
                 <a
                     href="{{ route('pembelian.invoices.edit', $invoice) }}"
                     class="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 text-xs font-semibold rounded-lg transition"
@@ -81,7 +84,9 @@
                     </svg>
                     Edit Draft
                 </a>
+                @endaccessRoute
 
+                @accessRoute('pembelian.invoices.post')
                 <button
                     type="button"
                     @click="postModalOpen = true"
@@ -92,7 +97,9 @@
                     </svg>
                     Posting ke Hutang Usaha (AP)
                 </button>
+                @endaccessRoute
 
+                @accessRoute('pembelian.invoices.destroy')
                 <button
                     type="button"
                     @click="deleteModalOpen = true"
@@ -103,10 +110,12 @@
                     </svg>
                     Hapus Draft
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Bayar Tagihan Ini --}}
             @if (!$isDraft && !$isCancelled && $remaining > 0)
+                @accessRoute('pembelian.payments.create')
                 <a
                     href="{{ route('pembelian.payments.create', ['supplier_id' => $invoice->supplier_id ?: $invoice->purchaseOrder?->supplier_id, 'invoice_id' => $invoice->id]) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-[0.98]"
@@ -117,10 +126,12 @@
                     </svg>
                     Bayar Tagihan Ini
                 </a>
+                @endaccessRoute
             @endif
 
             {{-- Tombol Batalkan Faktur --}}
             @if (!$isDraft && !$isCancelled && $remaining > 0)
+                @accessRoute('pembelian.invoices.cancel')
                 <button
                     type="button"
                     @click="cancelModalOpen = true"
@@ -131,10 +142,12 @@
                     </svg>
                     Batalkan Faktur
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Shortcut Retur Pembelian --}}
             @if (!$isCancelled && $invoice->supplier_id)
+                @accessRoute('pembelian.returns.create')
                 <a
                     href="{{ route('pembelian.returns.create', ['supplier_id' => $invoice->supplier_id]) }}"
                     class="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 text-amber-800 bg-amber-50 hover:bg-amber-100 text-xs font-semibold rounded-lg transition"
@@ -146,6 +159,7 @@
                     </svg>
                     Buat Retur
                 </a>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -455,12 +469,14 @@
                         Pembayaran tagihan ini dicatat melalui modul <strong>Pembelian &gt; Pembayaran Hutang (Vendor Payment)</strong>.
                     </div>
                     @if ($invoice->accountPayable->remaining > 0)
+                        @accessRoute('pembelian.payments.create')
                         <a
                             href="{{ route('pembelian.payments.create', ['supplier_id' => $invoice->supplier_id ?: $invoice->purchaseOrder?->supplier_id, 'invoice_id' => $invoice->id]) }}"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15803d] hover:bg-[#14532d] text-white text-xs font-bold rounded-lg shadow-sm transition self-start sm:self-auto"
                         >
                             Catat Pembayaran Tagihan Ini
                         </a>
+                        @endaccessRoute
                     @endif
                 </div>
             @else
@@ -515,6 +531,7 @@
     </div>
 
     {{-- Modal Konfirmasi Posting --}}
+    @accessRoute('pembelian.invoices.post')
     <x-confirmation-modal
         id="post-invoice-modal"
         name="postModalOpen"
@@ -532,8 +549,10 @@
             Sistem akan secara otomatis membentuk entri jurnal Buku Besar (Debit Persediaan/PPN Masukan, Kredit Hutang Dagang) serta mencatat tagihan ini pada Buku Pembantu Hutang Dagang (AP).
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Draft --}}
+    @accessRoute('pembelian.invoices.destroy')
     <x-confirmation-modal
         id="delete-invoice-modal"
         name="deleteModalOpen"
@@ -552,8 +571,10 @@
             Penerimaan barang (GRN) yang tertagih pada faktur ini akan kembali dapat ditagihkan. Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Batalkan Faktur --}}
+    @accessRoute('pembelian.invoices.cancel')
     <div
         x-show="cancelModalOpen"
         class="fixed inset-0 z-50 overflow-y-auto"
@@ -611,5 +632,6 @@
             </div>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

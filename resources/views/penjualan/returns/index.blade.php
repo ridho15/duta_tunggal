@@ -18,6 +18,7 @@
         </div>
 
         <div>
+            @accessRoute('penjualan.returns.create')
             <a
                 href="{{ route('penjualan.returns.create') }}"
                 class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition"
@@ -27,6 +28,7 @@
                 </svg>
                 <span>Ajukan Retur Baru</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -281,6 +283,7 @@
                                         <span>Detail</span>
                                     </a>
 
+                                    @accessRoute('penjualan.returns.pdf')
                                     <a
                                         href="{{ route('penjualan.returns.pdf', $item->id) }}"
                                         target="_blank"
@@ -291,6 +294,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -305,12 +309,14 @@
                                     <p class="text-xs text-gray-400 mt-0.5">
                                         Belum ada dokumen retur untuk kriteria filter yang dipilih.
                                     </p>
+                                    @accessRoute('penjualan.returns.create')
                                     <a
                                         href="{{ route('penjualan.returns.create') }}"
                                         class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#15803d] hover:underline"
                                     >
                                         Ajukan Retur Pertama
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>

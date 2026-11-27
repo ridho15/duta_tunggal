@@ -40,6 +40,7 @@
         {{-- Action Buttons --}}
         <div class="flex items-center flex-wrap gap-2">
             {{-- Cetak PDF --}}
+            @accessRoute('keuangan.asset.pdf')
             <a
                 href="{{ route('keuangan.asset.pdf', $asset) }}"
                 target="_blank"
@@ -50,9 +51,11 @@
                 </svg>
                 Cetak Kartu Aset (PDF)
             </a>
+            @endaccessRoute
 
             {{-- Susutkan Bulan Ini --}}
             @if ($asset->status === 'active' && $asset->monthly_depreciation > 0)
+                @accessRoute('keuangan.asset.depreciation.process-single')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-depreciate-single', { action: '{{ route('keuangan.asset.depreciation.process-single', $asset) }}' })"
@@ -64,9 +67,11 @@
                     </svg>
                     Susutkan Bulan Ini
                 </button>
+                @endaccessRoute
             @endif
 
             {{-- Hitung Ulang Penyusutan --}}
+            @accessRoute('keuangan.asset.calculate-depreciation')
             <form action="{{ route('keuangan.asset.calculate-depreciation', $asset) }}" method="POST" class="inline">
                 @csrf
                 <button
@@ -80,9 +85,11 @@
                     Hitung Depresiasi
                 </button>
             </form>
+            @endaccessRoute
 
             {{-- Post Jurnal Akuisisi Manual Jika Belum --}}
             @if (!$hasJournals)
+                @accessRoute('keuangan.asset.post-acquisition-journal')
                 <form action="{{ route('keuangan.asset.post-acquisition-journal', $asset) }}" method="POST" class="inline">
                     @csrf
                     <button
@@ -95,10 +102,12 @@
                         Post Jurnal Akuisisi
                     </button>
                 </form>
+                @endaccessRoute
             @endif
 
             {{-- Mutasi Antar Cabang --}}
             @if ($asset->status === 'active')
+                @accessRoute('keuangan.asset.transfer.create')
                 <a
                     href="{{ route('keuangan.asset.transfer.create', ['asset_id' => $asset->id]) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition"
@@ -109,7 +118,9 @@
                     </svg>
                     Mutasi Cabang
                 </a>
+                @endaccessRoute
 
+                @accessRoute('keuangan.asset.disposal.create')
                 <a
                     href="{{ route('keuangan.asset.disposal.create', ['asset_id' => $asset->id]) }}"
                     class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition"
@@ -120,9 +131,11 @@
                     </svg>
                     Pelepasan / Disposal
                 </a>
+                @endaccessRoute
             @endif
 
             {{-- Edit --}}
+            @accessRoute('keuangan.asset.edit')
             <a
                 href="{{ route('keuangan.asset.edit', $asset) }}"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition"
@@ -132,6 +145,7 @@
                 </svg>
                 Ubah
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -387,6 +401,7 @@
                             </td>
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 @if ($entry->status === 'recorded')
+                                    @accessRoute('keuangan.asset.depreciation.reverse')
                                     <button
                                          type="button"
                                          @click="$dispatch('open-modal-reverse-depreciation', { action: '{{ route('keuangan.asset.depreciation.reverse', $entry->id) }}', period: '{{ \Carbon\Carbon::createFromDate($entry->period_year, $entry->period_month, 1)->translatedFormat('F Y') }}' })"
@@ -397,6 +412,7 @@
                                          </svg>
                                          <span>Batalkan (Reversal)</span>
                                      </button>
+                                    @endaccessRoute
                                  @else
                                     <span class="text-[11px] text-gray-400 italic">Sudah Reversal</span>
                                 @endif
@@ -426,12 +442,14 @@
                     {{ $asset->transfers->count() }} Mutasi Tercatat
                 </span>
                 @if ($asset->status === 'active')
+                    @accessRoute('keuangan.asset.transfer.create')
                     <a href="{{ route('keuangan.asset.transfer.create', ['asset_id' => $asset->id]) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl transition">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
                         <span>Ajukan Mutasi</span>
                     </a>
+                    @endaccessRoute
                 @endif
             </div>
         </div>
@@ -568,6 +586,7 @@
                 @endif
             </table>
     {{-- Modal Konfirmasi Susutkan Bulan Ini --}}
+    @accessRoute('keuangan.asset.depreciation.process-single')
     <x-confirmation-modal
         name="depreciate-single"
         title="Proses Penyusutan Aset Bulan Ini"
@@ -583,8 +602,10 @@
             Jurnal depresiasi bulanan (Beban Penyusutan vs Akumulasi Penyusutan) akan otomatis dibukukan ke Buku Besar.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Reverse Depresiasi --}}
+    @accessRoute('keuangan.asset.depreciation.reverse')
     <x-confirmation-modal
         name="reverse-depreciation"
         title="Batalkan (Reverse) Depresiasi Periode"
@@ -600,5 +621,6 @@
             Jurnal beban depresiasi dan akumulasi terkait akan dihapus dari buku besar dan nilai buku aset akan disesuaikan kembali.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

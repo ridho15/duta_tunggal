@@ -29,6 +29,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+            @accessRoute('manufaktur.qc.pdf')
             <a
                 href="{{ route('manufaktur.qc.pdf', $qc) }}"
                 target="_blank"
@@ -39,8 +40,10 @@
                 </svg>
                 Cetak Sertifikat Mutu (PDF)
             </a>
+            @endaccessRoute
 
             @if ($qc->status == 0)
+                @accessRoute('manufaktur.qc.process-form')
                 <a
                     href="{{ route('manufaktur.qc.process-form', $qc) }}"
                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -50,6 +53,7 @@
                     </svg>
                     Proses Inspeksi Mutu
                 </a>
+                @endaccessRoute
             @endif
         </div>
     </div>

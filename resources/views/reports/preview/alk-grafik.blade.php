@@ -90,6 +90,7 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    @accessRoute('reports.alk-grafik.excel')
                     <a href="{{ route('reports.alk-grafik.excel', $exportParams) }}"
                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-900 shadow-2xs transition-colors">
                         <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,6 +98,7 @@
                         </svg>
                         <span>Download Excel</span>
                     </a>
+                    @endaccessRoute
 
                     <a href="{{ route('reports.alk-grafik.pdf', $exportParams) }}"
                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-900 shadow-2xs transition-colors">

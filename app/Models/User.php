@@ -16,6 +16,7 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable, HasRoles {
         hasPermissionTo as protected spatieHasPermissionTo;
+        hasRole as protected spatieHasRole;
     }
     use LogsGlobalActivity;
     protected $fillable = [
@@ -123,6 +124,32 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasPermission(string $permission): bool
     {
         return $this->hasPermissionTo($permission);
+    }
+
+    /**
+     * Peran hasil duplikat (roles.base_role, mis. "Sales 2" dari "Sales") ikut lolos cek nama peran lama.
+     * Owner / Super Admin tidak pernah diwarisi lewat base_role (akses penuh hanya untuk peran aslinya).
+     */
+    public function hasRole($roles, ?string $guard = null): bool
+    {
+        if ($this->spatieHasRole($roles, $guard)) {
+            return true;
+        }
+        $this->loadMissing('roles');
+        $bases = $this->roles->pluck('base_role')->filter()
+            ->diff(config('access.super_roles', ['Owner', 'Super Admin']))->values();
+        if ($bases->isEmpty()) {
+            return false;
+        }
+        $wanted = is_string($roles) ? explode('|', $roles) : collect($roles)->flatten()->all();
+        foreach ($wanted as $role) {
+            $name = $role instanceof \Spatie\Permission\Contracts\Role ? $role->name : (string) $role;
+            if ($bases->contains($name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function hasPermissionTo($permission, $guardName = null): bool

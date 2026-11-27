@@ -18,6 +18,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Pemrosesan penyusutan massal berkala, posting jurnal beban & akumulasi, serta pembatalan (reversal) jurnal.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('keuangan.asset.depreciation.pdf')
             <a
                 href="{{ route('keuangan.asset.depreciation.pdf', ['period_month' => $selectedMonth, 'period_year' => $selectedYear, 'cabang_id' => request('cabang_id')]) }}"
                 target="_blank"
@@ -28,6 +29,7 @@
                 </svg>
                 Cetak Rekapitulasi (PDF)
             </a>
+            @endaccessRoute
             <a
                 href="{{ route('keuangan.asset.index') }}"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition"
@@ -120,6 +122,7 @@
             </div>
 
             {{-- Form Eksekusi --}}
+            @accessRoute('keuangan.asset.depreciation.process-monthly')
             <form
                 action="{{ route('keuangan.asset.depreciation.process-monthly') }}"
                 method="POST"
@@ -190,6 +193,7 @@
                     </button>
                 </div>
             </form>
+            @endaccessRoute
         </div>
     </div>
 
@@ -367,6 +371,7 @@
 
                                     {{-- Reversal Action --}}
                                     @if ($item->status === 'recorded')
+                                        @accessRoute('keuangan.asset.depreciation.reverse')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-reverse-depreciation', { action: '{{ route('keuangan.asset.depreciation.reverse', $item) }}', name: '{{ addslashes($item->asset->name ?? 'Aset') }}', period: '{{ \Carbon\Carbon::createFromDate($item->period_year, $item->period_month, 1)->translatedFormat('F Y') }}' })"
@@ -377,6 +382,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -409,6 +415,7 @@
     </div>
 
     {{-- Modal Konfirmasi Eksekusi Penyusutan Massal --}}
+    @accessRoute('keuangan.asset.depreciation.process-monthly')
     <x-confirmation-modal
         name="batch-depreciation"
         title="Konfirmasi Eksekusi Penyusutan Massal"
@@ -433,8 +440,10 @@
             </button>
         </x-slot:footer>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Reverse Depresiasi Aset --}}
+    @accessRoute('keuangan.asset.depreciation.reverse')
     <x-confirmation-modal
         name="reverse-depreciation"
         title="Batalkan (Reverse) Penyusutan Aset"
@@ -450,5 +459,6 @@
             Jurnal buku besar terkait akan dihapus dan nilai buku aset akan disesuaikan kembali.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

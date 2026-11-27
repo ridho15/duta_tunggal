@@ -53,8 +53,9 @@ class OrderRequestController extends Controller
 
         // Query dasar dengan pembatasan cabang jika bukan pengguna berkewenangan penuh
         $baseQuery = OrderRequest::query();
+        // Cabang ada di baris item (kolom cabang header dihapus Mei 2026)
         if (!$canAccessAll && $cabangId) {
-            $baseQuery->where('cabang_id', $cabangId);
+            $baseQuery->whereHas('orderRequestItem', fn ($q) => $q->where('cabang_id', $cabangId));
         }
 
         // Hitung count per status untuk tab filter
@@ -90,7 +91,7 @@ class OrderRequestController extends Controller
 
         // Filter Cabang
         if (!empty($cabangFilter) && $canAccessAll) {
-            $query->where('cabang_id', $cabangFilter);
+            $query->whereHas('orderRequestItem', fn ($q) => $q->where('cabang_id', $cabangFilter));
         }
 
         // Filter Supplier (berdasarkan supplier pada baris item)

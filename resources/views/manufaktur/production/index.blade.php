@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Pencatatan aktual barang jadi dari lini perakitan pabrik sebelum inspeksi mutu (QC).</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('manufaktur.production.create')
             <a
                 href="{{ route('manufaktur.production.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Catat Hasil Produksi
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -264,10 +266,17 @@
                                             QC Lolos: {{ number_format((float)$qc->passed_quantity, 0) }}
                                         </a>
                                     @else
+                                        @accessRoute('manufaktur.qc.process-form')
                                         <a href="{{ route('manufaktur.qc.process-form', $qc) }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">
                                             <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                                             Menunggu QC
                                         </a>
+                                        @else
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500" aria-hidden="true"></span>
+                                            Menunggu QC
+                                        </span>
+                                        @endaccessRoute
                                     @endif
                                 @else
                                     <span class="text-gray-400 text-xs italic">Belum Ada QC</span>
@@ -287,6 +296,7 @@
                                         </svg>
                                     </a>
 
+                                    @accessRoute('manufaktur.production.pdf')
                                     <a
                                         href="{{ route('manufaktur.production.pdf', $item) }}"
                                         target="_blank"
@@ -297,8 +307,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     @if ($item->status === 'draft')
+                                        @accessRoute('manufaktur.production.edit')
                                         <a
                                             href="{{ route('manufaktur.production.edit', $item) }}"
                                             class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
@@ -308,7 +320,9 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </a>
+                                        @endaccessRoute
 
+                                        @accessRoute('manufaktur.production.finish')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-finish-production', { action: '{{ route('manufaktur.production.finish', $item) }}', number: '{{ $item->production_number }}' })"
@@ -319,7 +333,9 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
 
+                                        @accessRoute('manufaktur.production.destroy')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-delete-production', { action: '{{ route('manufaktur.production.destroy', $item) }}', number: '{{ $item->production_number }}' })"
@@ -330,6 +346,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -359,6 +376,7 @@
     </div>
 
     {{-- Modal Konfirmasi Selesai Produksi --}}
+    @accessRoute('manufaktur.production.finish')
     <x-confirmation-modal
         name="finish-production"
         title="Selesaikan Produksi & Terbitkan QC"
@@ -374,8 +392,10 @@
             Status produksi akan berubah menjadi <strong>Finished</strong> dan pemeriksaan Quality Control (QC) akan diterbitkan secara otomatis.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Draft Produksi --}}
+    @accessRoute('manufaktur.production.destroy')
     <x-confirmation-modal
         name="delete-production"
         title="Hapus Draft Bukti Produksi"
@@ -391,5 +411,6 @@
             Dokumen draft yang dihapus tidak dapat dipulihkan kembali.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

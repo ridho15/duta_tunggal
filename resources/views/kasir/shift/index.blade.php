@@ -43,6 +43,7 @@
                 <span>Cetak PDF</span>
             </a>
 
+            @accessRoute('kasir.laporan.excel')
             <a
                 href="{{ route('kasir.laporan.excel', request()->query()) }}"
                 class="inline-flex items-center gap-2 px-3.5 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -53,6 +54,7 @@
                 </svg>
                 <span>Ekspor Excel</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 

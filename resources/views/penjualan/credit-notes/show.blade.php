@@ -56,6 +56,7 @@
             </a>
 
             {{-- Tombol Cetak PDF --}}
+            @accessRoute('penjualan.credit-notes.pdf')
             <a
                 href="{{ route('penjualan.credit-notes.pdf', $creditNote->id) }}"
                 target="_blank"
@@ -66,10 +67,12 @@
                 </svg>
                 Cetak PDF
             </a>
+            @endaccessRoute
 
             {{-- Aksi Draf --}}
             @if ($creditNote->isDraft())
                 {{-- Tombol Terbitkan --}}
+                @accessRoute('penjualan.credit-notes.issue')
                 <button
                     type="button"
                     @click="showIssueModal = true"
@@ -80,8 +83,10 @@
                     </svg>
                     Terbitkan Nota Kredit
                 </button>
+                @endaccessRoute
 
                 {{-- Hapus Draf --}}
+                @accessRoute('penjualan.credit-notes.destroy')
                 <button
                     type="button"
                     @click="$dispatch('open-modal-delete-credit-note', { action: '{{ route('penjualan.credit-notes.destroy', $creditNote->id) }}' })"
@@ -92,9 +97,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </button>
+                @endaccessRoute
             @else
                 {{-- Tombol Ubah Faktur Pajak Retur --}}
                 @if(!$creditNote->isVoid())
+                    @accessRoute('penjualan.credit-notes.updateTaxDocument')
                     <button
                         type="button"
                         @click="showTaxDocModal = true"
@@ -105,8 +112,10 @@
                         </svg>
                         No. Faktur Pajak Retur
                     </button>
+                    @endaccessRoute
 
                     @if(auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || auth()->user()->hasRole(['Super Admin', 'Finance Manager', 'Director']) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+                        @accessRoute('penjualan.credit-notes.void')
                         <button
                             type="button"
                             @click="showVoidModal = true"
@@ -117,6 +126,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             Void Nota Kredit
+                        @endaccessRoute
                         </button>
                     @endif
                 @endif
@@ -488,6 +498,7 @@
     @endif
 
     {{-- MODAL 1: Konfirmasi Penerbitan (Issue Modal) --}}
+    @accessRoute('penjualan.credit-notes.issue')
     <div
         x-show="showIssueModal"
         x-transition:enter="transition ease-out duration-200"
@@ -588,8 +599,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- MODAL 2: Ubah Nomor Faktur Pajak Retur --}}
+    @accessRoute('penjualan.credit-notes.updateTaxDocument')
     <div
         x-show="showTaxDocModal"
         x-transition:enter="transition ease-out duration-200"
@@ -645,8 +658,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Void Nota Kredit (Super Admin) --}}
+    @accessRoute('penjualan.credit-notes.void')
     <div
         x-show="showVoidModal"
         x-cloak
@@ -718,8 +733,10 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Draf Nota Kredit --}}
+    @accessRoute('penjualan.credit-notes.destroy')
     <x-confirmation-modal
         name="delete-credit-note"
         title="Hapus Draf Nota Kredit"
@@ -735,5 +752,6 @@
             Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 </div>
 @endsection

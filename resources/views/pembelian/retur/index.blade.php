@@ -21,12 +21,14 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('pembelian.returns.create')
             <a href="{{ route('pembelian.returns.create') }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 <span>Buat Retur Pembelian</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -297,6 +299,7 @@
 
                                     {{-- Edit Draft/Rejected --}}
                                     @if (in_array($ret->status, ['draft', 'rejected']))
+                                        @accessRoute('pembelian.returns.edit')
                                         <a
                                             href="{{ route('pembelian.returns.edit', $ret->id) }}"
                                             class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded text-[11px] transition"
@@ -304,10 +307,12 @@
                                         >
                                             Ubah
                                         </a>
+                                        @endaccessRoute
                                     @endif
 
                                     {{-- Ajukan (Submit for approval) --}}
                                     @if ($ret->status === 'draft')
+                                        @accessRoute('pembelian.returns.submit')
                                         <button
                                             type="button"
                                             @click="$dispatch('open-modal-submit-return', { action: '{{ route('pembelian.returns.submit', $ret->id) }}', nota: '{{ $ret->nota_retur }}' })"
@@ -316,10 +321,12 @@
                                         >
                                             Ajukan
                                         </button>
+                                        @endaccessRoute
                                     @endif
 
                                     {{-- Approve Button (Modal) --}}
                                     @if (in_array($ret->status, ['draft', 'pending_approval']))
+                                        @accessRoute('pembelian.returns.approve')
                                         <button
                                             type="button"
                                             onclick="openApproveModal({{ $ret->id }}, '{{ $ret->nota_retur }}')"
@@ -328,10 +335,12 @@
                                         >
                                             Setujui
                                         </button>
+                                        @endaccessRoute
                                     @endif
 
                                     {{-- Reject Button (Modal) --}}
                                     @if ($ret->status === 'pending_approval')
+                                        @accessRoute('pembelian.returns.reject')
                                         <button
                                             type="button"
                                             onclick="openRejectModal({{ $ret->id }}, '{{ $ret->nota_retur }}')"
@@ -340,9 +349,11 @@
                                         >
                                             Tolak
                                         </button>
+                                        @endaccessRoute
                                     @endif
 
                                     {{-- Cetak PDF --}}
+                                    @accessRoute('pembelian.returns.pdf')
                                     <a
                                         href="{{ route('pembelian.returns.pdf', $ret->id) }}"
                                         target="_blank"
@@ -353,9 +364,11 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     {{-- Hapus Draft --}}
                                     @if (in_array($ret->status, ['draft', 'rejected']))
+                                        @accessRoute('pembelian.returns.destroy')
                                         <button
                                             type="button"
                                             onclick="openDeleteModal({{ $ret->id }}, '{{ $ret->nota_retur }}')"
@@ -366,6 +379,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     @endif
                                 </div>
                             </td>
@@ -397,6 +411,7 @@
 </div>
 
 {{-- Modal Konfirmasi Persetujuan (Approve Modal) --}}
+@accessRoute('pembelian.returns.approve')
 <div id="approveModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden border border-gray-200">
         <form id="approveForm" method="POST" action="">
@@ -442,8 +457,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Penolakan (Reject Modal) --}}
+@accessRoute('pembelian.returns.reject')
 <div id="rejectModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden border border-gray-200">
         <form id="rejectForm" method="POST" action="">
@@ -483,8 +500,10 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 {{-- Modal Konfirmasi Hapus Draft --}}
+@accessRoute('pembelian.returns.destroy')
 <div id="deleteModal" class="fixed inset-0 z-50 hidden bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden border border-gray-200">
         <form id="deleteForm" method="POST" action="">
@@ -510,6 +529,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 @push('scripts')
 <script>
@@ -543,6 +563,7 @@
 @endpush
 
     {{-- Modal Konfirmasi Ajukan Retur Pembelian --}}
+    @accessRoute('pembelian.returns.submit')
     <x-confirmation-modal
         name="submit-return"
         title="Ajukan Retur Pembelian"
@@ -555,4 +576,5 @@
             Ajukan dokumen retur pembelian <span class="font-bold text-gray-900 font-mono" x-text="data.nota"></span> untuk persetujuan manajer?
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

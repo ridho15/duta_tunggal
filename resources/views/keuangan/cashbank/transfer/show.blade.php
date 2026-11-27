@@ -43,6 +43,7 @@
             >
                 &larr; Kembali
             </a>
+            @accessRoute('keuangan.cashbank.transfer.pdf')
             <a
                 href="{{ route('keuangan.cashbank.transfer.pdf', $transfer) }}"
                 target="_blank"
@@ -51,7 +52,9 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Cetak Bukti Transfer PDF
             </a>
+            @endaccessRoute
             @if (!$transfer->isCancelled())
+                @accessRoute('keuangan.cashbank.transfer.cancel')
                 <button
                     type="button"
                     @click="deleteModalOpen = true"
@@ -60,6 +63,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Batalkan Transfer
                 </button>
+                @endaccessRoute
             @endif
         </div>
     </div>
@@ -258,6 +262,7 @@
     </div>
 
     {{-- Modal Konfirmasi Batal Transfer --}}
+    @accessRoute('keuangan.cashbank.transfer.cancel')
     <div
         x-show="deleteModalOpen"
         x-cloak
@@ -323,5 +328,6 @@
             </form>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

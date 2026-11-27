@@ -44,11 +44,14 @@
             </a>
 
             @if ($transfer->status === 'Draft')
+                @accessRoute('gudang.transfer.edit')
                 <a href="{{ route('gudang.transfer.edit', $transfer) }}"
                    class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Edit Draft
                 </a>
+                @endaccessRoute
 
+                @accessRoute('gudang.transfer.request')
                 <button type="button"
                         @click="$dispatch('open-modal-request-transfer')"
                         class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition shadow-sm">
@@ -57,21 +60,27 @@
                     </svg>
                     <span>Ajukan Transfer</span>
                 </button>
+                @endaccessRoute
 
+                @accessRoute('gudang.transfer.destroy')
                 <button type="button"
                         @click="$dispatch('open-modal-delete-transfer')"
                         class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
                     Hapus
                 </button>
+                @endaccessRoute
             @endif
 
             @if (in_array($transfer->status, ['Request', 'Pending']))
+                @accessRoute('gudang.transfer.reject')
                 <button type="button"
                         onclick="openRejectModal()"
                         class="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm">
                     Tolak
                 </button>
+                @endaccessRoute
 
+                @accessRoute('gudang.transfer.approve')
                 <button type="button"
                         @click="$dispatch('open-modal-approve-transfer')"
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl transition shadow-sm active:scale-[0.98]">
@@ -80,9 +89,11 @@
                     </svg>
                     <span>Setujui Mutasi</span>
                 </button>
+                @endaccessRoute
             @endif
 
             @if (in_array(strtolower($transfer->status), ['reject', 'cancelled']))
+                @accessRoute('gudang.transfer.revert-draft')
                 <form action="{{ route('gudang.transfer.revert-draft', $transfer) }}" method="POST" class="inline">
                     @csrf
                     <button type="submit"
@@ -90,26 +101,34 @@
                         Kembalikan ke Draft
                     </button>
                 </form>
+                @endaccessRoute
 
+                @accessRoute('gudang.transfer.destroy')
                 <button type="button"
                         @click="$dispatch('open-modal-delete-transfer')"
                         class="px-3 py-2 text-xs font-semibold text-rose-600 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition shadow-sm">
                     Hapus
                 </button>
+                @endaccessRoute
             @endif
 
             @if (in_array($transfer->status, ['Approved', 'Shipped']) && $transfer->hasRemainingToShip())
+                @accessRoute('gudang.transfer.ship')
                 <button type="button" @click="$dispatch('open-modal-ship-transfer')"
                         class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl transition shadow-sm active:scale-[0.98]">
                     <span>Kirim Barang</span>
                 </button>
+                @endaccessRoute
+                @accessRoute('gudang.transfer.close-remaining')
                 <button type="button" @click="$dispatch('open-modal-close-remaining')"
                         class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
                     Tutup Sisa
                 </button>
+                @endaccessRoute
             @endif
 
             @if (in_array($transfer->status, ['Approved', 'Shipped', 'Completed', 'completed']))
+                @accessRoute('gudang.transfer.pdf')
                 <a href="{{ route('gudang.transfer.pdf', $transfer) }}"
                    target="_blank"
                    class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
@@ -118,8 +137,10 @@
                     </svg>
                     <span>Cetak Surat Jalan (PDF)</span>
                 </a>
+                @endaccessRoute
 
                 @if (auth()->user() && (\App\Support\MenuAccess::isSuper(auth()->user()) || (method_exists(auth()->user(), 'canManageAllCabang') && auth()->user()->canManageAllCabang())))
+                    @accessRoute('gudang.transfer.void')
                     <button type="button"
                             @click="$dispatch('open-modal-void-transfer')"
                             class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition shadow-sm active:scale-[0.98]">
@@ -128,6 +149,7 @@
                         </svg>
                         <span>Void Transfer Stok (Super Admin)</span>
                     </button>
+                    @endaccessRoute
                 @endif
             @endif
         </div>
@@ -265,7 +287,7 @@
                             <td class="py-3 px-4 text-right font-mono text-[#15803d] font-semibold">{{ number_format($item->receivedQuantity(), 0, ',', '.') }}</td>
                             <td class="py-3 px-4 text-right font-mono {{ $item->remainingToShip() > 0 ? 'text-amber-700 font-semibold' : 'text-gray-400' }}">{{ number_format($item->remainingToShip(), 0, ',', '.') }}</td>
                             <td class="py-3 px-4 text-center">
-                                @if ($item->product)
+                                @if ($item->product?->getKey())
                                     <a href="{{ route('gudang.stok.card', $item->product) }}"
                                        target="_blank"
                                        class="inline-flex items-center gap-1 text-[11px] font-semibold text-[#15803d] hover:text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition shadow-sm">
@@ -323,11 +345,13 @@
                                 Diterima {{ $shipment->received_at->translatedFormat('d M H:i') }} · {{ $shipment->receiver?->name ?? '-' }}
                             </span>
                         @else
+                            @accessRoute('gudang.transfer.receive')
                             <button type="button"
                                     @click="$dispatch('open-modal-receive-shipment', { action: @js(route('gudang.transfer.receive', $shipment)), number: @js($shipment->shipment_number) })"
                                     class="px-3.5 py-2 text-xs font-semibold text-white bg-[#15803d] hover:bg-[#14532d] rounded-xl shadow-sm whitespace-nowrap">
                                 Terima di Gudang Tujuan
                             </button>
+                            @endaccessRoute
                         @endif
                     </div>
                 @endforeach
@@ -337,6 +361,7 @@
 </div>
 
 {{-- Modal Penolakan Transfer --}}
+@accessRoute('gudang.transfer.reject')
 <div id="rejectModal" class="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl space-y-4">
         <div class="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -367,6 +392,7 @@
         </form>
     </div>
 </div>
+@endaccessRoute
 
 <script>
     function openRejectModal() {
@@ -377,6 +403,7 @@
     }
 </script>
     {{-- Modal Konfirmasi Ajukan Transfer --}}
+    @accessRoute('gudang.transfer.request')
     <x-confirmation-modal
         name="request-transfer"
         title="Ajukan Transfer Stok"
@@ -390,9 +417,11 @@
             Apakah Anda yakin ingin mengajukan transfer stok <strong>{{ $transfer->transfer_number }}</strong> untuk persetujuan supervisor/manajer gudang?
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Hapus Transfer (Draft, Reject, Cancelled) --}}
     @if (in_array(strtolower((string) $transfer->status), ['draft', 'reject', 'cancelled']))
+    @accessRoute('gudang.transfer.destroy')
     <x-confirmation-modal
         name="delete-transfer"
         title="Hapus Dokumen Transfer Stok"
@@ -406,9 +435,11 @@
             Apakah Anda yakin ingin menghapus transfer stok <strong>{{ $transfer->transfer_number }}</strong>? Tindakan ini tidak dapat dibatalkan.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
     @endif
 
     {{-- Modal Konfirmasi Setujui Transfer --}}
+    @accessRoute('gudang.transfer.approve')
     <x-confirmation-modal
         name="approve-transfer"
         title="Setujui Transfer Stok Antar Gudang"
@@ -425,8 +456,10 @@
             Stok di gudang asal akan <strong>dicadangkan</strong> (belum berpindah). Stok baru keluar saat gudang asal menekan Kirim Barang, dan masuk ke gudang tujuan saat diterima.
         </p>
     </x-confirmation-modal>
+    @endaccessRoute
 
     {{-- Modal Konfirmasi Void Transfer (Super Admin) --}}
+    @accessRoute('gudang.transfer.void')
     <x-confirmation-modal
         name="void-transfer"
         title="Void Transfer Stok Antar Gudang (Super Admin)"
@@ -452,8 +485,10 @@
             <input type="text" name="cancel_reason" required placeholder="Contoh: Muatan rusak di jalan / salah gudang tujuan" class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-rose-500 focus:border-rose-500">
         </div>
     </x-confirmation-modal>
+    @endaccessRoute
     {{-- Modal KIRIM BARANG (gudang asal): qty yang benar-benar naik kendaraan, boleh sebagian --}}
     @if (in_array($transfer->status, ['Approved', 'Shipped']) && $transfer->hasRemainingToShip())
+    @accessRoute('gudang.transfer.ship')
     <x-confirmation-modal name="ship-transfer" title="Kirim Barang dari Gudang Asal" variant="success"
         confirm-text="Kirim" cancel-text="Batal" action="{{ route('gudang.transfer.ship', $transfer) }}" method="POST">
         <p class="text-xs text-gray-600 text-left">Isi qty yang <strong>benar-benar naik kendaraan</strong>. Barang yang tidak ikut dikirim isi 0 — sisanya bisa dikirim berikutnya atau ditutup.</p>
@@ -472,19 +507,24 @@
                    class="w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-[#15803d] focus:border-[#15803d]">
         </div>
     </x-confirmation-modal>
+    @endaccessRoute
 
+    @accessRoute('gudang.transfer.close-remaining')
     <x-confirmation-modal name="close-remaining" title="Tutup Sisa Mutasi" variant="warning"
         confirm-text="Ya, Tutup Sisa" cancel-text="Batal" action="{{ route('gudang.transfer.close-remaining', $transfer) }}" method="POST">
         <p class="text-sm text-gray-600 text-left">Qty yang belum dikirim akan <strong>dibatalkan</strong> dan cadangan stok di gudang asal dilepas.@if ($transfer->shipments->isEmpty()) Karena belum ada yang dikirim, mutasi ini menjadi <strong>Dibatalkan</strong>.@endif</p>
         <input type="text" name="reason" required minlength="5" maxlength="500" placeholder="Alasan, mis. kendaraan tidak muat"
                class="mt-3 w-full text-xs rounded-xl border border-gray-300 px-3 py-2 focus:ring-amber-500 focus:border-amber-500">
     </x-confirmation-modal>
+    @endaccessRoute
     @endif
 
     {{-- Modal TERIMA (gudang tujuan) --}}
+    @accessRoute('gudang.transfer.receive')
     <x-confirmation-modal name="receive-shipment" title="Terima Barang di Gudang Tujuan" variant="success"
         confirm-text="Ya, Barang Diterima" cancel-text="Batal" method="POST">
         <p class="text-sm text-gray-600">Konfirmasi seluruh barang pada pengiriman <strong x-text="data.number"></strong> sudah tiba di <strong>{{ $transfer->toWarehouse?->name }}</strong>?</p>
         <p class="text-xs text-[#15803d] mt-2 font-medium">Stok gudang tujuan langsung bertambah.</p>
     </x-confirmation-modal>
+    @endaccessRoute
 @endsection

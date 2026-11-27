@@ -18,6 +18,7 @@
         </div>
 
         <div>
+            @accessRoute('penjualan.invoices.create')
             <a
                 href="{{ route('penjualan.invoices.create') }}"
                 class="inline-flex items-center gap-2 bg-[#15803d] hover:bg-[#14532d] text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition"
@@ -27,6 +28,7 @@
                 </svg>
                 <span>Buat Faktur Penjualan</span>
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -206,6 +208,7 @@
                             {{-- Aksi --}}
                             <td class="px-5 py-4 text-right">
                                 <div class="inline-flex items-center gap-2">
+                                    @accessRoute('penjualan.invoices.pdf')
                                     <a
                                         href="{{ route('penjualan.invoices.pdf', $inv->id) }}"
                                         target="_blank"
@@ -217,6 +220,7 @@
                                             <rect x="6" y="14" width="12" height="8" rx="1" stroke-width="1.8"></rect>
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     <a
                                         href="{{ route('penjualan.invoices.show', $inv->id) }}"
@@ -284,6 +288,7 @@
                 </div>
 
                 <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+                    @accessRoute('penjualan.invoices.pdf')
                     <a
                         href="{{ route('penjualan.invoices.pdf', $inv->id) }}"
                         target="_blank"
@@ -295,6 +300,7 @@
                         </svg>
                         <span>Cetak PDF</span>
                     </a>
+                    @endaccessRoute
 
                     <a
                         href="{{ route('penjualan.invoices.show', $inv->id) }}"

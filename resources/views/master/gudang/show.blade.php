@@ -59,6 +59,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Kelola penataan rak penyimpanan dan informasi gudang cabang.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('master.gudang.edit')
             <a
                 href="{{ route('master.gudang.edit', $gudang) }}"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition"
@@ -68,6 +69,7 @@
                 </svg>
                 <span>Edit Gudang</span>
             </a>
+            @endaccessRoute
             <a
                 href="{{ route('master.gudang.index') }}"
                 class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl transition"
@@ -136,6 +138,7 @@
                 <h2 class="text-lg font-bold text-gray-900">Daftar Rak / Slot Penyimpanan</h2>
                 <p class="text-xs text-gray-500">Kelola nomor rak, lorong, atau tingkat penyimpanan inventaris di gudang ini.</p>
             </div>
+            @accessRoute('master.rak.store')
             <button
                 type="button"
                 @click="openAddRak()"
@@ -146,6 +149,7 @@
                 </svg>
                 <span>Tambah Rak</span>
             </button>
+            @endaccessRoute
         </div>
 
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -179,6 +183,7 @@
                                 </td>
                                 <td class="py-3.5 px-4 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
+                                        @accessRoute('master.rak.update')
                                         <button
                                             type="button"
                                             @click="openEditRak({{ $rak->id }}, '{{ addslashes($rak->code) }}', '{{ addslashes($rak->name) }}', '{{ addslashes($rak->description) }}')"
@@ -189,6 +194,8 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                             </svg>
                                         </button>
+                                        @endaccessRoute
+                                        @accessRoute('master.rak.destroy')
                                         <button
                                             type="button"
                                             @click="openDelete('{{ route('master.rak.destroy', $rak) }}', '{{ $rak->name }} ({{ $rak->code }})')"
@@ -199,6 +206,7 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                             </svg>
                                         </button>
+                                        @endaccessRoute
                                     </div>
                                 </td>
                             </tr>
@@ -210,6 +218,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
                                         </svg>
                                         <p class="font-medium text-xs">Belum ada rak yang terdaftar di gudang ini.</p>
+                                        @accessRoute('master.rak.store')
                                         <button
                                             type="button"
                                             @click="openAddRak()"
@@ -217,6 +226,7 @@
                                         >
                                             Tambah Rak Pertama
                                         </button>
+                                        @endaccessRoute
                                     </div>
                                 </td>
                             </tr>
@@ -227,6 +237,7 @@
         </div>
     </div>
 
+    @accessRoute('master.rak.store')
     {{-- Rak Create / Edit Modal --}}
     <div
         x-show="rakModalOpen"
@@ -357,5 +368,6 @@
             </div>
         </div>
     </div>
+    @endaccessRoute
 </div>
 @endsection

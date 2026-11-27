@@ -23,22 +23,30 @@
 
         <div class="flex flex-wrap items-center gap-2">
             @if ($adjustment->status === 'draft')
+                @accessRoute('gudang.adjustment.edit')
                 <a href="{{ route('gudang.adjustment.edit', $adjustment) }}" class="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-xl transition">Ubah</a>
+                @endaccessRoute
+                @accessRoute('gudang.adjustment.approve')
                 <form method="POST" action="{{ route('gudang.adjustment.approve', $adjustment) }}" onsubmit="return confirm('Setujui penyesuaian ini? Stok dan jurnal akan langsung berubah dan tidak dapat dibatalkan dari layar ini.')">
                     @csrf
                     <button type="submit" class="px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition">Setujui</button>
                 </form>
+                @endaccessRoute
+                @accessRoute('gudang.adjustment.reject')
                 <form method="POST" action="{{ route('gudang.adjustment.reject', $adjustment) }}" onsubmit="return confirm('Tolak penyesuaian ini? Stok tidak akan berubah.')">
                     @csrf
                     <button type="submit" class="px-4 py-2 bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs sm:text-sm font-semibold rounded-xl transition">Tolak</button>
                 </form>
+                @endaccessRoute
             @endif
             @if (in_array($adjustment->status, ['draft', 'rejected'], true))
+                @accessRoute('gudang.adjustment.destroy')
                 <form method="POST" action="{{ route('gudang.adjustment.destroy', $adjustment) }}" onsubmit="return confirm('Hapus penyesuaian ini?')">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="px-4 py-2 text-rose-600 hover:bg-rose-50 text-xs sm:text-sm font-semibold rounded-xl transition">Hapus</button>
                 </form>
+                @endaccessRoute
             @endif
         </div>
     </div>

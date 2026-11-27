@@ -43,6 +43,7 @@
                 </svg>
                 Pelepasan / Disposal
             </a>
+            @accessRoute('keuangan.asset.create')
             <a
                 href="{{ route('keuangan.asset.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -52,6 +53,7 @@
                 </svg>
                 Registrasi Aset Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -297,6 +299,7 @@
                                     </a>
 
                                     {{-- Edit --}}
+                                    @accessRoute('keuangan.asset.edit')
                                     <a
                                         href="{{ route('keuangan.asset.edit', $asset) }}"
                                         class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -306,8 +309,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
                                     {{-- Cetak PDF --}}
+                                    @accessRoute('keuangan.asset.pdf')
                                     <a
                                         href="{{ route('keuangan.asset.pdf', $asset) }}"
                                         target="_blank"
@@ -318,6 +323,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -332,12 +338,14 @@
                                     </div>
                                     <p class="font-bold text-gray-700">Belum Ada Data Aset Tetap</p>
                                     <p class="text-xs text-gray-400 mt-1 mb-4">Mulai daftarkan aset perusahaan untuk mengelola penyusutan dan nilai buku secara otomatis.</p>
+                                    @accessRoute('keuangan.asset.create')
                                     <a
                                         href="{{ route('keuangan.asset.create') }}"
                                         class="inline-flex items-center gap-2 px-4 py-2 bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold rounded-xl shadow-sm transition"
                                     >
                                         Registrasi Aset Sekarang
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>

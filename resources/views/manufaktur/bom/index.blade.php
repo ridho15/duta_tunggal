@@ -16,6 +16,7 @@
             <p class="text-sm text-gray-500 mt-0.5">Definisi formula baku, rasio kebutuhan bahan baku, serta estimasi biaya standar tenaga kerja dan overhead.</p>
         </div>
         <div class="flex items-center gap-2">
+            @accessRoute('manufaktur.bom.create')
             <a
                 href="{{ route('manufaktur.bom.create') }}"
                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold rounded-xl shadow-sm transition active:scale-[0.98]"
@@ -25,6 +26,7 @@
                 </svg>
                 Buat Resep BOM Baru
             </a>
+            @endaccessRoute
         </div>
     </div>
 
@@ -234,6 +236,7 @@
                                         </svg>
                                     </a>
 
+                                    @accessRoute('manufaktur.bom.edit')
                                     <a
                                         href="{{ route('manufaktur.bom.edit', $bom) }}"
                                         class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
@@ -243,7 +246,9 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
+                                    @accessRoute('manufaktur.bom.pdf')
                                     <a
                                         href="{{ route('manufaktur.bom.pdf', $bom) }}"
                                         target="_blank"
@@ -254,7 +259,9 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
                                     </a>
+                                    @endaccessRoute
 
+                                    @accessRoute('manufaktur.bom.toggle-active')
                                     <form method="POST" action="{{ route('manufaktur.bom.toggle-active', $bom) }}" class="inline">
                                         @csrf
                                         <button
@@ -267,6 +274,7 @@
                                             </svg>
                                         </button>
                                     </form>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>
@@ -281,12 +289,14 @@
                                 <p class="text-sm font-semibold text-gray-700">Belum ada Resep Produksi (BOM)</p>
                                 <p class="text-xs text-gray-400 mt-0.5">Mulai dengan membuat formula resep pertama untuk produk yang dirakit/diproduksi.</p>
                                 <div class="mt-4">
+                                    @accessRoute('manufaktur.bom.create')
                                     <a
                                         href="{{ route('manufaktur.bom.create') }}"
                                         class="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold bg-[#15803d] text-white rounded-xl shadow-sm hover:bg-[#166534] transition"
                                     >
                                         Tambah BOM Baru
                                     </a>
+                                    @endaccessRoute
                                 </div>
                             </td>
                         </tr>

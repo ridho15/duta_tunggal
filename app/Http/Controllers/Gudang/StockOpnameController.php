@@ -428,6 +428,9 @@ class StockOpnameController extends Controller
         if (! $user) {
             abort(401);
         }
+        if (\App\Support\Access::grantedByChecklist()) {
+            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
+        }
 
         if (MenuAccess::isSuper($user) || in_array('GDG', MenuAccess::codesFor($user))) {
             return;
