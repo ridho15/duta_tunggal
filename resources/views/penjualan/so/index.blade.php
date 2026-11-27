@@ -45,6 +45,12 @@
         @endforeach
     </div>
 
+    @if (! empty($searchAllTabs))
+        <div class="text-xs text-gray-600 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+            Hasil pencarian "<strong>{{ $search }}</strong>" ditampilkan dari <strong>semua status</strong>.
+        </div>
+    @endif
+
     <!-- Card Wrapper Tabel & Filter Bar -->
     <div class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
         <!-- Filter Controls -->
@@ -120,6 +126,13 @@
                                 <div class="text-xs text-gray-400 mt-0.5">
                                     <span class="font-mono">{{ $so->order_date ? $so->order_date->format('d M') : '-' }}</span> · {{ $so->createdBy->name ?? 'Sales' }}
                                 </div>
+                                @php $soDos = $so->deliveryOrder->whereNotIn('status', ['reject']); @endphp
+                                @if ($soDos->isNotEmpty())
+                                    {{-- Nomor DO terkait: SO yang sudah dibuatkan DO tetap mudah dicocokkan (Ko Handy 27 Nov 2026) --}}
+                                    <div class="text-[11px] text-gray-500 mt-0.5 font-mono leading-snug">
+                                        DO: {{ $soDos->take(2)->pluck('do_number')->implode(', ') }}@if ($soDos->count() > 2) <span class="font-sans">+{{ $soDos->count() - 2 }} lagi</span>@endif
+                                    </div>
+                                @endif
                             </td>
                             <td class="py-3 px-3 font-medium text-gray-800">
                                 {{ $so->customer?->name ?? '-' }}
@@ -222,9 +235,15 @@
                 @endphp
                 <div class="p-4 hover:bg-gray-50/80 transition-colors">
                     <div class="flex justify-between items-center">
-                        <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold font-mono text-gray-900 text-base">
-                            {{ $so->so_number }}
-                        </a>
+                        <div>
+                            <a href="{{ route('penjualan.so.show', $so->id) }}" class="font-bold font-mono text-gray-900 text-base">
+                                {{ $so->so_number }}
+                            </a>
+                            @php $soDosMob = $so->deliveryOrder->whereNotIn('status', ['reject']); @endphp
+                            @if ($soDosMob->isNotEmpty())
+                                <div class="text-[11px] text-gray-500 font-mono">DO: {{ $soDosMob->take(1)->pluck('do_number')->implode('') }}@if ($soDosMob->count() > 1) <span class="font-sans">+{{ $soDosMob->count() - 1 }}</span>@endif</div>
+                            @endif
+                        </div>
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $statusConfigMob['badge'] }}">
                             <span class="w-1.5 h-1.5 rounded-full {{ $statusConfigMob['dot'] }}"></span>
                             {{ $statusConfigMob['label'] }}
