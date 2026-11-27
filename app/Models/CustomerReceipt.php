@@ -90,14 +90,7 @@ class CustomerReceipt extends Model
      */
     public function canPrintVoucher(?User $user): bool
     {
-        if (! $user || ! \App\Support\Access::allows('penjualan.receipts.voucher', $user)) {
-            return false;
-        }
-        if (\App\Support\Access::isSuper($user) || $user->hasRole(config('access.receipt_voucher_all_roles', []))) {
-            return true;
-        }
-
-        return (int) $this->created_by === (int) $user->getKey();
+        return \App\Support\Access::canPrintReceiptVoucher($user, $this->created_by);
     }
 
     public function createdBy()

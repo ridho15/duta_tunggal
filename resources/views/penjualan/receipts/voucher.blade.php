@@ -246,7 +246,11 @@
 </head>
 <body>
     {{-- Voucher penerimaan kas/bank: tata letak identik dengan Voucher Pengeluaran Pembayaran Hutang (permintaan akunting 27 Nov 2026) --}}
-    @php $st = strtolower((string) $receipt->status); @endphp
+    @php
+        $st = strtolower((string) $receipt->status);
+        // Pelunasan memakai saldo titip: bukan kas masuk (jurnal Dr Deposit Pelanggan / Cr Piutang)
+        $fromDeposit = ! isset($deposit) && strtolower((string) $receipt->payment_method) === 'deposit';
+    @endphp
 
     <table class="header-table">
         <tr>
@@ -257,7 +261,7 @@
                 </div>
             </td>
             <td style="width: 45%;" class="doc-title">
-                <h1>BUKTI PENERIMAAN KAS / BANK</h1>
+                <h1>{{ $fromDeposit ? 'BUKTI PEMAKAIAN SALDO TITIP' : 'BUKTI PENERIMAAN KAS / BANK' }}</h1>
                 <div class="doc-number">No. Voucher: {{ $voucherNumber }}</div>
                 <div>
                     @if ($st === 'paid')
@@ -294,7 +298,7 @@
                         <tr><td class="label">Tanggal Terima</td><td class="colon">:</td><td class="value">{{ $receipt->payment_date ? \Carbon\Carbon::parse($receipt->payment_date)->translatedFormat('d F Y') : '-' }}</td></tr>
                         <tr><td class="label">Metode Bayar</td><td class="colon">:</td><td class="value"><strong>{{ $receipt->payment_method }}</strong></td></tr>
                         <tr><td class="label">Akun Kas / Bank</td><td class="colon">:</td><td class="value">{{ $receipt->coa ? "({$receipt->coa->code}) {$receipt->coa->name}" : '-' }}</td></tr>
-                        <tr><td class="label">Cabang / No. Kwitansi</td><td class="colon">:</td><td class="value">{{ $receipt->cabang?->nama ?? 'Pusat' }} · {{ $kwitansiNumber }}</td></tr>
+                        <tr><td class="label">{{ isset($deposit) ? 'Cabang / No. Titip' : 'Cabang / No. Kwitansi' }}</td><td class="colon">:</td><td class="value">{{ $receipt->cabang?->nama ?? 'Pusat' }} · {{ $kwitansiNumber }}</td></tr>
                     </table>
                 </div>
             </td>
@@ -305,13 +309,34 @@
         <thead>
             <tr>
                 <th style="width: 5%; text-align: center;">No</th>
-                <th style="width: 35%;">No. Faktur Penjualan</th>
+                <th style="width: 35%;">{{ isset($deposit) ? 'Keterangan' : 'No. Faktur Penjualan' }}</th>
                 <th style="width: 18%;">Tgl &amp; Jatuh Tempo</th>
                 <th style="width: 20%; text-align: right;">Total Tagihan</th>
                 <th style="width: 22%; text-align: right;">Nominal Diterima (Rp)</th>
             </tr>
         </thead>
         <tbody>
+            @if (isset($deposit))
+                {{-- Titip dana customer: belum ada faktur, uang dicatat sebagai Deposit Pelanggan (utang ke customer) --}}
+                <tr>
+                    <td style="text-align: center;">1</td>
+                    <td>
+                        <strong>Titip Dana Customer {{ $deposit->deposit_number }}</strong>
+                        <br><span style="color: #718096; font-size: 8.5px;">Belum ada faktur; dipakai saat pelunasan invoice berikutnya</span>
+                    </td>
+                    <td>{{ $receipt->payment_date ? \Carbon\Carbon::parse($receipt->payment_date)->format('d/m/Y') : '-' }}</td>
+                    <td style="text-align: right;">-</td>
+                    <td style="text-align: right; font-weight: bold; color: #15803d;">{{ \App\Helpers\MoneyHelper::rupiah($deposit->amount) }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td colspan="4" style="color: #4a5568; font-size: 8.5px;">
+                        Jurnal: Debit {{ $receipt->coa ? "({$receipt->coa->code}) {$receipt->coa->name}" : 'Kas / Bank' }}
+                        · Kredit {{ $deposit->coa?->code ? "({$deposit->coa->code}) {$deposit->coa->name}" : 'Deposit Pelanggan' }}.
+                        Sisa saldo titip: {{ \App\Helpers\MoneyHelper::rupiah($deposit->remaining_amount) }}.
+                    </td>
+                </tr>
+            @else
             @forelse ($receipt->customerReceiptItem as $idx => $line)
                 @php $inv = $line->invoice; @endphp
                 <tr>
@@ -332,6 +357,7 @@
             @empty
                 <tr><td colspan="5" style="text-align: center; color: #a0aec0; padding: 15px;">Tidak ada rincian faktur yang tercatat.</td></tr>
             @endforelse
+            @endif
             @if ((float) $receipt->overpayment_amount > 0)
                 <tr>
                     <td></td>
@@ -344,11 +370,17 @@
 
     <table class="total-box">
         <tr>
-            <td class="total-label">TOTAL PENERIMAAN KAS / BANK:</td>
+            <td class="total-label">{{ $fromDeposit ? 'TOTAL PELUNASAN DARI SALDO TITIP:' : 'TOTAL PENERIMAAN KAS / BANK:' }}</td>
             <td class="total-value" style="width: 25%;">{{ \App\Helpers\MoneyHelper::rupiah($receipt->total_payment) }}</td>
         </tr>
     </table>
 
+    @if ($fromDeposit)
+        <div class="notes-box" style="margin-bottom: 8px;">
+            <strong>Catatan akuntansi:</strong>
+            <div>Tidak ada uang kas / bank masuk. Piutang dilunasi dari saldo titip customer: Debit Deposit Pelanggan, Kredit Piutang Usaha.</div>
+        </div>
+    @endif
     @if ($receipt->notes)
         <div class="notes-box">
             <div class="notes-title">Catatan / Keterangan Penerimaan:</div>

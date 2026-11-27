@@ -107,6 +107,12 @@
             <span>Dibatalkan</span>
             <span class="px-1.5 py-0.2 rounded-full text-[10px] {{ $tab === 'cancelled' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800' }}">{{ $counts['cancelled'] }}</span>
         </a>
+
+        <a href="{{ route('penjualan.receipts.index', ['tab' => 'titip', 'q' => $search, 'cabang_id' => $cabangId]) }}"
+           class="{{ $tabClass($tab === 'titip') }}">
+            <span>Titip Dana</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] {{ $tab === 'titip' ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-800' }}">{{ $counts['titip'] ?? 0 }}</span>
+        </a>
     </div>
 
     {{-- Filter Bar --}}
@@ -158,6 +164,69 @@
         </form>
     </div>
 
+    @if ($tab === 'titip')
+    {{-- Titip Dana customer (deposit): uang titipan sebelum ada invoice / kelebihan bayar --}}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-gray-50/80 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider text-[11px]">
+                    <tr>
+                        <th class="py-3 px-4">No. Titip</th>
+                        <th class="py-3 px-4">Tanggal</th>
+                        <th class="py-3 px-4">Customer</th>
+                        <th class="py-3 px-4">Metode &amp; Akun</th>
+                        <th class="py-3 px-4 text-right">Nominal</th>
+                        <th class="py-3 px-4 text-right">Sisa Saldo</th>
+                        <th class="py-3 px-4">Dicatat Oleh</th>
+                        <th class="py-3 px-4 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse ($deposits as $dep)
+                        <tr class="hover:bg-gray-50/60">
+                            <td class="py-3 px-4 font-bold text-gray-900">{{ $dep->deposit_number }}</td>
+                            <td class="py-3 px-4 text-gray-700">{{ ($d = $dep->receivedDate()) ? \Carbon\Carbon::parse($d)->format('d/m/Y') : '-' }}</td>
+                            <td class="py-3 px-4 text-gray-900">{{ $dep->fromModel?->name ?? '-' }}</td>
+                            <td class="py-3 px-4 text-gray-700">
+                                {{ $dep->payment_method ?: 'Titip Dana' }}{{ $dep->payment_reference ? ' · ' . $dep->payment_reference : '' }}
+                                <div class="text-[11px] text-gray-500">{{ $dep->paymentCoa?->code ? $dep->paymentCoa->code . ' ' . $dep->paymentCoa->name : '' }}</div>
+                            </td>
+                            <td class="py-3 px-4 text-right font-semibold text-gray-900">{{ \App\Helpers\MoneyHelper::rupiah($dep->amount) }}</td>
+                            <td class="py-3 px-4 text-right {{ (float) $dep->remaining_amount > 0 ? 'text-[#15803d] font-semibold' : 'text-gray-500' }}">{{ \App\Helpers\MoneyHelper::rupiah($dep->remaining_amount) }}</td>
+                            <td class="py-3 px-4 text-gray-700">{{ $dep->createdBy?->name ?? '-' }}</td>
+                            <td class="py-3 px-4 text-right">
+                                @if ($dep->sourceReceipt)
+                                    <a href="{{ route('penjualan.receipts.show', $dep->sourceReceipt) }}" class="text-[11px] font-semibold text-[#15803d] underline underline-offset-2" title="Kelebihan bayar: uangnya sudah tercantum di voucher penerimaan ini">
+                                        Ikut voucher KW-{{ str_pad((string) $dep->sourceReceipt->id, 6, '0', STR_PAD_LEFT) }}
+                                    </a>
+                                @elseif ($dep->canPrintVoucher(auth()->user()))
+                                    <a href="{{ route('penjualan.receipts.deposit-voucher', $dep) }}" target="_blank"
+                                       class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 font-semibold text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400">
+                                        Cetak Voucher
+                                    </a>
+                                @else
+                                    <span class="text-[11px] text-gray-500" title="Voucher dicetak oleh pencatatnya atau Finance Manager / Owner">Voucher oleh pencatat</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="py-12 text-center text-sm text-gray-700">
+                                Belum ada titip dana customer{{ $search ? ' yang cocok dengan "' . $search . '"' : '' }}.
+                                @accessRoute('penjualan.receipts.create')
+                                    <a href="{{ route('penjualan.receipts.create') }}" class="ml-1 font-semibold text-[#15803d] underline underline-offset-2">Catat titip dana</a>
+                                @endaccessRoute
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($deposits->hasPages())
+            <div class="p-4 border-t border-gray-100 bg-gray-50/50">{{ $deposits->links() }}</div>
+        @endif
+    </div>
+    @else
     {{-- Receipts Table --}}
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
@@ -340,6 +409,7 @@
             </div>
         @endif
     </div>
+    @endif
 
 </div>
 @endsection

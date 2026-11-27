@@ -115,7 +115,7 @@ return [
                         'create' => ['Catat Penerimaan', ['create', 'store'], ['create customer receipt']],
                         'cancel' => ['Batalkan', ['cancel'], ['update customer receipt']],
                         'print' => ['Cetak Kwitansi', ['pdf'], ['view customer receipt']],
-                        'voucher' => ['Cetak Voucher Penerimaan', ['voucher'], ['view customer receipt']],
+                        'voucher' => ['Cetak Voucher Penerimaan', ['voucher', 'deposit-voucher'], ['view customer receipt']],
                     ],
                 ],
                 'penjualan.returns' => [

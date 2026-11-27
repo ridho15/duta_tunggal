@@ -156,6 +156,22 @@ class Access
         return self::isSuper($user ?? Auth::user());
     }
 
+    /**
+     * Voucher Penerimaan Kas/Bank (penerimaan & titip dana customer): wajib centang "Cetak Voucher Penerimaan";
+     * pencatat (mis. kasir) mencetak miliknya, Finance Manager / Owner / Super Admin semua (keputusan Ko Handy 27 Nov 2026).
+     */
+    public static function canPrintReceiptVoucher(?User $user, $createdBy): bool
+    {
+        if (! $user || ! self::allows('penjualan.receipts.voucher', $user)) {
+            return false;
+        }
+        if (self::isSuper($user) || $user->hasRole(config('access.receipt_voucher_all_roles', []))) {
+            return true;
+        }
+
+        return $createdBy !== null && (int) $createdBy === (int) $user->getKey();
+    }
+
     /** Boleh mengatur peran & hak akses: hanya Owner / Super Admin. */
     public static function canManageRoles(?User $user = null): bool
     {
@@ -171,8 +187,8 @@ class Access
         if ($key === 'export') {
             return self::canExportImport($user);
         }
-        if (self::isSuper($user)) {
-            return true;
+        if (self::isSuper($user) || self::unmanaged($user)) {
+            return true;   // user tanpa peran: tombol tidak disembunyikan checklist, aturan lama di halaman yang menentukan
         }
 
         return self::grantedKeys($user)[$key] ?? false;
@@ -184,6 +200,12 @@ class Access
         $key = self::keyForRoute($routeName);
 
         return $key === null || self::allows($key, $user);
+    }
+
+    /** User tanpa peran dan tanpa akses khusus: tidak diatur checklist (aturan lama per halaman berlaku). */
+    public static function unmanaged(User $user): bool
+    {
+        return $user->roles->isEmpty() && self::overrides($user) === [];
     }
 
     /** Boleh salah satu halaman (untuk judul kelompok menu). */
@@ -269,8 +291,8 @@ class Access
      */
     public static function gateAllows(?User $user, string $ability): bool
     {
-        if (! $user || self::isSuper($user)) {
-            return false;   // super ditangani aturan lama (Super Admin) / role Owner sendiri
+        if (! $user || self::isSuper($user) || self::unmanaged($user)) {
+            return false;   // super & user tanpa peran ditangani aturan lama
         }
         if (self::$legacyIndex === null) {
             self::$legacyIndex = [];

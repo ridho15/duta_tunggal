@@ -28,6 +28,11 @@ class EnforceAccess
             return $next($request);
         }
 
+        // User tanpa peran & tanpa akses khusus: aturan lama per halaman yang berlaku (perilaku sebelum checklist); export tetap dicek
+        if ($key !== 'export' && Access::unmanaged($user)) {
+            return $next($request);
+        }
+
         if (! Access::allows($key, $user)) {
             $what = $key === 'export' ? 'Export/Import Excel (khusus Owner / Super Admin)' : Access::label($key);
             $message = "Anda tidak memiliki akses: {$what}. Solusi: minta Owner / Super Admin mencentang akses ini di Pengaturan → Peran & Hak Akses.";
