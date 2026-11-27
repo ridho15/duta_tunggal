@@ -41,9 +41,6 @@ class DeliveryScheduleController extends Controller
         if (! $user) {
             abort(401);
         }
-        if (\App\Support\Access::grantedByChecklist()) {
-            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
-        }
 
         $allowedRoles = ['OWN', 'ADP'];
         if (MenuAccess::isSuper($user) || ! empty(array_intersect($allowedRoles, MenuAccess::codesFor($user)))) {

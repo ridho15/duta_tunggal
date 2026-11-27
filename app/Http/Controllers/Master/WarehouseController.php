@@ -27,9 +27,6 @@ class WarehouseController extends Controller
         if (! $user) {
             abort(401);
         }
-        if (\App\Support\Access::grantedByChecklist()) {
-            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
-        }
 
         $allowedRoles = ['OWN', 'GDG', 'ADP', 'PUR', 'IT'];
         if (MenuAccess::isSuper($user) || ! empty(array_intersect($allowedRoles, MenuAccess::codesFor($user)))) {

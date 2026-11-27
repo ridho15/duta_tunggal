@@ -40,6 +40,11 @@ return [
     // boleh mencetak semua (keputusan Ko Handy 27 Nov 2026).
     'receipt_voucher_all_roles' => ['Finance Manager'],
 
+    // Route yang secara kerja milik halaman lain (nama route => kunci akses). Konfirmasi stok DO dikerjakan gudang (Checker).
+    'route_overrides' => [
+        'penjualan.do.confirmStock' => 'gudang.kiriman.confirm',
+    ],
+
     'shared_prefixes' => ['penjualan.customers', 'pembelian.products', 'pembelian.suppliers', 'pembelian.product-details', 'pembelian.supplier-details'],
 
     // Akhiran route export / import Excel-CSV di SEMUA halaman: khusus Owner / Super Admin (keputusan Ko Handy 27 Nov 2026).
@@ -75,7 +80,6 @@ return [
                     'actions' => [
                         'view' => ['Lihat', ['index', 'show'], ['view any delivery order', 'view delivery order']],
                         'create' => ['Buat DO', ['create', 'store'], ['create delivery order']],
-                        'confirm' => ['Konfirmasi Stok', ['confirmStock'], ['update delivery order']],
                         'send' => ['Kirim', ['send'], ['update delivery order']],
                         'cancel' => ['Batalkan / Minta Batal', ['cancel', 'request-cancel'], ['update delivery order']],
                         'print' => ['Cetak', ['pdf'], ['view delivery order']],
@@ -159,6 +163,7 @@ return [
                     'actions' => [
                         'view' => ['Lihat', ['index', 'pickingList']],
                         'process' => ['Cek / Ubah Qty', ['check', 'submitCheck', 'editQty']],
+                        'confirm' => ['Konfirmasi Stok DO', []],   // route penjualan.do.confirmStock, lihat route_overrides
                         'retur' => ['Retur DO', ['retur', 'submitRetur']],
                     ],
                 ],

@@ -70,11 +70,7 @@ it('peran hasil duplikat (Sales → Sales 2) langsung bisa bekerja seperti peran
 
 it('akses khusus user: bisa ditambah & dicabut di luar peran', function () {
     $this->user->assignRole(Role::findByName('Sales'));
-    DB::table('user_access_overrides')->insert([
-        ['user_id' => $this->user->id, 'access_key' => 'keuangan.journal.view', 'allowed' => 1, 'created_at' => now(), 'updated_at' => now()],
-        ['user_id' => $this->user->id, 'access_key' => 'penjualan.so.view', 'allowed' => 0, 'created_at' => now(), 'updated_at' => now()],
-    ]);
-    Access::flush();
+    \App\Support\AccessManager::saveUserOverrides($this->user, ['keuangan.journal.view'], ['penjualan.so.view']);
 
     $this->actingAs($this->user)->get(route('keuangan.journal.index'))->assertOk();
     $this->get(route('penjualan.so.index'))->assertForbidden();

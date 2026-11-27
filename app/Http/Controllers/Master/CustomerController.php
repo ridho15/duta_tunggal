@@ -38,9 +38,6 @@ class CustomerController extends Controller
         if (! $user) {
             abort(401);
         }
-        if (\App\Support\Access::grantedByChecklist()) {
-            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
-        }
 
         $allowedRoles = ['OWN', 'SM', 'SLS', 'KSR', 'FIN'];
         if (MenuAccess::isSuper($user) || ! empty(array_intersect($allowedRoles, MenuAccess::codesFor($user)))) {

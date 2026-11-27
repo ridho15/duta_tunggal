@@ -85,6 +85,9 @@ class Access
             || str_starts_with($lastSegment, 'export') || str_starts_with($lastSegment, 'import')) {
             return 'export';
         }
+        if (isset(config('access.route_overrides', [])[$routeName])) {
+            return config('access.route_overrides')[$routeName];
+        }
         foreach (config('access.shared_prefixes', []) as $shared) {
             if (str_starts_with($routeName, $shared . '.')) {
                 return null;
@@ -138,12 +141,6 @@ class Access
     }
 
     // ------------------------------------------------------------------ cek akses
-
-    /** Request ini sudah lolos checklist (EnforceAccess) → cek peran lama di controller tidak perlu menolak lagi. */
-    public static function grantedByChecklist(): bool
-    {
-        return app()->bound('request') && request()->attributes->has('access_granted');
-    }
 
     public static function isSuper(?User $user): bool
     {
@@ -202,10 +199,45 @@ class Access
         return $key === null || self::allows($key, $user);
     }
 
+    /** @return array<int, string> kunci akses yang diwakili izin teknis lama ini (+ Lihat halamannya) */
+    public static function keysForLegacyPermissions(array $permissions): array
+    {
+        if ($permissions === []) {
+            return [];
+        }
+        $have = array_flip($permissions);
+        $keys = [];
+        foreach (self::pages() as $pageKey => $page) {
+            foreach ($page['actions'] as $action => $def) {
+                foreach ($def[2] ?? [] as $perm) {
+                    if (isset($have[$perm])) {
+                        $keys[] = "{$pageKey}.{$action}";
+                        $keys[] = "{$pageKey}.view";
+                        break;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
     /** User tanpa peran dan tanpa akses khusus: tidak diatur checklist (aturan lama per halaman berlaku). */
     public static function unmanaged(User $user): bool
     {
         return $user->roles->isEmpty() && self::overrides($user) === [];
+    }
+
+    /** Punya salah satu centang (Lihat atau aksi apa pun) pada halaman ini. */
+    public static function allowsAnyOnPage(string $pageKey, ?User $user = null): bool
+    {
+        foreach (array_keys(self::pages()[$pageKey]['actions'] ?? []) as $action) {
+            if (self::allows("{$pageKey}.{$action}", $user)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Boleh salah satu halaman (untuk judul kelompok menu). */
@@ -228,6 +260,10 @@ class Access
         }
 
         $keys = array_fill_keys(self::roleKeysForUser($user), true);
+        // Izin teknis yang diberikan langsung ke user (bukan lewat peran) ikut menjadi akses
+        foreach (self::keysForLegacyPermissions($user->getDirectPermissions()->pluck('name')->all()) as $key) {
+            $keys[$key] = true;
+        }
         foreach (self::overrides($user) as $key => $allowed) {
             if ($allowed) {
                 $keys[$key] = true;
@@ -274,52 +310,6 @@ class Access
 
         return DB::table('user_access_overrides')->where('user_id', $user->getKey())
             ->pluck('allowed', 'access_key')->map(fn ($v) => (bool) $v)->all();
-    }
-
-    /** @var array<string, array<int, string>>|null izin teknis lama => kunci akses */
-    private static ?array $legacyIndex = null;
-
-    private const POLICY_ACTIONS = [
-        'viewAny' => 'view', 'view' => 'view', 'create' => 'create', 'update' => 'update',
-        'delete' => 'delete', 'deleteAny' => 'delete', 'forceDelete' => 'delete', 'restore' => 'delete',
-    ];
-
-    /**
-     * Dipanggil Gate::before. True bila:
-     *  - kemampuan = izin teknis lama yang dipetakan ke kunci akses yang dimiliki user; atau
-     *  - kemampuan Policy (viewAny/view/create/update/delete/approve/…) pada halaman route yang sedang dibuka dan aksinya dicentang.
-     */
-    public static function gateAllows(?User $user, string $ability): bool
-    {
-        if (! $user || self::isSuper($user) || self::unmanaged($user)) {
-            return false;   // super & user tanpa peran ditangani aturan lama
-        }
-        if (self::$legacyIndex === null) {
-            self::$legacyIndex = [];
-            foreach (self::pages() as $pageKey => $page) {
-                foreach ($page['actions'] as $action => $def) {
-                    foreach ($def[2] ?? [] as $perm) {
-                        self::$legacyIndex[$perm][] = "{$pageKey}.{$action}";
-                    }
-                }
-            }
-        }
-        foreach (self::$legacyIndex[$ability] ?? [] as $key) {
-            if (self::allows($key, $user)) {
-                return true;
-            }
-        }
-
-        $granted = self::grantedByChecklist() ? request()->attributes->get('access_granted') : null;
-        if (is_string($granted) && $granted !== 'export') {
-            [$pageKey] = self::split($granted);
-            $action = self::POLICY_ACTIONS[$ability] ?? $ability;
-            if (isset(self::pages()[$pageKey]['actions'][$action])) {
-                return self::allows("{$pageKey}.{$action}", $user);
-            }
-        }
-
-        return false;
     }
 
     public static function flush(): void

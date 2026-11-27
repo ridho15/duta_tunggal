@@ -37,11 +37,6 @@ class MenuAccess
             return;
         }
 
-        // Route sudah lolos checklist Peran & Hak Akses → aturan peran lama tidak menghalangi (checklist yang menentukan)
-        if (request()->attributes->get('access_granted')) {
-            return;
-        }
-
         if (! empty($allowedRoles) && array_intersect(static::roleNamesFor($user), $allowedRoles)) {
             return;
         }

@@ -641,9 +641,6 @@ class StockTransferController extends Controller
         if (! $user) {
             abort(401);
         }
-        if (\App\Support\Access::grantedByChecklist()) {
-            return;   // sudah dicek checklist Peran & Hak Akses (middleware EnforceAccess)
-        }
 
         if (self::userMay($user, $permission)) {
             return;
