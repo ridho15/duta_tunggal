@@ -66,7 +66,8 @@ class SaleOrderController extends Controller
         $cabangId = $user?->cabang_id;
         $canAccessAll = is_array($user?->manage_type) && in_array('all', $user->manage_type);
 
-        $activeTab = $request->query('tab', 'perlu_tindakan');
+        // Default 'semua' (Ko Handy 27 Nov 2026): SO yang sudah dibuatkan DO keluar dari 'Perlu tindakan' sehingga terkesan hilang.
+        $activeTab = $request->query('tab', 'semua');
         $search = trim((string) $request->query('search', ''));
         $dateFilter = $request->query('date');
         $salesFilter = $request->query('sales');
@@ -95,9 +96,10 @@ class SaleOrderController extends Controller
             'semua' => (clone $baseQuery)->count(),
         ];
 
-        // Filter query menurut tab yang aktif
+        // Filter query menurut tab yang aktif. Saat MENCARI, semua status ikut dicari agar nomor SO selalu ketemu.
         $query = clone $baseQuery;
-        match ($activeTab) {
+        $searchAllTabs = $search !== '' && $activeTab !== 'semua';
+        match ($searchAllTabs ? 'semua' : $activeTab) {
             'draft' => $query->where('status', 'draft'),
             'menunggu_approve' => $query->where('status', 'request_approve'),
             'dalam_proses' => $query->whereIn('status', ['approved', 'confirmed', 'partially_delivered', 'received']),
@@ -140,7 +142,7 @@ class SaleOrderController extends Controller
                 ->whereMonth('order_date', substr($dateFilter, 5, 2));
         }
 
-        $saleOrders = $query->with(['customer', 'createdBy', 'saleOrderItem.product'])
+        $saleOrders = $query->with(['customer', 'createdBy', 'saleOrderItem.product', 'deliveryOrder:delivery_orders.id,do_number,status'])
             // Untuk tombol "Selesai" (Ko Handy 21 Nov): jumlah DO yang sudah dikirim (ber-SJ) dan yang masih diproses.
             ->withCount([
                 'deliveryOrder as shipped_do_count' => fn ($q) => $q->whereIn('delivery_orders.status', \App\Models\DeliveryOrder::DELIVERED_STATUSES),
@@ -165,6 +167,7 @@ class SaleOrderController extends Controller
             'counts' => $counts,
             'activeTab' => $activeTab,
             'search' => $search,
+            'searchAllTabs' => $searchAllTabs,
             'dateFilter' => $dateFilter,
             'salesFilter' => $salesFilter,
             'salesUsers' => $salesUsers,
