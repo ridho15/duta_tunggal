@@ -271,6 +271,11 @@
                                             <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                                             Menunggu QC
                                         </a>
+                                        @else
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500" aria-hidden="true"></span>
+                                            Menunggu QC
+                                        </span>
                                         @endaccessRoute
                                     @endif
                                 @else
