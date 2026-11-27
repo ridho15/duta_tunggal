@@ -161,7 +161,7 @@
 
                     <div>
                         <span class="text-gray-400 block text-[11px]">Resep Formula Acuan:</span>
-                        @if ($bom)
+                        @if ($bom?->getKey())
                             <a href="{{ route('manufaktur.bom.show', $bom) }}" class="font-bold text-[#15803d] hover:underline block mt-0.5">
                                 {{ $bom->code }} — {{ $bom->nama_bom }}
                             </a>
