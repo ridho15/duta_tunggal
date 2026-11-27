@@ -6,6 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Cabang;
 use App\Support\Access;
+use App\Support\AccessDefaults;
 use App\Support\AccessManager;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Spatie\Permission\Models\Role;
@@ -20,10 +21,17 @@ class QaEvidenceRbacAccessTest extends TestCase
     protected User $purchasing;
     protected Cabang $cabang;
 
+    protected function shouldSeedBaseData(): bool
+    {
+        return ! (Cabang::exists() && Role::where('name', 'Owner')->exists());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        AccessDefaults::ensurePermissions();
+        AccessDefaults::installAll();
         Access::flush();
 
         $this->cabang = Cabang::firstOrFail();
@@ -76,29 +84,36 @@ class QaEvidenceRbacAccessTest extends TestCase
 
     /**
      * REQ 2: Data Master KHUSUS tingkat manajer (Keputusan Ko Handy 27 Nov 2026)
-     * Sales & Purchasing DITOLAK (403), Sales Manager & Owner DIPERBOLEHKAN (200).
+     * Sales & Purchasing DITOLAK (403), Sales Manager (Customer) & Inventory Manager (Produk) & Owner DIPERBOLEHKAN (200).
      */
     public function test_master_data_restricted_to_manager_levels(): void
     {
-        // 1. Sales mencoba buka Master Produk -> Ditolak (403)
+        $admin = User::factory()->create([
+            'cabang_id' => $this->cabang->id,
+            'manage_type' => ['all'],
+        ]);
+        $admin->assignRole('Admin');
+
+        // 1. Sales mencoba buka Master Produk & Master Customer -> Ditolak (403)
         $this->actingAs($this->sales);
-        $resSales = $this->get(route('master.products.index'));
-        $this->assertEquals(403, $resSales->getStatusCode(), 'Sales harus ditolak dari Master Data');
+        $this->assertEquals(403, $this->get(route('master.products.index'))->getStatusCode(), 'Sales harus ditolak dari Master Produk');
+        $this->assertEquals(403, $this->get(route('master.customers.index'))->getStatusCode(), 'Sales harus ditolak dari Master Customer');
 
         // 2. Purchasing mencoba buka Master Produk -> Ditolak (403)
         $this->actingAs($this->purchasing);
-        $resPur = $this->get(route('master.products.index'));
-        $this->assertEquals(403, $resPur->getStatusCode(), 'Purchasing harus ditolak dari Master Data');
+        $this->assertEquals(403, $this->get(route('master.products.index'))->getStatusCode(), 'Purchasing harus ditolak dari Master Produk');
 
-        // 3. Sales Manager membuka Master Produk -> Lolos (200)
+        // 3. Sales Manager membuka Master Customer -> Lolos (200)
         $this->actingAs($this->salesManager);
-        $resMgr = $this->get(route('master.products.index'));
-        $this->assertEquals(200, $resMgr->getStatusCode(), 'Sales Manager harus diizinkan membuka Master Data');
+        $this->assertEquals(200, $this->get(route('master.customers.index'))->getStatusCode(), 'Sales Manager harus diizinkan membuka Master Customer');
 
-        // 4. Owner membuka Master Produk -> Lolos (200)
+        // 4. Admin (tingkat manajer) membuka Master Produk -> Lolos (200)
+        $this->actingAs($admin);
+        $this->assertEquals(200, $this->get(route('master.products.index'))->getStatusCode(), 'Admin harus diizinkan membuka Master Produk');
+
+        // 5. Owner membuka Master Produk -> Lolos (200)
         $this->actingAs($this->owner);
-        $resOwner = $this->get(route('master.products.index'));
-        $this->assertEquals(200, $resOwner->getStatusCode(), 'Owner harus diizinkan membuka Master Data');
+        $this->assertEquals(200, $this->get(route('master.products.index'))->getStatusCode(), 'Owner harus diizinkan membuka Master Produk');
     }
 
     /**
