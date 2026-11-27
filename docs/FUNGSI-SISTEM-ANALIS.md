@@ -268,6 +268,16 @@ Jawaban tertulis Ko Handy ("jawaban ke developer 09 Nov 2026"). Kolom *Status* =
 | PDF PO: DPP 180.180 vs 165.165 | **Sudah.** Tarif 11%/12% disajikan seperti Faktur Pajak: kolom Tax 12%, Harga Jual (DPP), DPP Nilai Lain (11/12), PPN; ringkasan Harga Jual → DPP Nilai Lain → PPN 12% → Grand Total. Nilai uang tidak berubah. Sama di layar detail PO & Faktur Pembelian. |
 | Mutasi tidak bisa diubah setelah disetujui | **Sudah.** Mutasi 4 tahap: Buat → **Disetujui** (stok asal dicadangkan, belum pindah) → **Dikirim** oleh gudang asal (boleh sebagian item & qty, boleh berkali-kali; barang di Gudang Transit cabang tujuan) → **Diterima** gudang tujuan per pengiriman. Sisa yang batal dikirim: **Tutup Sisa** (cadangan dilepas). Jurnal antar cabang dibuat saat dikirim. Mutasi Approved lama (stok sudah pindah) otomatis berstatus Selesai. |
 
+**Keputusan Ko Handy, 27 Nov 2026 (Peran & Hak Akses, Export/Import)**
+
+| Item | Penyelesaian |
+|---|---|
+| Checklist akses per halaman & tombol | **Sudah.** Pengaturan → Peran & Hak Akses (hanya Owner / Super Admin). Per halaman: Lihat (menu), Tambah, Ubah, Hapus + tombol khusus (Approve, Kirim, Cetak, Void, dll). Tanpa centang Lihat, menu hilang dan halaman ditolak; tombol tanpa centang tersembunyi dan ditolak server (403 dengan pesan solusi) walau dibuka lewat alamat langsung. Katalog: `config/access.php`. |
+| Akses bawaan | Saat dipasang, setiap peran mendapat centang = akses sebelumnya (menu samping per peran + izin teknis lama), jadi tidak ada yang berubah sampai Owner mengubah centang. Owner & Super Admin selalu penuh. |
+| Duplikat & tambah peran | Duplikat (mis. Akuntan 1 → Akuntan 2) membawa semua centang dan aturan peran asal (`roles.base_role`); tambah peran bisa dari template atau kosong. Nama peran bawaan terkunci; peran yang masih dipakai user tidak bisa dihapus. Semua perubahan tercatat di riwayat (`access_change_logs`). |
+| Akses khusus per user | Dari daftar Pengguna → Atur akses: tambah atau cabut akses di luar peran (`user_access_overrides`), salin peran & akses dari user lain, atau kembalikan ke akses peran. Memberi / mengganti peran user kini hanya Owner / Super Admin. |
+| Export / Import Excel-CSV | **Khusus Owner / Super Admin** di semua halaman data: panel "Export / Import data" di atas daftar (Excel / CSV, filter tanggal). Tombol export lama (laporan Excel) ikut khusus Owner / Super Admin. Import hanya data master (produk, customer, supplier, kategori, satuan, COA, kendaraan, mata uang): periksa dulu tanpa menyimpan, lalu proses; satu baris salah = tidak ada yang tersimpan; tidak ada penghapusan. Daftar dataset: `config/data_transfer.php`. |
+
 ## 9. Cara Menguji
 
 **Aturan praktis**
