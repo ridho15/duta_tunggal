@@ -414,11 +414,20 @@
         @endif
 
         {{-- MODUL KEUANGAN & LAPORAN --}}
-        @if ($canAny(['keuangan.cashbank.index', 'keuangan.journal.index', 'keuangan.period.index', 'master.coa.index', 'keuangan.asset.index', 'laporan.financial.index']))
+        @if ($canAny(['keuangan.payment-requests.index', 'keuangan.cashbank.index', 'keuangan.journal.index', 'keuangan.period.index', 'master.coa.index', 'keuangan.asset.index', 'laporan.financial.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Keuangan
                 </div>
+
+                @if ($can('keuangan.payment-requests.index'))
+                <a href="{{ route('keuangan.payment-requests.index') }}" class="{{ $itemClass(request()->is('keuangan/permintaan-bayar*')) }}">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 7h6M9 11h6M9 15h3M6 3h12a1 1 0 0 1 1 1v16l-3-2-2 2-2-2-2 2-2-2-3 2V4a1 1 0 0 1 1-1Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span>Permintaan Bayar</span>
+                </a>
+                @endif
 
                 @if ($can('keuangan.cashbank.index'))
                 <a href="{{ route('keuangan.cashbank.index') ?? '#' }}" class="{{ $itemClass(request()->is('keuangan/kas-bank*') || request()->is('keuangan/transfer*')) }}">
@@ -467,7 +476,7 @@
                     @endif
 
                     @if ($can('laporan.financial.index'))
-                    <a href="{{ route('laporan.financial.index') ?? '#' }}" class="{{ $itemClass(request()->is('laporan*')) }}">
+                    <a href="{{ route('laporan.financial.index') ?? '#' }}" class="{{ $itemClass(request()->is('laporan/keuangan*')) }}">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path d="M3 3v18h18" stroke-width="1.8" stroke-linecap="round"></path>
                             <path d="m19 9-5 5-4-4-3 3" stroke-width="1.8" stroke-linecap="round"></path>
@@ -475,6 +484,21 @@
                         <span>Laporan Keuangan</span>
                     </a>
                     @endif
+            </div>
+        @endif
+
+        {{-- PUSAT LAPORAN: satu pintu untuk semua laporan --}}
+        @if ($can('laporan.pusat.index'))
+            <div class="space-y-0.5">
+                <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
+                    Laporan
+                </div>
+                <a href="{{ route('laporan.pusat.index') }}" class="{{ $itemClass(request()->routeIs('laporan.pusat.*', 'laporan.penjualan-detail.*', 'laporan.stok-terjual.*', 'laporan.cetak-produk.*')) }}">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 17v-6M13 17V7M17 17v-3M4 21h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span>Pusat Laporan</span>
+                </a>
             </div>
         @endif
 

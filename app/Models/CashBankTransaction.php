@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CashBankTransaction extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries, \App\Models\Concerns\SignsOnCreate;
 
     protected $fillable = [
         'number', 'date', 'type', 'account_coa_id', 'offset_coa_id', 'amount', 'counterparty', 'description', 'attachment_path',

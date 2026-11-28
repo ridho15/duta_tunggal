@@ -494,34 +494,38 @@
     @endif
 
     <div class="signature-section">
+        @php
+            // Tanda tangan digital tersimpan di dokumen; PO lama tanpa catatan memakai tanda tangan akun pembuat / penyetuju
+            $poSig = function (string $role, $user) use ($purchaseOrder) {
+                $sig = $purchaseOrder->signatureFor($role);
+                $img = $sig?->imagePath();
+                if (! $sig && $user?->signature && is_file($p = storage_path('app/public/' . ltrim($user->signature, '/')))) {
+                    $img = $p;
+                }
+
+                return ['img' => $img, 'name' => $sig?->signer_name ?? $user?->name, 'at' => $sig?->signed_at];
+            };
+            $made = $poSig('created', $purchaseOrder->createdBy);
+            $ok = $poSig('approved', $purchaseOrder->status === 'draft' ? null : $purchaseOrder->approvedBy);
+        @endphp
         <table class="signature-table">
             <tr>
-                <td>
-                    <div class="signature-box">
-                        <p style="margin-bottom: 10px;">Dibuat Oleh,</p>
-                        @if ($purchaseOrder->createdBy->signature)
-                            <img src="{{ public_path('storage' . $purchaseOrder->createdBy->signature) }}" class="signature-img" alt="Signature">
-                        @else
-                            <div style="height: 70px; margin: 10px 0;"></div>
-                        @endif
-                        <div class="signature-name">
-                            {{ $purchaseOrder->created_by->name ?? 'Staff Purchasing' }}
+                @foreach ([['Dibuat Oleh,', $made, 'Staff Purchasing'], ['Disetujui Oleh,', $ok, 'Direktur']] as [$label, $s, $fallback])
+                    <td>
+                        <div class="signature-box">
+                            <p style="margin-bottom: 10px;">{{ $label }}</p>
+                            @if ($s['img'])
+                                <img src="{{ $s['img'] }}" class="signature-img" alt="">
+                            @else
+                                <div style="height: 70px; margin: 10px 0;"></div>
+                            @endif
+                            <div class="signature-name">{{ $s['name'] ?? $fallback }}</div>
+                            @if ($s['at'])
+                                <div style="font-size: 7.5px; color: #6b7280;">Ditandatangani digital {{ $s['at']->translatedFormat('d M Y H:i') }}</div>
+                            @endif
                         </div>
-                    </div>
-                </td>
-                <td>
-                    <div class="signature-box">
-                        <p style="margin-bottom: 10px;">Disetujui Oleh,</p>
-                        @if ($purchaseOrder->approvedBy->signature)
-                            <img src="{{ public_path('storage' . $purchaseOrder->approvedBy->signature) }}" class="signature-img" alt="Signature">
-                        @else
-                            <div style="height: 70px; margin: 10px 0;"></div>
-                        @endif
-                        <div class="signature-name">
-                            {{ $purchaseOrder->approved_by->name ?? 'Direktur' }}
-                        </div>
-                    </div>
-                </td>
+                    </td>
+                @endforeach
             </tr>
         </table>
     </div>

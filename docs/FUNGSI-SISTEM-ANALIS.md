@@ -324,3 +324,21 @@ const t0 = performance.now(); const txt = await fetch(u).then(r => r.text());
   dan per gudang **sebelum** transaksi uji.
 - Kartu stok (sumber kebenaran mutasi):
   `/gudang/stok/{productId}/kartu?start_date=2026-01-01&end_date=2026-12-31`.
+
+**Permintaan Ko Handy, 28 Nov 2026 (Pusat Laporan)**
+
+| Item | Penyelesaian |
+|---|---|
+| Menu Laporan satu pintu | **Sudah.** Menu samping **Laporan → Pusat Laporan** (`/laporan`): semua laporan yang boleh dibuka user, dikelompokkan Penjualan / Gudang & Stok / Pembelian / Keuangan. Laporan baru cukup ditambah di daftar `ReportCenterController::REPORTS` + katalog akses bagian `laporan`. |
+| Detail Penjualan | Per baris faktur penjualan (bukan draft/batal): tanggal faktur, no. faktur / SO / e-Faktur, customer & cabang, produk, qty, harga & diskon, total, retur (qty & nilai, retur tidak ditolak), status kirim (DO terkirim vs qty SO: Terkirim semua / Terkirim x dari y / Belum dikirim). Filter tanggal, cabang, customer, cari. Ringkasan: total penjualan, qty, jumlah faktur, nilai retur. |
+| Stok Barang Terjual | Barang keluar karena penjualan (mutasi stok tipe `sales`, saat DO dikirim) per tanggal / periode, per gudang, berdampingan dengan stok terakhir & stok minimum (tanda Habis / Di bawah minimum). Urut dari yang paling banyak terjual. |
+| Cetak Banyak Produk | Daftar stok per produk per gudang: rentang kode produk, cabang, gudang, tipe pajak, tanpa/dengan nilai (harga pokok, hanya yang dicentang "Lihat Nilai", bawaan tingkat manajer), qty kosong ya/tidak. PDF tanpa nilai punya kolom "Hitung Fisik". |
+| Cetak & akses | Semua laporan: Cetak PDF (maks. 2.000 baris, di atas itu diminta mempersempit filter) dan Unduh Excel (khusus Owner / Super Admin). Akses bawaan mengikuti laporan lama (Detail Penjualan = yang bisa Laporan Penjualan; Stok Terjual & Cetak Produk = yang bisa Cek Stok / Laporan Stok). |
+
+**Permintaan Ko Handy, 28 Nov 2026 (Permintaan Bayar non-barang & tanda tangan digital)**
+
+| Item | Penyelesaian |
+|---|---|
+| Permintaan Bayar | **Sudah.** Keuangan → Permintaan Bayar: buat (dibayar kepada, keperluan, baris akun Beban / Aset non-piutang dipilih user, lampiran) → ajukan → disetujui → dibayar kasir / finance (Kas & Bank keluar + jurnal Dr akun biaya / Cr Kas-Bank otomatis) → cetak voucher "Bukti Pengeluaran Kas / Bank". Ditolak = pembuat memperbaiki lalu mengajukan ulang. Staf hanya melihat permintaannya sendiri; penyetuju / kasir / finance melihat semua. |
+| Siapa menyetujui | Bisa diatur di Pengaturan → Aturan Persetujuan, dokumen "Permintaan Bayar (non-barang)". Bawaan bila belum diatur: s/d Rp 5 jt = Finance Manager, Sales/Purchasing/Inventory Manager, Admin; di atas Rp 5 jt = Finance Manager, Admin; Owner/Super Admin selalu boleh. Pembuat tidak boleh menyetujui sendiri (Owner/Super Admin boleh dengan alasan min. 10 karakter). Pembayar: Kasir, Finance Manager, Accounting, Admin Keuangan, Admin, Owner/Super Admin. |
+| Tanda tangan digital | Menu profil → "Tanda tangan saya": gambar di layar (mouse / jari / pena) atau unggah PNG/JPG. Saat mengajukan / menyetujui / membayar / membuat dokumen, gambar DISALIN ke dokumen bersama nama, jabatan, waktu & IP (`document_signatures`), jadi dokumen lama tidak berubah bila tanda tangan diganti. Dipakai di: voucher Permintaan Bayar, PO (pembuat & penyetuju; nama di PDF PO dulu selalu "Staff Purchasing"/"Direktur", kini nama asli), voucher Kas & Bank, Pembayaran Hutang (dulu "Dibuat oleh" = orang yang mencetak), voucher Penerimaan. |

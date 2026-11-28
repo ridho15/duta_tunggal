@@ -391,9 +391,13 @@
     <table class="signature-table">
         <tr>
             <td>
+                @php $made = is_object($receipt) && method_exists($receipt, 'signatureFor') ? $receipt->signatureFor('created') : null; @endphp
                 <div class="signature-title">Dibuat Oleh (Finance / Kasir)</div>
-                <div class="signature-name">{{ $receipt->createdBy?->name ?? auth()->user()?->name ?? 'Staff Finance' }}</div>
-                <div class="signature-date">Tgl: {{ now()->format('d/m/Y') }}</div>
+                @if ($made && ($img = $made->imagePath()))
+                    <img src="{{ $img }}" alt="" style="max-height: 40px; max-width: 120px; margin-top: -40px;">
+                @endif
+                <div class="signature-name">{{ $made?->signer_name ?? $receipt->createdBy?->name ?? 'Staff Finance' }}</div>
+                <div class="signature-date">Tgl: {{ $made ? $made->signed_at->format('d/m/Y') : '..........................' }}</div>
             </td>
             <td>
                 <div class="signature-title">Diperiksa Oleh (Accounting)</div>

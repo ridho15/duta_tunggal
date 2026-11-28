@@ -19,10 +19,13 @@ class ApprovalRule extends Model
 
     public const TYPE_CREDIT_NOTE = 'credit_note';
 
+    public const TYPE_PAYMENT_REQUEST = 'payment_request';
+
     public const TYPES = [
         self::TYPE_QUOTATION => 'Quotation',
         self::TYPE_SALE_ORDER => 'Sales Order',
         self::TYPE_CREDIT_NOTE => 'Nota Kredit',
+        self::TYPE_PAYMENT_REQUEST => 'Permintaan Bayar (non-barang)',
     ];
 
     protected $fillable = ['document_type', 'label', 'above_amount', 'up_to_amount', 'roles', 'approver_label', 'is_active', 'notes', 'created_by', 'updated_by'];

@@ -363,6 +363,19 @@ return [
                         'print' => ['Cetak Voucher', ['pdf', 'transfer.pdf']],
                     ],
                 ],
+                'keuangan.payment-request' => [
+                    'label' => 'Permintaan Bayar', 'prefix' => 'keuangan.payment-requests',
+                    'default_all' => true,   // semua peran boleh mengajukan; menyetujui & membayar tetap dibatasi aturan nominal/peran
+                    'actions' => [
+                        'view' => ['Lihat', ['index', 'show']],
+                        'create' => ['Buat / Ajukan', ['create', 'store', 'submit']],
+                        'update' => ['Ubah Draf', ['edit', 'update']],
+                        'approve' => ['Setujui / Tolak', ['approve', 'reject']],
+                        'pay' => ['Bayar', ['pay']],
+                        'cancel' => ['Batalkan', ['cancel']],
+                        'print' => ['Cetak Voucher', ['pdf']],
+                    ],
+                ],
                 'keuangan.journal' => [
                     'label' => 'Buku Besar & Jurnal', 'prefix' => 'keuangan.journal', 'subject' => 'journal entry', 'bypass' => true,
                     'actions' => [
@@ -404,6 +417,47 @@ return [
                     'actions' => [
                         'view' => ['Lihat', ['index', 'balance-sheet', 'income-statement', 'trial-balance']],
                         'print' => ['Cetak PDF', ['balance-sheet.pdf', 'income-statement.pdf', 'trial-balance.pdf']],
+                    ],
+                ],
+            ],
+        ],
+
+        'laporan' => [
+            'label' => 'Pusat Laporan',
+            'pages' => [
+                // default_from: peran yang dulu bisa melihat halaman ini otomatis mendapat laporan baru (akses bawaan)
+                'laporan.pusat' => [
+                    'label' => 'Pusat Laporan', 'prefix' => 'laporan.pusat',
+                    'default_from' => ['penjualan.laporan', 'pembelian.laporan', 'gudang.laporan', 'laporan.financial'],
+                    'actions' => ['view' => ['Lihat', ['index']]],
+                ],
+                'laporan.penjualan-detail' => [
+                    'label' => 'Detail Penjualan', 'prefix' => 'laporan.penjualan-detail',
+                    'default_from' => ['penjualan.laporan'],
+                    'export_suffixes' => ['excel'],
+                    'actions' => [
+                        'view' => ['Lihat', ['index']],
+                        'print' => ['Cetak PDF', ['pdf']],
+                    ],
+                ],
+                'laporan.stok-terjual' => [
+                    'label' => 'Stok Barang Terjual', 'prefix' => 'laporan.stok-terjual',
+                    'default_from' => ['gudang.laporan', 'gudang.stok'],
+                    'export_suffixes' => ['excel'],
+                    'actions' => [
+                        'view' => ['Lihat', ['index']],
+                        'print' => ['Cetak PDF', ['pdf']],
+                    ],
+                ],
+                'laporan.cetak-produk' => [
+                    'label' => 'Cetak Banyak Produk', 'prefix' => 'laporan.cetak-produk',
+                    'manager_actions' => ['value'],   // harga pokok: bawaan hanya tingkat manajer (master_data_roles)
+                    'default_from' => ['gudang.stok', 'gudang.laporan'],
+                    'export_suffixes' => ['excel'],
+                    'actions' => [
+                        'view' => ['Lihat', ['index']],
+                        'print' => ['Cetak PDF', ['pdf']],
+                        'value' => ['Lihat Nilai (Harga Pokok)', []],
                     ],
                 ],
             ],

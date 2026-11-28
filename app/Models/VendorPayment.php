@@ -12,7 +12,7 @@ use App\Models\JournalEntry;
 
 class VendorPayment extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries, \App\Models\Concerns\SignsOnCreate;
     protected $table = 'vendor_payments';
 
     public const STATUS_DRAFT = 'Draft';

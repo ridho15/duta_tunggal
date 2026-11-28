@@ -76,6 +76,13 @@
                 </div>
 
                 <div class="py-1">
+                    <a href="{{ route('signature.edit') }}" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3-1 4-6 6-6s1 5 3 5 3-4 5-4 2 2 4 2M3 21h18" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Tanda tangan saya
+                    </a>
+                </div>
+
+                <div class="py-1">
                     <form action="{{ route('logout') }}" method="POST">
                         @csrf
                         <button

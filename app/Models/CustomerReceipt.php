@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CustomerReceipt extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries, \App\Models\Concerns\SignsOnCreate;
     protected $table = 'customer_receipts';
     protected $fillable = [
         'invoice_id',
