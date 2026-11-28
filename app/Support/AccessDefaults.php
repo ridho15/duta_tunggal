@@ -38,7 +38,7 @@ class AccessDefaults
             }
             // Peran di luar daftar bawaan yang belum punya checklist (mis. dibuat langsung di database): tidak dipersempit,
             // aturan lama yang menentukan. Peran baru dari halaman Peran selalu menyimpan checklist sendiri.
-            $canView = $views === null || in_array($pageKey, $views, true)
+            $canView = $views === null || ! empty($page['default_all']) || in_array($pageKey, $views, true)
                 || array_intersect($page['default_from'] ?? [], $views) !== [];
             foreach ($page['actions'] as $action => $def) {
                 // Checklist hanya mempersempit (aturan lama tetap berlaku): Lihat = menu lama; aksi = semua (aksi lintas modul,

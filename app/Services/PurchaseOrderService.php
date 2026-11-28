@@ -172,6 +172,16 @@ class PurchaseOrderService
             'approved_by'   => $userId ?? Auth::id(),
         ]);
 
+        // Tanda tangan digital (28 Nov 2026): penyetuju sekarang; pembuat disalin bila belum ada
+        $signatures = app(\App\Services\SignatureService::class);
+        if ($user) {
+            $signatures->sign($purchaseOrder, 'approved', $user);
+        }
+        $creator = $purchaseOrder->created_by ? \App\Models\User::find($purchaseOrder->created_by) : null;
+        if ($creator && ! $purchaseOrder->signatureFor('created')) {
+            $signatures->sign($purchaseOrder, 'created', $creator);
+        }
+
         // Re-evaluate the linked Order Request status using the current fulfillment totals.
         if ($purchaseOrder->refer_model_type === 'App\\Models\\OrderRequest') {
             $orderRequest = \App\Models\OrderRequest::find($purchaseOrder->refer_model_id);

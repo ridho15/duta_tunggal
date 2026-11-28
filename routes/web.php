@@ -636,6 +636,25 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         });
     });
 
+    // Permintaan Bayar non-barang (Keuangan) + tanda tangan digital pengguna
+    Route::prefix('keuangan/permintaan-bayar')->name('keuangan.payment-requests.')->controller(\App\Http\Controllers\Keuangan\ExpenseRequestController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/buat', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{paymentRequest}', 'show')->name('show');
+        Route::get('/{paymentRequest}/ubah', 'edit')->name('edit');
+        Route::put('/{paymentRequest}', 'update')->name('update');
+        Route::post('/{paymentRequest}/ajukan', 'submit')->name('submit');
+        Route::post('/{paymentRequest}/setujui', 'approve')->name('approve');
+        Route::post('/{paymentRequest}/tolak', 'reject')->name('reject');
+        Route::post('/{paymentRequest}/bayar', 'pay')->name('pay');
+        Route::post('/{paymentRequest}/batal', 'cancel')->name('cancel');
+        Route::get('/{paymentRequest}/voucher', 'pdf')->name('pdf');
+    });
+    Route::get('/tanda-tangan-saya', [\App\Http\Controllers\SignatureController::class, 'edit'])->name('signature.edit');
+    Route::post('/tanda-tangan-saya', [\App\Http\Controllers\SignatureController::class, 'update'])->name('signature.update');
+    Route::get('/tanda-tangan/{signature}', [\App\Http\Controllers\SignatureController::class, 'image'])->name('signature.image');
+
     // Pusat Laporan (satu menu untuk semua laporan; Excel khusus Owner / Super Admin lewat checklist akses)
     Route::prefix('laporan')->name('laporan.')->controller(\App\Http\Controllers\Laporan\ReportCenterController::class)->group(function () {
         Route::get('/', 'index')->name('pusat.index');

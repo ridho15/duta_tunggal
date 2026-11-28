@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 class PurchaseOrder extends Model
 {
-    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries;
+    use SoftDeletes, HasFactory, LogsGlobalActivity, CascadesJournalEntries, \App\Models\Concerns\HasSignatures;
     protected $table = 'purchase_orders';
     protected $fillable = [
         'supplier_id',

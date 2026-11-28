@@ -347,9 +347,14 @@
                 </div>
             </td>
             <td>
+                @php $made = $transaction->signatureFor('created'); @endphp
                 <div class="sig-box">
                     <div class="sig-title">Kasir / Teller</div>
-                    <div class="sig-line">( Petugas Kasir )</div>
+                    @if ($made && ($img = $made->imagePath()))
+                        <img src="{{ $img }}" alt="" style="max-height: 40px; max-width: 120px;">
+                    @endif
+                    <div class="sig-line">( {{ $made?->signer_name ?? 'Petugas Kasir' }} )</div>
+                    @if ($made)<div style="font-size: 7px; color: #6b7280;">ttd digital {{ $made->signed_at->format('d/m/Y H:i') }}</div>@endif
                 </div>
             </td>
             <td>

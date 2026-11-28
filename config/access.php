@@ -363,6 +363,19 @@ return [
                         'print' => ['Cetak Voucher', ['pdf', 'transfer.pdf']],
                     ],
                 ],
+                'keuangan.payment-request' => [
+                    'label' => 'Permintaan Bayar', 'prefix' => 'keuangan.payment-requests',
+                    'default_all' => true,   // semua peran boleh mengajukan; menyetujui & membayar tetap dibatasi aturan nominal/peran
+                    'actions' => [
+                        'view' => ['Lihat', ['index', 'show']],
+                        'create' => ['Buat / Ajukan', ['create', 'store', 'submit']],
+                        'update' => ['Ubah Draf', ['edit', 'update']],
+                        'approve' => ['Setujui / Tolak', ['approve', 'reject']],
+                        'pay' => ['Bayar', ['pay']],
+                        'cancel' => ['Batalkan', ['cancel']],
+                        'print' => ['Cetak Voucher', ['pdf']],
+                    ],
+                ],
                 'keuangan.journal' => [
                     'label' => 'Buku Besar & Jurnal', 'prefix' => 'keuangan.journal', 'subject' => 'journal entry', 'bypass' => true,
                     'actions' => [

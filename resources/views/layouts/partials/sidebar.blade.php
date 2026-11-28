@@ -414,11 +414,20 @@
         @endif
 
         {{-- MODUL KEUANGAN & LAPORAN --}}
-        @if ($canAny(['keuangan.cashbank.index', 'keuangan.journal.index', 'keuangan.period.index', 'master.coa.index', 'keuangan.asset.index', 'laporan.financial.index']))
+        @if ($canAny(['keuangan.payment-requests.index', 'keuangan.cashbank.index', 'keuangan.journal.index', 'keuangan.period.index', 'master.coa.index', 'keuangan.asset.index', 'laporan.financial.index']))
             <div class="space-y-0.5">
                 <div class="text-[10.5px] tracking-wider text-gray-400 font-bold px-2.5 pt-2 pb-1 uppercase">
                     Keuangan
                 </div>
+
+                @if ($can('keuangan.payment-requests.index'))
+                <a href="{{ route('keuangan.payment-requests.index') }}" class="{{ $itemClass(request()->is('keuangan/permintaan-bayar*')) }}">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 7h6M9 11h6M9 15h3M6 3h12a1 1 0 0 1 1 1v16l-3-2-2 2-2-2-2 2-2-2-3 2V4a1 1 0 0 1 1-1Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span>Permintaan Bayar</span>
+                </a>
+                @endif
 
                 @if ($can('keuangan.cashbank.index'))
                 <a href="{{ route('keuangan.cashbank.index') ?? '#' }}" class="{{ $itemClass(request()->is('keuangan/kas-bank*') || request()->is('keuangan/transfer*')) }}">
