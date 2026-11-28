@@ -324,3 +324,13 @@ const t0 = performance.now(); const txt = await fetch(u).then(r => r.text());
   dan per gudang **sebelum** transaksi uji.
 - Kartu stok (sumber kebenaran mutasi):
   `/gudang/stok/{productId}/kartu?start_date=2026-01-01&end_date=2026-12-31`.
+
+**Permintaan Ko Handy, 28 Nov 2026 (Pusat Laporan)**
+
+| Item | Penyelesaian |
+|---|---|
+| Menu Laporan satu pintu | **Sudah.** Menu samping **Laporan → Pusat Laporan** (`/laporan`): semua laporan yang boleh dibuka user, dikelompokkan Penjualan / Gudang & Stok / Pembelian / Keuangan. Laporan baru cukup ditambah di daftar `ReportCenterController::REPORTS` + katalog akses bagian `laporan`. |
+| Detail Penjualan | Per baris faktur penjualan (bukan draft/batal): tanggal faktur, no. faktur / SO / e-Faktur, customer & cabang, produk, qty, harga & diskon, total, retur (qty & nilai, retur tidak ditolak), status kirim (DO terkirim vs qty SO: Terkirim semua / Terkirim x dari y / Belum dikirim). Filter tanggal, cabang, customer, cari. Ringkasan: total penjualan, qty, jumlah faktur, nilai retur. |
+| Stok Barang Terjual | Barang keluar karena penjualan (mutasi stok tipe `sales`, saat DO dikirim) per tanggal / periode, per gudang, berdampingan dengan stok terakhir & stok minimum (tanda Habis / Di bawah minimum). Urut dari yang paling banyak terjual. |
+| Cetak Banyak Produk | Daftar stok per produk per gudang: rentang kode produk, cabang, gudang, tipe pajak, tanpa/dengan nilai (harga pokok, hanya yang dicentang "Lihat Nilai", bawaan tingkat manajer), qty kosong ya/tidak. PDF tanpa nilai punya kolom "Hitung Fisik". |
+| Cetak & akses | Semua laporan: Cetak PDF (maks. 2.000 baris, di atas itu diminta mempersempit filter) dan Unduh Excel (khusus Owner / Super Admin). Akses bawaan mengikuti laporan lama (Detail Penjualan = yang bisa Laporan Penjualan; Stok Terjual & Cetak Produk = yang bisa Cek Stok / Laporan Stok). |

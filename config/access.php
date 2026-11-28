@@ -409,6 +409,47 @@ return [
             ],
         ],
 
+        'laporan' => [
+            'label' => 'Pusat Laporan',
+            'pages' => [
+                // default_from: peran yang dulu bisa melihat halaman ini otomatis mendapat laporan baru (akses bawaan)
+                'laporan.pusat' => [
+                    'label' => 'Pusat Laporan', 'prefix' => 'laporan.pusat',
+                    'default_from' => ['penjualan.laporan', 'pembelian.laporan', 'gudang.laporan', 'laporan.financial'],
+                    'actions' => ['view' => ['Lihat', ['index']]],
+                ],
+                'laporan.penjualan-detail' => [
+                    'label' => 'Detail Penjualan', 'prefix' => 'laporan.penjualan-detail',
+                    'default_from' => ['penjualan.laporan'],
+                    'export_suffixes' => ['excel'],
+                    'actions' => [
+                        'view' => ['Lihat', ['index']],
+                        'print' => ['Cetak PDF', ['pdf']],
+                    ],
+                ],
+                'laporan.stok-terjual' => [
+                    'label' => 'Stok Barang Terjual', 'prefix' => 'laporan.stok-terjual',
+                    'default_from' => ['gudang.laporan', 'gudang.stok'],
+                    'export_suffixes' => ['excel'],
+                    'actions' => [
+                        'view' => ['Lihat', ['index']],
+                        'print' => ['Cetak PDF', ['pdf']],
+                    ],
+                ],
+                'laporan.cetak-produk' => [
+                    'label' => 'Cetak Banyak Produk', 'prefix' => 'laporan.cetak-produk',
+                    'manager_actions' => ['value'],   // harga pokok: bawaan hanya tingkat manajer (master_data_roles)
+                    'default_from' => ['gudang.stok', 'gudang.laporan'],
+                    'export_suffixes' => ['excel'],
+                    'actions' => [
+                        'view' => ['Lihat', ['index']],
+                        'print' => ['Cetak PDF', ['pdf']],
+                        'value' => ['Lihat Nilai (Harga Pokok)', []],
+                    ],
+                ],
+            ],
+        ],
+
         'master' => [
             'label' => 'Data Master',
             'note' => 'Disarankan hanya untuk Owner, Super Admin, Admin, Manager, dan Finance Manager.',

@@ -636,6 +636,20 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
         });
     });
 
+    // Pusat Laporan (satu menu untuk semua laporan; Excel khusus Owner / Super Admin lewat checklist akses)
+    Route::prefix('laporan')->name('laporan.')->controller(\App\Http\Controllers\Laporan\ReportCenterController::class)->group(function () {
+        Route::get('/', 'index')->name('pusat.index');
+        Route::get('/detail-penjualan', 'salesDetail')->name('penjualan-detail.index');
+        Route::get('/detail-penjualan/pdf', 'salesDetailPdf')->name('penjualan-detail.pdf');
+        Route::get('/detail-penjualan/excel', 'salesDetailExcel')->name('penjualan-detail.excel');
+        Route::get('/stok-terjual', 'soldStock')->name('stok-terjual.index');
+        Route::get('/stok-terjual/pdf', 'soldStockPdf')->name('stok-terjual.pdf');
+        Route::get('/stok-terjual/excel', 'soldStockExcel')->name('stok-terjual.excel');
+        Route::get('/cetak-produk', 'productList')->name('cetak-produk.index');
+        Route::get('/cetak-produk/pdf', 'productListPdf')->name('cetak-produk.pdf');
+        Route::get('/cetak-produk/excel', 'productListExcel')->name('cetak-produk.excel');
+    });
+
     // Modul Laporan Keuangan
     Route::prefix('laporan')->name('laporan.')->group(function () {
         Route::get('/keuangan', [\App\Http\Controllers\Laporan\FinancialReportController::class, 'index'])->name('financial.index');
