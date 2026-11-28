@@ -34,7 +34,7 @@ class SoldStockReport
         return $q->pluck('id')->all();
     }
 
-    /** Agregat qty terjual per produk (urut terbanyak) — dasar paginasi. */
+    /** Agregat qty terjual per produk (urut terbanyak), dasar paginasi. */
     public function productQuery(array $filters, ?User $user): Builder
     {
         $warehouses = $this->warehouseIds($filters, $user);
